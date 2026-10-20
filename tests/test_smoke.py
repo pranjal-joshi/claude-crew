@@ -32,7 +32,8 @@ class HttpSmoke(TempCrewCase):
     def test_index(self):
         status, body = self.get("/")
         self.assertEqual(status, 200)
-        self.assertEqual(body, (ROOT / "index.html").read_bytes())
+        page = (ROOT / "index.html").read_bytes().replace(b"__CREW_TOKEN__", server.UI_TOKEN.encode()).replace(b"__CREW_LAN__", b"0")
+        self.assertEqual(body, page)
         self.assertIn(b"<title>Crew</title>", body)
 
     def test_state(self):

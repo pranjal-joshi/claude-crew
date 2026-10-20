@@ -265,6 +265,13 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 - Webhooks are the one write path without the browser header. Each needs its own random token, compared in constant time.
 - Poll triggers run the command you typed, in your shell, in the project folder. Treat them like a cron job you wrote yourself.
 
+### Security model
+
+- **Local trust.** Anything that can read your user's files or run as you can drive Crew, the same as it can run `claude` itself. Crew does not defend against other software on your account.
+- **Per-run tokens.** The page gets one secret when it loads, and `crew_mcp` gets another through its environment. Every `POST /api/act/*` needs one of them (`X-Crew-Auth`), on top of the `X-Crew` header, so a random local process or an agent's Bash can't just call the API.
+- **Agents and the boss are limited.** The MCP token only allows the actions the crew tools use (tasks, hand-offs, agents, workflows, triggers). It can't create poll triggers (shell commands), change the permission mode, switch project or browse folders. Those need the page.
+- **LAN.** With `--lan`, a device that signs in with the key gets the page, so it can use the board, but it can't browse the host's disk or switch projects.
+
 ## FAQ
 
 **Does it cost extra?** No. Agents use your own Claude Code login, so usage counts against your plan or API key like any other Claude Code session. The token counter shows what each agent used.

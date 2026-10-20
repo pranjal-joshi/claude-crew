@@ -47,13 +47,13 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
 **Metrics (opt-in local counters, no telemetry):** time from install to first merged change (< 15 min) · first-pass approval rate (≥ 70%) and review time (< 60 s) · merged tasks per week and $ per merged task.
 
 ### Phase 1 · v0.1.1 safety hotfix (all small, ship first)
-- [ ] Reuse an agent's branch when its worktree folder is missing. Today `git worktree add -B … HEAD` (server.py:466) resets it and orphans approved, unmerged commits
-- [ ] Keep synced local Claude files (`.claude/settings.local.json`, `.mcp.json`, `CLAUDE.local.md`) out of commits by listing them in the worktree's `.git/info/exclude`. Approve runs `git add -A` today
-- [ ] Poll triggers (`shell=True`) can only be created from the UI, after a confirm that shows the command. The boss's `add_trigger` rejects `kind=poll`
-- [ ] A per-run token on mutating API calls (the page and crew_mcp get it), so other local processes and agents' Bash can't drive `/api/act`
-- [ ] For `--lan` requests, turn off `/api/browse` and `/api/project` (no browsing the host disk or switching projects from a phone)
-- [ ] Write `crew.json` and state atomically (temp file and replace, keep a `.bak`). Rename a corrupt state file to `.corrupt` and say so instead of silently starting empty. Guard the webhook `Content-Length`
-- [ ] Tests: git integration on a temp repo (approve, rename, remove, missing worktree), the auth matrix, bad webhook token
+- [x] Reuse an agent's branch when its worktree folder is missing. Today `git worktree add -B … HEAD` (server.py:466) resets it and orphans approved, unmerged commits
+- [x] Keep synced local Claude files (`.claude/settings.local.json`, `.mcp.json`, `CLAUDE.local.md`) out of commits by listing them in the worktree's `.git/info/exclude`. Approve runs `git add -A` today
+- [x] Poll triggers (`shell=True`) can only be created from the UI, after a confirm that shows the command. The boss's `add_trigger` rejects `kind=poll`
+- [x] A per-run token on mutating API calls (the page and crew_mcp get it), so other local processes and agents' Bash can't drive `/api/act`
+- [x] For `--lan` requests, turn off `/api/browse` and `/api/project` (no browsing the host disk or switching projects from a phone)
+- [x] Write `crew.json` and state atomically (temp file and replace, keep a `.bak`). Rename a corrupt state file to `.corrupt` and say so instead of silently starting empty. Guard the webhook `Content-Length`
+- [x] Tests: git integration on a temp repo (approve, rename, remove, missing worktree), the auth matrix, bad webhook token
 
 ### Phase 2 · v0.2 core loop: from a queued task to a merged change
 - [ ] **Review as a decision sheet:** a verdict line (files · +/- · tests), Approve & commit pinned as the one primary, diff collapsed per file, Send back secondary, Hand off in ⋮, `A` approves with an undo toast. First check the "duplicated hunk" in review.png; it may just be demo data

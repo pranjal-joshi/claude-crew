@@ -14,6 +14,7 @@ import urllib.request
 URL = os.environ.get("CREW_URL", "http://127.0.0.1:8770")
 ME = os.environ.get("CREW_AGENT", "")
 BOSS = os.environ.get("CREW_ROLE") == "boss"
+TOKEN = os.environ.get("CREW_TOKEN", "")
 
 S = {"type": "string"}
 I = {"type": "integer"}
@@ -49,8 +50,8 @@ TOOLS = [
          {"id": S, "name": S, "description": S, "steps": {"type": "array", "items": STEP}, "output": {"type": "object"}},
          ["name", "steps"], boss=True),
     tool("add_trigger", "Create a trigger. kind: schedule (spec.cron, 5-field local time), event (spec.on: review|done|error, "
-         "optional spec.tag/spec.agent), watch (spec.glob, spec.every seconds), poll (spec.command, spec.every minutes, "
-         "spec.when: change|fail|output) or webhook. It creates `task` (title, details, tag, agent) or, with task.workflow "
+         "optional spec.tag/spec.agent), watch (spec.glob, spec.every seconds) or webhook. kind poll (runs a shell command) "
+         "is UI-only: you cannot create it, so ask the user to add it in Crew's Triggers panel. It creates `task` (title, details, tag, agent) or, with task.workflow "
          "set to a workflow id, starts that workflow with the task title as its goal.",
          {"name": S, "kind": S, "spec": {"type": "object"}, "task": {"type": "object"}}, ["name", "kind", "task"], boss=True),
 ]
@@ -58,7 +59,7 @@ TOOLS = [
 
 def call(path, body=None):
     req = urllib.request.Request(URL + path, data=json.dumps(body).encode() if body is not None else None,
-                                 headers={"Content-Type": "application/json", "X-Crew": "1"}, method="POST" if body is not None else "GET")
+                                 headers={"Content-Type": "application/json", "X-Crew": "1", "X-Crew-Auth": TOKEN}, method="POST" if body is not None else "GET")
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read())

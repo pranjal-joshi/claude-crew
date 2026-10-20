@@ -136,27 +136,78 @@ CLAUDE_LOCAL = [".claude/settings.local.json", ".claude/skills", ".claude/agents
                 ".claude/rules", ".mcp.json", "CLAUDE.local.md"]
 
 
-def sync_claude_files(src: Path, dst: Path) -> list[str]:
-    """Copy the project's untracked Claude Code files into an agent's worktree. Tracked files come with git."""
+def local_claude_files(src: Path) -> list[str]:
+    """The project's untracked Claude Code files (posix paths relative to src). Tracked ones come with git."""
     tracked = set(git(src, "ls-files", "--", *CLAUDE_LOCAL).stdout.split("\n"))
-    copied = []
+    out = []
     for rel in CLAUDE_LOCAL:
         s_path = src / rel
         files = [s_path] if s_path.is_file() else [f for f in s_path.rglob("*") if f.is_file()] if s_path.is_dir() else []
-        for f in files:
-            r = f.relative_to(src).as_posix()
-            if r in tracked:
+        out += [r for f in files if (r := f.relative_to(src).as_posix()) not in tracked]
+    return out
+
+
+def git_exclude(wt: Path, paths: list[str]) -> None:
+    """List paths in the worktree's info/exclude so `git add -A` never picks them up. Idempotent.
+    Git keeps a single info/exclude per repository, so all worktrees (and the project itself) share it."""
+    if not paths:
+        return
+    out = git(wt, "rev-parse", "--git-path", "info/exclude").stdout.strip()
+    if not out:
+        return
+    f = wt / out  # absolute when git reports it that way
+    try:
+        text = f.read_text(encoding="utf-8") if f.exists() else ""
+        have = set(text.splitlines())
+        lines = ["/" + re.sub(r"([\*?\[\]!#])", r"\\1", r) for r in paths]
+        new = [ln for ln in dict.fromkeys(lines) if ln not in have]
+        if new:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(text + ("" if not text or text.endswith("\n") else "\n") + "\n".join(new) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def sync_claude_files(src: Path, dst: Path) -> list[str]:
+    """Copy the project's untracked Claude Code files into an agent's worktree, and keep them out of its commits."""
+    paths = local_claude_files(src)
+    copied = []
+    for r in paths:
+        f, d = src / r, dst / r
+        try:
+            if d.exists() and d.stat().st_mtime >= f.stat().st_mtime and d.stat().st_size == f.stat().st_size:
                 continue
-            d = dst / r
-            try:
-                if d.exists() and d.stat().st_mtime >= f.stat().st_mtime and d.stat().st_size == f.stat().st_size:
-                    continue
-                d.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(f, d)
-                copied.append(r)
-            except OSError:
-                pass
+            d.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f, d)
+            copied.append(r)
+        except OSError:
+            pass
+    git_exclude(dst, paths)
     return copied
+
+
+def write_atomic(path: Path, text: str, bak_every: float = 0) -> None:
+    """Write via a temp file in the same folder and os.replace, keeping the previous file as <name>.bak
+    (refreshed at most every bak_every seconds)."""
+    tmp, bak = path.with_name(path.name + ".tmp"), path.with_name(path.name + ".bak")
+    tmp.write_text(text, encoding="utf-8")
+    try:
+        if path.exists() and (not bak.exists() or time.time() - bak.stat().st_mtime >= bak_every):
+            shutil.copyfile(path, bak)
+    except OSError:
+        pass
+    os.replace(tmp, path)
+
+
+def load_json_file(path: Path) -> dict:
+    """A JSON object from path. Raises ValueError when it is unreadable, invalid or not an object."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise ValueError(str(e)) from e
+    if not isinstance(data, dict):
+        raise ValueError("not a JSON object")
+    return data
 
 
 def _md_description(f: Path) -> str:
@@ -357,13 +408,16 @@ class Crew:
                                   **{k: a[k] for k in ("icon", "color") if a.get(k)}} for a in self.agents.values()]
         if not self.config_path:
             return
-        saved = json.loads(self.config_path.read_text(encoding="utf-8")) if self.config_path.exists() else {}
+        try:
+            saved = load_json_file(self.config_path) if self.config_path.exists() else {}
+        except ValueError:
+            saved = {}
         saved["agents"] = self.config["agents"]
         saved["permission_mode"] = self.config["permission_mode"]
         saved["workflows"] = self.config.get("workflows", [])
         if self.config.get("boss"):
             saved["boss"] = self.config["boss"]
-        self.config_path.write_text(json.dumps(saved, indent=2), encoding="utf-8")
+        write_atomic(self.config_path, json.dumps(saved, indent=2))
 
     def _launch_key(self, a: dict) -> tuple:
         # MCP servers found later are allowed from the agent's next start; no restart (that would drop the live context)
@@ -374,8 +428,15 @@ class Crew:
         if not self.state_file.exists():
             return
         try:
-            data = json.loads(self.state_file.read_text(encoding="utf-8"))
-        except Exception:
+            data = load_json_file(self.state_file)
+        except ValueError as e:
+            bad = self.state_file.with_name(f"{self.state_file.name}.corrupt-{time.strftime('%Y%m%d-%H%M%S')}")
+            try:
+                os.replace(self.state_file, bad)
+            except OSError:
+                pass
+            print(f"crew: state file {self.state_file} is unreadable ({e}); moved to {bad.name} and starting empty", file=sys.stderr)
+            self.event("error", f"state file was corrupt; moved to {bad.name} and started empty")
             return
         if data.get("project") != str(self.project):
             return
@@ -409,9 +470,7 @@ class Crew:
                            "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", []), "commands": a.get("commands", [])}
                        for n, a in self.agents.items()},
                 "boss": {k: self.boss[k] for k in ("session", "cost", "tokens", "ctx")} | {"log": self.boss["log"][-200:]}}
-        tmp = self.state_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
-        tmp.replace(self.state_file)
+        write_atomic(self.state_file, json.dumps(data, indent=1), bak_every=60)
 
     def touch(self) -> None:
         with self.lock:
@@ -463,17 +522,26 @@ class Crew:
         path = WORK_ROOT / "wt" / self.key / a["name"]
         if not (path / ".git").exists():
             path.parent.mkdir(parents=True, exist_ok=True)
-            r = git(self.project, "worktree", "add", "-B", branch, str(path), "HEAD")
+            git(self.project, "worktree", "prune")  # a stale registration for a deleted folder would block the add
+            # An existing branch keeps its approved commits: check it out, never reset it
+            have = git(self.project, "rev-parse", "--verify", "-q", f"refs/heads/{branch}").returncode == 0
+            r = git(self.project, "worktree", "add", str(path), branch) if have else git(self.project, "worktree", "add", "-b", branch, str(path), "HEAD")
             if r.returncode != 0:
                 self.log(a, "error", "worktree failed: " + r.stderr.strip())
                 return
         a["cwd"], a["branch"] = str(path), branch
 
+    def _stage(self, cwd: Path) -> None:
+        """Stage everything except the local Claude files synced in from the project."""
+        git(cwd, "add", "-A")
+        if paths := local_claude_files(self.project):
+            git(cwd, "reset", "-q", "--", *paths)
+
     def diff(self, a: dict) -> dict:
         if not self.git:
             return {"stat": "", "patch": "", "note": "Project is not a git repo, so no diff is available."}
         cwd = Path(a["cwd"])
-        git(cwd, "add", "-A")
+        self._stage(cwd)
         stat = git(cwd, "diff", "--cached", "--stat").stdout
         patch = git(cwd, "diff", "--cached").stdout
         if len(patch) > 120_000:
@@ -536,7 +604,8 @@ class Crew:
                 self.log(a, "sys", f"synced {len(copied)} local Claude file{'s' if len(copied) != 1 else ''} into the worktree")
         servers = {} if boss else local_mcp_servers(self.project)
         servers["crew"] = {"type": "stdio", "command": sys.executable, "args": [str(APP_DIR / "crew_mcp.py")],
-                           "env": {"CREW_URL": f"http://127.0.0.1:{PORT}", "CREW_AGENT": a["name"], "CREW_ROLE": "boss" if boss else "agent"}}
+                           "env": {"CREW_URL": f"http://127.0.0.1:{PORT}", "CREW_AGENT": a["name"], "CREW_ROLE": "boss" if boss else "agent",
+                                   "CREW_TOKEN": MCP_TOKEN}}
         f = WORK_ROOT / "mcp" / f"{self.key}-{a['name']}.json"
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text(json.dumps({"mcpServers": servers}, indent=1), encoding="utf-8")
@@ -805,7 +874,7 @@ class Crew:
         """Commit the owner's worktree and move the task to Done. Caller holds the lock."""
         w = self.agents.get(t["who"])
         if w and self.git:
-            git(Path(w["cwd"]), "add", "-A")
+            self._stage(Path(w["cwd"]))
             r = git(Path(w["cwd"]), "-c", "user.name=crew", "-c", "user.email=crew@localhost",
                     "commit", "-m", f"#{t['id']} {t['title']}\n\n{(t.get('summary') or '')[:2000]}")
             t["commit"] = git(Path(w["cwd"]), "rev-parse", "--short", "HEAD").stdout.strip() if r.returncode == 0 else None
@@ -1133,7 +1202,7 @@ class Crew:
         return None, {"name": name, "description": str(p.get("description") or "").strip()[:300], "steps": steps[:12], "output": out}
 
     # ---- actions from the UI ---------------------------------------------------
-    def act(self, action: str, p: dict) -> dict:
+    def act(self, action: str, p: dict, via: str = "ui") -> dict:
         with self.lock:
             a = self.agents.get(p.get("agent", ""))
             t = self._task(p.get("task"))
@@ -1434,6 +1503,8 @@ class Crew:
                 self._send(w, msg)
                 self.event("reject", f"#{t['id']} sent back to {w['name']}", w["name"])
             elif action in ("trigger_add", "trigger_update"):
+                if p.get("kind") == "poll" and via != "ui":
+                    return {"error": "poll triggers run shell commands: create them in Crew's Triggers panel, not through the boss or an agent"}
                 tr = self._trigger(p.get("id")) if action == "trigger_update" else None
                 if action == "trigger_update" and not tr:
                     return {"error": "unknown trigger"}
@@ -1577,8 +1648,14 @@ def switch_project(path: str) -> dict:
 
 
 PORT = 8770
+# Per-run secrets for POST /api/act. The page gets UI_TOKEN; only crew_mcp's environment gets MCP_TOKEN, and that
+# tier may call just the actions crew_mcp.py uses (nothing that runs shell commands or changes mode, project or MCP trust).
+UI_TOKEN = secrets.token_urlsafe(24)
+MCP_TOKEN = secrets.token_urlsafe(24)
+MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add"}
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
+MAX_BODY = 1_000_000
 
 
 def lan_ips() -> list[str]:
@@ -1643,8 +1720,29 @@ class Handler(BaseHTTPRequestHandler):
         self._page(cookie=f"crew_key={LAN_KEY}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax")
         return True
 
+    def _tier(self) -> str | None:
+        """Who is calling, by the per-run token header: 'ui' (the served page), 'mcp' (crew_mcp), or None."""
+        tok = (self.headers.get("X-Crew-Auth") or "").encode("utf-8", "replace")
+        if hmac.compare_digest(tok, UI_TOKEN.encode()):
+            return "ui"
+        return "mcp" if hmac.compare_digest(tok, MCP_TOKEN.encode()) else None
+
+    def _read_body(self, required: bool = False) -> bytes | None:
+        """The request body, or None after answering 400 (bad Content-Length) or 413 (over MAX_BODY)."""
+        raw = self.headers.get("Content-Length")
+        if raw is None and not required:
+            return b""
+        if raw is None or not raw.isdigit():
+            self._json({"error": "bad or missing Content-Length"}, 400)
+            return None
+        if int(raw) > MAX_BODY:
+            self._json({"error": f"body too large (max {MAX_BODY} bytes)"}, 413)
+            return None
+        return self.rfile.read(int(raw))
+
     def _page(self, cookie: str | None = None):
-        body = (APP_DIR / "index.html").read_bytes()
+        body = (APP_DIR / "index.html").read_bytes().replace(b"__CREW_TOKEN__", UI_TOKEN.encode()).replace(
+            b"__CREW_LAN__", b"0" if self._local() else b"1")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -1734,23 +1832,36 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.startswith("/api/hook/"):  # webhook triggers: a per-trigger token, no browser header needed
             u = urlsplit(self.path)
             token = self.headers.get("X-Crew-Token") or (parse_qs(u.query).get("token") or [""])[0]
-            body = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 64_000)).decode("utf-8", "replace")
+            if (raw := self._read_body(required=True)) is None:
+                return
+            body = raw.decode("utf-8", "replace")
             res = CREW.hook(u.path.rsplit("/", 1)[1], token, body)
             return self._json(res, 403 if "error" in res else 200)
         # Custom header forces a CORS preflight, which this server never answers: other sites can't post here.
         if not self._host_ok() or self.headers.get("X-Crew") != "1":
             return self.send_error(HTTPStatus.FORBIDDEN)
-        n = int(self.headers.get("Content-Length") or 0)
+        tier = self._tier()
+        if not tier:
+            return self._json({"error": "missing or bad X-Crew-Auth token: reload the page"}, 403)
+        if (raw := self._read_body()) is None:
+            return
         try:
-            payload = json.loads(self.rfile.read(n) or b"{}")
+            payload = json.loads(raw or b"{}")
         except json.JSONDecodeError:
             return self._json({"error": "bad json"}, 400)
-        if self.path == "/api/browse":
-            res = browse(payload.get("path") or "")
-        elif self.path == "/api/project":
-            res = switch_project(payload.get("path") or "")
+        if not isinstance(payload, dict):
+            return self._json({"error": "bad json"}, 400)
+        if self.path in ("/api/browse", "/api/project"):
+            if tier != "ui":
+                return self._json({"error": "not allowed for this caller"}, 403)
+            if not self._local():
+                return self._json({"error": "browsing folders and switching projects works only on the computer running Crew"}, 403)
+            res = browse(payload.get("path") or "") if self.path == "/api/browse" else switch_project(payload.get("path") or "")
         elif self.path.startswith("/api/act/"):
-            res = CREW.act(self.path.rsplit("/", 1)[1], payload)
+            action = self.path.rsplit("/", 1)[1]
+            if tier == "mcp" and action not in MCP_ACTIONS:
+                return self._json({"error": f"{action} is not available to agents or the boss"}, 403)
+            res = CREW.act(action, payload, via=tier)
         else:
             return self.send_error(HTTPStatus.NOT_FOUND)
         self._json(res, 400 if "error" in res else 200)
@@ -1849,8 +1960,17 @@ def main() -> None:
     if not cfg_path.exists():
         cfg = json.loads(json.dumps(DEFAULT_CONFIG))
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
-        cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-    config = DEFAULT_CONFIG | {"workflows": DEFAULT_WORKFLOWS} | json.loads(cfg_path.read_text(encoding="utf-8"))
+        write_atomic(cfg_path, json.dumps(cfg, indent=2))
+    try:
+        saved = load_json_file(cfg_path)
+    except ValueError as e:
+        bak = cfg_path.with_name(cfg_path.name + ".bak")
+        try:
+            saved = load_json_file(bak)
+        except ValueError:
+            sys.exit(f"config file {cfg_path} is not valid JSON ({e}). Fix it, or delete it to start from the defaults.")
+        print(f"crew: {cfg_path} is not valid JSON ({e}); using {bak.name}", file=sys.stderr)
+    config = DEFAULT_CONFIG | {"workflows": DEFAULT_WORKFLOWS} | saved
     config.setdefault("workflows", DEFAULT_WORKFLOWS)
 
     if not project.exists() and project.parent == WORK_ROOT.resolve():

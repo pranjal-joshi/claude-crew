@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#18191f">
+<meta name="crew-token" content="__CREW_TOKEN__">
+<meta name="crew-lan" content="__CREW_LAN__">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Crew</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%20width%3D%2264%22%20height%3D%2264%22%3E%20%3Cdefs%3E%20%3CradialGradient%20id%3D%22bg%22%20cx%3D%2230%25%22%20cy%3D%2225%25%22%20r%3D%2290%25%22%3E%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f3a984%22/%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23c24e26%22/%3E%20%3C/radialGradient%3E%20%3C/defs%3E%20%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2216%22%20fill%3D%22url%28%23bg%29%22/%3E%20%3Cg%20stroke%3D%22%231a0d07%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.55%22%3E%20%3Cpath%20d%3D%22M32%2032L32%2014.5M32%2032L48.6%2026.6M32%2032L42.3%2046.2M32%2032L21.7%2046.2M32%2032L15.4%2026.6%22/%3E%20%3C/g%3E%20%3Cg%20fill%3D%22%231a0d07%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2214.5%22%20r%3D%225%22/%3E%20%3Ccircle%20cx%3D%2248.6%22%20cy%3D%2226.6%22%20r%3D%225%22/%3E%20%3Ccircle%20cx%3D%2242.3%22%20cy%3D%2246.2%22%20r%3D%225%22/%3E%20%3Ccircle%20cx%3D%2221.7%22%20cy%3D%2246.2%22%20r%3D%225%22/%3E%20%3Ccircle%20cx%3D%2215.4%22%20cy%3D%2226.6%22%20r%3D%225%22/%3E%20%3C/g%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%226.5%22%20fill%3D%22%23fff4ee%22%20stroke%3D%22%231a0d07%22%20stroke-width%3D%222.6%22/%3E%20%3C/svg%3E">
@@ -794,16 +796,20 @@ const fmtTok = n => { n = n || 0; return n < 1000 ? String(n) : n < 1e6 ? (n / 1
 const tokTotal = a => (a.tokens?.in || 0) + (a.tokens?.out || 0) + (a.tokens?.cache || 0);
 let showCost = (() => { try { return localStorage.getItem('crew.showCost') !== '0'; } catch { return true; } })();
 const costTxt = v => showCost ? ' · ' + money(v) : '';
+const meta = n => document.querySelector(`meta[name="${n}"]`)?.content || '';
+const AUTH = {'Content-Type': 'application/json', 'X-Crew': '1', 'X-Crew-Auth': meta('crew-token')};
+const LAN_CLIENT = meta('crew-lan') === '1';  // served to another device: no folder browsing or project switching
 async function post(path, body) {
-  const r = await fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Crew': '1'}, body: JSON.stringify(body)});
+  const r = await fetch(path, {method: 'POST', headers: AUTH, body: JSON.stringify(body)});
   const j = await r.json().catch(() => ({})); if (j.error) toast(j.error, 'var(--red)'); return j;
 }
 const COLS = [['backlog','Backlog','var(--faint)'],['doing','In progress','var(--green)'],['review','Review','var(--blue)'],['done','Done','var(--violet)']];
 const STATUS_DOT = {idle:'var(--faint)',running:'var(--green)',review:'var(--blue)',error:'var(--red)',killed:'var(--red)'};
 
 async function act(action, payload = {}) {
-  const r = await fetch('/api/act/' + action, {method:'POST', headers:{'Content-Type':'application/json','X-Crew':'1'}, body: JSON.stringify(payload)});
+  const r = await fetch('/api/act/' + action, {method:'POST', headers: AUTH, body: JSON.stringify(payload)});
   const j = await r.json().catch(() => ({}));
+  if (r.status === 403 && !j.error) j.error = 'Crew restarted since this page loaded: reload the page';  // tokens are per run
   if (j.error) toast(j.error, 'var(--red)');
   return j;
 }
@@ -826,7 +832,7 @@ const money = v => '$' + (v || 0).toFixed(2);
 function render() {
   if (!S) return;
   queueMicrotask(renderChat);
-  $('#projName').textContent = S.project_name || S.project; $('#projBtn').title = S.project + ' · switch project';
+  $('#projName').textContent = S.project_name || S.project; if (!LAN_CLIENT) $('#projBtn').title = S.project + ' · switch project';
   $('#ver').textContent = S.app_version ? 'v' + S.app_version : '';
   $('#projGit').textContent = S.git ? 'git' : 'no git';
   const pm = S.permission_mode, cls = pm === 'bypassPermissions' ? 'bypass' : pm === 'auto' ? 'auto' : '';
@@ -1086,6 +1092,7 @@ $('#aCreate').onclick = async () => {
 // project picker
 let pmPath = '';
 async function openProjectModal() {
+  if (LAN_CLIENT) return;
   $('#projModal').classList.add('on'); $('#pmPath').value = S.project;
   await browseTo(S.project); setTimeout(() => $('#pmPath').select(), 0);
 }
@@ -1110,6 +1117,7 @@ async function openProject(path) {
   return go();
 }
 $('#projBtn').onclick = openProjectModal;
+if (LAN_CLIENT) { $('#projBtn').style.pointerEvents = 'none'; $('#projBtn').title = 'Switching projects works only on the computer running Crew'; $('#projBtn .faint').hidden = true; }
 $('#pmOpen').onclick = () => { const v = $('#pmPath').value.trim(); if (v) openProject(v); };
 $('#pmPath').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#pmOpen').click(); } };
 
@@ -1562,9 +1570,13 @@ $('#trigModal').addEventListener('click', async e => {
   if (d.trDel) { const tr = find(d.trDel); return askConfirm('Delete trigger?', `<b>${esc(tr.name)}</b> stops firing. Tasks it already created stay on the board.`, 'Delete', async () => { await act('trigger_delete', {id: tr.id}); openTriggers(); }, true); }
   if ('trBack' in d) { tv = {mode: 'list'}; return drawTriggers(); }
   if ('trSave' in d) {
-    const r = await act(tv.id ? 'trigger_update' : 'trigger_add', tv.id ? {...tv.f, id: tv.id} : tv.f);
-    if (r.ok) { toast(tv.id ? 'Trigger saved' : 'Trigger created', 'var(--amber)'); tv = {mode: 'list'}; drawTriggers(); }
-    return;
+    const save = async () => {
+      $('#trigModal').classList.add('on');  // the confirm closed it
+      const r = await act(tv.id ? 'trigger_update' : 'trigger_add', tv.id ? {...tv.f, id: tv.id} : tv.f);
+      if (r.ok) { toast(tv.id ? 'Trigger saved' : 'Trigger created', 'var(--amber)'); tv = {mode: 'list'}; drawTriggers(); }
+    };
+    if (tv.f.kind === 'poll') return askConfirm('Run this command on your computer?', `Every ${esc(String(tv.f.spec.every || 5))} min Crew runs this in your shell, in <b>${esc(S.project)}</b>, with your permissions:<br><code style="display:block;margin-top:8px;white-space:pre-wrap;word-break:break-all">${esc(tv.f.spec.command || '')}</code>`, 'Save trigger', save, true);
+    return save();
   }
   if (d.copy) { try { await navigator.clipboard.writeText(d.copy); toast('Copied', 'var(--green)'); } catch { toast('Copy failed: select the text instead', 'var(--red)'); } return; }
   if (d.kind) { tv.f.kind = d.kind; tv.f.spec.every = d.kind === 'poll' ? 5 : d.kind === 'watch' ? 10 : tv.f.spec.every; return drawTrigForm(); }
@@ -2183,7 +2195,7 @@ function buildPalette() {
   const all = [
     {ic: '＋', label: 'New task', k: 'N', run: () => openTask()},
     {ic: '＋', label: 'Add agent', run: () => openAgentModal()},
-    {ic: '⌂', label: 'Switch project…', run: () => openProjectModal()},
+    ...(LAN_CLIENT ? [] : [{ic: '⌂', label: 'Switch project…', run: () => openProjectModal()}]),
     ...(['localhost', '127.0.0.1'].includes(location.hostname) ? [{ic: '▯', label: 'Open on phone…', run: () => openLan()}] : []),
     {ic: '⚡', label: 'Triggers…', k: 'T', run: () => openTriggers()},
     {ic: '■', label: 'Stop all running agents and runs', run: () => document.querySelector('[data-stop-all]')?.click()},
