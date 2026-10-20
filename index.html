@@ -137,7 +137,15 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:#1c
 .tag.test{background:var(--green-soft);color:var(--green)}
 .tag.review{background:var(--blue-soft);color:var(--blue)}
 .tag.research{background:var(--amber-soft);color:var(--amber)}
-.tag.docs{background:#1e1e25;color:#c4c4cf}
+.tag.docs,.tag.report{background:#1e1e25;color:#c4c4cf}
+.tag.plan,.tag.triage{background:rgba(106,164,255,.08);color:#9cc2ff}
+.tag.design{background:var(--violet-soft);color:var(--violet)}
+.tag.security{background:var(--red-soft);color:#ff8b90}
+.tag.eval,.tag.data,.tag.ml{background:var(--teal-soft);color:var(--teal)}
+.tag.ops,.tag.deploy,.tag.chore{background:rgba(242,180,65,.08);color:#e9c27a}
+.tag.incident{background:var(--red-soft);color:#ff8b90}
+.tag.qa{background:var(--green-soft);color:var(--green)}
+.tag.refactor,.tag.spike{background:var(--accent-soft);color:#f0a07f}
 .card .cta{margin-top:9px;display:flex;gap:6px}
 .card.review{border-color:rgba(106,164,255,.28)}
 .card.doing .bar{height:2px;margin:10px -11px -10px;border-radius:0 0 var(--r) var(--r);background:linear-gradient(90deg,transparent,var(--green),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:sh 1.6s linear infinite}
@@ -196,6 +204,42 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button{height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--line);background:var(--bg2);cursor:pointer;font:500 11.5px var(--mono);color:var(--muted)}
 .seg button.on{border-color:var(--accent-line);background:var(--accent-soft);color:#f6c4ae}
+.top .btn,.top .chip,.top .stat{white-space:nowrap;flex:none}
+@media (max-width:1600px){#palBtn{display:none}}
+.trigbtn{cursor:pointer}.trigbtn:hover{border-color:var(--line2);color:var(--text)}
+.trigbtn svg{color:var(--amber)}.trigbtn b{color:var(--text);font-weight:500}
+.modal.tm{width:min(860px,calc(100vw - 32px))}
+.modal.tm .mb{max-height:min(68vh,720px);overflow:auto}
+.trow{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--bg2)}
+.trow.off{opacity:.55}
+.trow.manual{background:transparent;border-style:dashed}
+.tic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:var(--raised);color:var(--muted)}
+.tic.k-schedule{background:var(--blue-soft);color:var(--blue)}.tic.k-event{background:var(--accent-soft);color:#f0a07f}
+.tic.k-watch{background:var(--teal-soft);color:var(--teal)}.tic.k-poll{background:var(--violet-soft);color:var(--violet)}
+.tic.k-webhook{background:var(--amber-soft);color:var(--amber)}
+.tmain{min-width:0;display:flex;flex-direction:column;gap:4px}
+.tmain .tn{font-weight:600;font-size:13.5px}
+.tmain .tw{font:12px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tmain .tt{font-size:12.5px;display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tmain .tmeta{font:11px var(--mono);color:var(--faint)}
+.tact{display:flex;align-items:center;gap:6px}
+.sw{width:34px;height:20px;border-radius:999px;border:1px solid var(--line2);background:var(--raised);position:relative;cursor:pointer;flex:none;transition:background .15s}
+.sw span{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--faint);transition:transform .15s,background .15s}
+.sw.on{background:rgba(242,180,65,.18);border-color:rgba(242,180,65,.45)}.sw.on span{transform:translateX(14px);background:var(--amber)}
+.hook{display:flex;gap:8px;align-items:center;margin-top:4px;min-width:0}
+.hook code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px var(--mono);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.preset{text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg2);cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.preset:hover{border-color:rgba(242,180,65,.4);background:rgba(242,180,65,.05)}
+.preset b{font-weight:600;font-size:12.5px}.preset span{font-size:11.5px;color:var(--faint);line-height:1.4}
+.thint{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.5}
+.thint code,.thint b{font:11px var(--mono);color:var(--muted)}
+.tsep{font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.08em;font-weight:600;display:flex;align-items:center;gap:10px;margin-top:4px}
+.tsep::after{content:"";flex:1;height:1px;background:var(--line)}
+.two{display:grid;grid-template-columns:160px 1fr;gap:12px}
+.field.mono{font:12.5px var(--mono)}
+.lc{text-transform:none;letter-spacing:0;font-weight:400;margin-left:6px}
+.srcl{display:flex;align-items:center;gap:5px;font:10.5px var(--mono);color:var(--amber);margin-bottom:5px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .modal .mf{padding:12px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
 .pal input{border:0;outline:0;background:transparent;width:100%;padding:15px 16px;font-size:14px;border-bottom:1px solid var(--line)}
 .pal .list{max-height:360px;overflow:auto;padding:6px}
@@ -310,6 +354,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       <span class="pn" id="projName">…</span><span class="pb" id="projGit"></span><span class="faint">▾</span>
     </button>
     <button class="chip modebtn" id="mode" title="Permission mode for all agents"></button>
+    <button class="chip trigbtn" id="trigBtn" title="Triggers: schedules, events, file watches, polls and webhooks"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> Triggers <b id="trigN">0</b></button>
     <div class="stats" id="stats"></div>
     <button class="btn ghost" id="palBtn" title="Command palette">Search <kbd>Ctrl K</kbd></button>
     <button class="btn primary" id="newBtn">＋ New task <kbd style="background:rgba(0,0,0,.18);border-color:rgba(0,0,0,.2);color:#3a1a0c">N</kbd></button>
@@ -362,6 +407,14 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       <div><div class="label">Effort</div><div class="seg tight" id="aEffort"></div></div>
     </div>
     <div class="mf"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="aCreate">Add agent</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="trigModal">
+  <div class="modal tm" role="dialog" aria-label="Triggers">
+    <div class="mh"><span id="tmTitle">Triggers</span><span class="faint" style="font-weight:400;font-size:12px;margin-left:auto;margin-right:12px">Each firing adds a task; agents pick it up like any other</span><button class="iconbtn" data-close>✕</button></div>
+    <div class="mb" id="tmBody"></div>
+    <div class="mf" id="tmFoot"></div>
   </div>
 </div>
 
@@ -441,6 +494,8 @@ function render() {
   const pm = S.permission_mode, cls = pm === 'bypassPermissions' ? 'bypass' : pm === 'auto' ? 'auto' : '';
   $('#mode').className = 'chip modebtn ' + cls;
   $('#mode').innerHTML = `${S.git ? '<span class="dot" style="background:var(--green)"></span><span class="wt"> worktrees ·</span>' : '<span class="dot" style="background:var(--amber)"></span><span class="wt"> no git ·</span>'} ${pm === 'bypassPermissions' ? '⚠ ' : ''}<b>${esc(MODE_INFO[pm]?.label || pm)}</b> ▾`;
+  $('#trigN').textContent = (S.triggers || []).filter(t => t.enabled).length;
+  if ($('#trigModal').classList.contains('on') && tv.mode === 'list') drawTriggers();
   const n = c => S.tasks.filter(t => t.col === c).length;
   const spend = S.agents.reduce((s, a) => s + (a.cost || 0), 0);
   const running = S.agents.filter(a => a.status === 'running').length;
@@ -518,6 +573,7 @@ function card(t) {
     : t.subagents ? `<span class="subtag" title="used ${t.subagents} subagent${t.subagents > 1 ? 's' : ''}">${SUBI}${t.subagents}</span>` : '';
   const hand = t.history?.length ? `<span class="handoff" title="Handed off ${t.history.length}x">↪ ${esc(t.history[t.history.length - 1].who || '')}</span>` : '';
   return `<div class="card ${t.col}" draggable="true" data-card="${t.id}">
+    ${t.source ? `<div class="srcl" title="Created by trigger: ${esc(t.source.name)}">${BOLT}${esc(t.source.name)}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><button class="kebab" data-menu="${t.id}" title="Hand off or move">⋯</button></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
     <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${hand}${subs}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
@@ -704,7 +760,7 @@ function renderDiff(p) {
   }).join('');
 }
 
-const FEED_COLOR = {start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)'};
+const FEED_COLOR = {trigger:'var(--amber)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)'};
 function renderFeed() {
   const f = S.feed;
   const last = f.length ? f[f.length - 1].t : 0;
@@ -859,6 +915,181 @@ $('#newBtn').onclick = () => openTask();
 document.querySelectorAll('.scrim').forEach(s => s.addEventListener('mousedown', e => { if (e.target === s) closeModals(); }));
 function closeModals() { document.querySelectorAll('.scrim').forEach(s => s.classList.remove('on')); }
 
+
+// ---- triggers ------------------------------------------------------------------
+// Assigning a task is the manual trigger; these start work on their own.
+const BOLT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>';
+const TRIG_KIND = {
+  schedule: {label: 'Schedule', ic: '◷', hint: "Cron in this computer's time zone."},
+  event: {label: 'Event', ic: '↯', hint: 'When a task reaches Review, is approved, or fails. Chains stop after 5 hops.'},
+  watch: {label: 'File watch', ic: '◉', hint: 'When files in the project folder change (not the agents\' worktrees).'},
+  poll: {label: 'Poll command', ic: '⟳', hint: 'Runs a command in the project folder and fires on its result: CI status, queues, APIs.'},
+  webhook: {label: 'Webhook', ic: '⇢', hint: 'An HTTP endpoint with a secret token, for CI, git hooks and scripts.'},
+};
+const TRIG_VARS = {schedule: '{weekday}', event: '{id} {title} {who} {summary} {branch} {commit} {merge}', watch: '{files}', poll: '{output} {exit}', webhook: '{payload}'};
+const TRIG_PRESETS = [
+  {name: 'Daily standup', blurb: 'Weekdays 11:00, the scribe writes your standup report.', kind: 'schedule', spec: {cron: '0 11 * * 1-5'},
+   task: {title: 'Standup report for {date}', tag: 'report', agent: 'scribe', details: "Summarise what merged since the last working day, what is in review, and what is blocked. Link every PR and work item. End with 'New on my plate'."}},
+  {name: 'Test what ships', blurb: 'When a feature is approved, the tester writes tests on top of it.', kind: 'event', spec: {on: 'done', tag: 'feature'},
+   task: {title: 'Write tests for #{id}: {title}', tag: 'test', agent: 'tester', details: '{who} finished this on {branch} (commit {commit}). Run `{merge}` in your worktree first.\n\nTheir summary:\n{summary}'}},
+  {name: 'Review what merges', blurb: "Every approved builder change gets a second pair of eyes.", kind: 'event', spec: {on: 'done', agent: 'builder'},
+   task: {title: 'Review #{id}: {title}', tag: 'review', agent: 'reviewer', details: 'Review commit {commit} on {branch}: `git show {commit}`. Report findings by severity; fix only clear defects.\n\nAuthor summary:\n{summary}'}},
+  {name: 'Plan, then build', blurb: 'An approved plan becomes a build task for the builder.', kind: 'event', spec: {on: 'done', tag: 'plan'},
+   task: {title: 'Build: {title}', tag: 'feature', agent: 'builder', details: 'The plan is on {branch} (commit {commit}). Run `{merge}`, read the plan, and implement its first step.\n\n{summary}'}},
+  {name: 'CI failure watch', blurb: 'Every 10 min, a new failed GitHub Actions run goes to ops.', kind: 'poll',
+   spec: {command: 'gh run list --status failure --limit 1 --json displayTitle,headBranch,url,createdAt', every: 10, when: 'output'},
+   task: {title: 'CI failed: find the cause', tag: 'incident', agent: 'ops', details: 'Latest failed run:\n{output}\n\nFind the failing step and the cause. Propose a fix; do not push.'}},
+  {name: 'Nightly hygiene', blurb: '02:00 every night: stale branches, worktrees, outdated deps.', kind: 'schedule', spec: {cron: '0 2 * * *'},
+   task: {title: 'Repo hygiene {date}', tag: 'chore', agent: 'ops', details: 'List local branches already merged into main, prunable worktrees and outdated dependencies. Report them; delete nothing.'}},
+  {name: 'Deploy webhook', blurb: 'CI posts after a deploy; ops checks health and errors.', kind: 'webhook', spec: {},
+   task: {title: 'Post-deploy check', tag: 'ops', agent: 'ops', details: 'A deploy just finished:\n{payload}\n\nCheck telemetry for new errors or latency since the deploy and report.'}},
+  {name: 'Prompt changed → re-eval', blurb: 'When prompt files change, the evaluator reruns the evals.', kind: 'watch', spec: {glob: '**/*prompt*, prompts/**/*', every: 15, cooldown: 300},
+   task: {title: 'Re-run evals: prompts changed', tag: 'eval', agent: 'evaluator', details: 'Changed files:\n{files}\n\nRerun the affected evals against the last baseline and report regressions with sample sizes.'}},
+  {name: 'Docs changed', blurb: 'Markdown edits get proofread by the scribe.', kind: 'watch', spec: {glob: '**/*.md', every: 15, cooldown: 300},
+   task: {title: 'Proofread changed docs', tag: 'docs', agent: 'scribe', details: 'Changed files:\n{files}'}},
+];
+let tv = {mode: 'list'};
+const cap = x => x[0].toUpperCase() + x.slice(1);
+const pad2 = x => String(x).padStart(2, '0');
+function cronText(c) {
+  const f = (c || '').trim().split(/\s+/);
+  if (f.length !== 5) return 'Needs 5 fields: minute hour day month weekday';
+  const [mi, h, dom, mon, dow] = f, num = x => /^\d+$/.test(x);
+  const DAYS = {'*': 'every day', '1-5': 'weekdays', '0,6': 'weekends', '6,0': 'weekends', '0': 'Sundays', '7': 'Sundays', '1': 'Mondays', '2': 'Tuesdays', '3': 'Wednesdays', '4': 'Thursdays', '5': 'Fridays', '6': 'Saturdays'};
+  if (mi.startsWith('*/') && h === '*' && dom === '*' && mon === '*' && dow === '*') return `Every ${mi.slice(2)} minutes`;
+  if (num(mi) && h === '*' && dom === '*' && mon === '*' && dow === '*') return `Every hour at :${pad2(mi)}`;
+  if (num(mi) && h.startsWith('*/') && dom === '*' && mon === '*' && dow === '*') return `Every ${h.slice(2)} hours at :${pad2(mi)}`;
+  if (num(mi) && num(h) && dom === '*' && mon === '*' && DAYS[dow]) return `${cap(DAYS[dow])} at ${pad2(h)}:${pad2(mi)}`;
+  if (num(mi) && num(h) && num(dom) && mon === '*' && dow === '*') return `Monthly on day ${dom} at ${pad2(h)}:${pad2(mi)}`;
+  return `Cron ${c}`;
+}
+function fmtWhen(ts) {
+  if (!ts) return 'later';
+  const d = new Date(ts * 1000), s = ts - Date.now() / 1000;
+  const rel = s < 3600 ? `${Math.max(1, Math.round(s / 60))}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`;
+  return `${d.toLocaleDateString(undefined, {weekday: 'short'})} ${pad2(d.getHours())}:${pad2(d.getMinutes())} (in ${rel})`;
+}
+function trigWhat(tr) {
+  const sp = tr.spec;
+  switch (tr.kind) {
+    case 'schedule': return cronText(sp.cron);
+    case 'event': return `When ${sp.tag ? `${/^[aeiou]/.test(sp.tag) ? 'an' : 'a'} ${sp.tag} task` : 'any task'}${sp.agent ? ` by ${sp.agent}` : ''} ${({review: 'reaches Review', done: 'is approved', error: 'fails'})[sp.on]}`;
+    case 'watch': return `When ${sp.glob} changes · checks every ${sp.every}s`;
+    case 'poll': return `Every ${sp.every} min: ${sp.command}  →  on ${({change: 'changed output', fail: 'failure', output: 'new output'})[sp.when]}`;
+    case 'webhook': return `POST ${location.origin}/api/hook/${tr.id}`;
+  }
+}
+function hookBox(tr) {
+  const curl = `curl -X POST "${location.origin}/api/hook/${tr.id}" -H "X-Crew-Token: ${tr.spec.token}" -d "deploy finished"`;
+  return `<div class="hook"><code title="${esc(curl)}">${esc(curl)}</code><button class="btn sm" data-copy="${esc(curl)}">Copy</button></div>`;
+}
+function openTriggers() { tv = {mode: 'list'}; drawTriggers(); $('#trigModal').classList.add('on'); }
+function blankTrig(kind = 'schedule') {
+  return {name: '', kind, enabled: true, spec: {cron: '0 9 * * 1-5', on: 'done', tag: '', agent: '', glob: 'src/**/*', every: kind === 'poll' ? 5 : 10, cooldown: 60, command: '', when: 'change'},
+          task: {title: '', details: '', tag: '', agent: ''}};
+}
+function editTrig(tr) {
+  const b = blankTrig(tr?.kind);
+  tv = {mode: 'form', id: tr?.id || null, f: tr ? {...b, name: tr.name, kind: tr.kind, enabled: tr.enabled, spec: {...b.spec, ...tr.spec}, task: {...b.task, ...tr.task}} : b};
+  drawTriggers();
+}
+function presetForm(i) {
+  const pr = TRIG_PRESETS[i], b = blankTrig(pr.kind);
+  const task = {...b.task, ...pr.task};
+  if (task.agent && !S.agents.some(a => a.name === task.agent)) task.agent = '';  // roster may differ
+  return {mode: 'form', id: null, f: {...b, name: pr.name, kind: pr.kind, spec: {...b.spec, ...pr.spec}, task}};
+}
+function drawTriggers() {
+  if (tv.mode === 'form') return drawTrigForm();
+  $('#tmTitle').textContent = 'Triggers';
+  const rows = (S.triggers || []).map(tr => `
+    <div class="trow ${tr.enabled ? '' : 'off'}">
+      <div class="tic k-${tr.kind}">${TRIG_KIND[tr.kind].ic}</div>
+      <div class="tmain">
+        <div class="tn">${esc(tr.name)} <span class="faint" style="font-weight:400">· ${TRIG_KIND[tr.kind].label}</span></div>
+        <div class="tw" title="${esc(trigWhat(tr))}">${esc(trigWhat(tr))}</div>
+        <div class="tt"><span class="faint">→</span><span class="tag ${esc(tr.task.tag || 'feature')}">${esc(tr.task.tag || 'feature')}</span><span style="overflow:hidden;text-overflow:ellipsis">${esc(tr.task.title)}</span><span class="faint">· ${tr.task.agent ? esc(tr.task.agent) : 'whoever matches'}</span></div>
+        ${tr.kind === 'webhook' ? hookBox(tr) : ''}
+        <div class="tmeta">${tr.fired ? `fired ${tr.fired}× · last ${ago(tr.last)} ago${tr.note ? ' · ' + esc(tr.note) : ''}` : 'not fired yet'}${tr.kind === 'schedule' && tr.enabled ? ` · next ${fmtWhen(tr.next)}` : ''}${tr.kind === 'poll' && tr.checked ? ` · checked ${ago(tr.checked.t)} ago, exit ${tr.checked.exit}` : ''}</div>
+      </div>
+      <div class="tact">
+        <button class="sw ${tr.enabled ? 'on' : ''}" data-tr-toggle="${tr.id}" title="${tr.enabled ? 'On: click to pause' : 'Off: click to turn on'}"><span></span></button>
+        <button class="btn sm" data-tr-run="${tr.id}" title="Fire once now">Run</button>
+        <button class="btn sm ghost" data-tr-edit="${tr.id}">Edit</button>
+        <button class="iconbtn danger" data-tr-del="${tr.id}" title="Delete trigger">✕</button>
+      </div>
+    </div>`).join('');
+  $('#tmBody').innerHTML = `
+    <div class="trow manual"><div class="tic">✋</div><div class="tmain"><div class="tn">Assign a task <span class="faint" style="font-weight:400">· Manual</span></div>
+      <div class="tw" style="white-space:normal">Drag a card onto an agent, use a card's ⋯ menu, or press N. Always on.</div></div><div></div></div>
+    ${rows || '<div class="empty">No automatic triggers yet. Start from a preset or build your own.</div>'}
+    <div><div class="label">Start from a preset</div><div class="presets">${TRIG_PRESETS.map((pr, i) => `<button class="preset" data-tr-preset="${i}"><b>${TRIG_KIND[pr.kind].ic} ${esc(pr.name)}</b><span>${esc(pr.blurb)}</span></button>`).join('')}</div></div>`;
+  $('#tmFoot').innerHTML = `<button class="btn primary" data-tr-new>＋ New trigger</button>`;
+}
+function drawTrigForm() {
+  const f = tv.f, sp = f.spec, k = f.kind;
+  $('#tmTitle').textContent = tv.id ? 'Edit trigger' : 'New trigger';
+  const seg = (attr, key, opts, cur) => `<div class="seg">${opts.map(([v, l]) => `<button data-${attr}="${key}" data-v="${esc(v)}" class="${(cur || '') === v ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>`;
+  const CRONS = [['0 9 * * 1-5', 'Weekdays 9:00'], ['0 11 * * 1-5', 'Weekdays 11:00'], ['0 * * * *', 'Hourly'], ['*/15 * * * *', 'Every 15 min'], ['0 2 * * *', 'Nightly 2:00'], ['0 10 * * 1', 'Mondays 10:00']];
+  let spec = '';
+  if (k === 'schedule') spec = `<div><div class="label">Cron<span class="faint lc">minute hour day month weekday</span></div>
+      <input class="field mono" data-s="cron" value="${esc(sp.cron)}" spellcheck="false" autocomplete="off">
+      <div class="seg" style="margin-top:8px">${CRONS.map(([v, l]) => `<button data-cron="${v}" class="${sp.cron === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <div class="thint" id="cronHint">${esc(cronText(sp.cron))}</div></div>`;
+  if (k === 'event') spec = `<div><div class="label">When a task</div>${seg('s', 'on', [['review', 'reaches Review'], ['done', 'is approved / done'], ['error', 'fails']], sp.on)}</div>
+      <div><div class="label">Tagged</div>${seg('s', 'tag', [['', 'any tag'], ...S.tags.map(t => [t, t])], sp.tag)}</div>
+      <div><div class="label">Worked on by</div>${seg('s', 'agent', [['', 'any agent'], ...S.agents.map(a => [a.name, a.name])], sp.agent)}</div>`;
+  if (k === 'watch') spec = `<div><div class="label">Files<span class="faint lc">globs inside the project, comma-separated</span></div><input class="field mono" data-s="glob" value="${esc(sp.glob)}" spellcheck="false" autocomplete="off"></div>
+      <div class="two"><div><div class="label">Check every (s)</div><input class="field" type="number" min="5" data-s="every" value="${sp.every}"></div>
+      <div><div class="label">Quiet period (s)</div><input class="field" type="number" min="0" data-s="cooldown" value="${sp.cooldown}" style="max-width:160px"><div class="thint">At most one task per quiet period; edits inside it are batched.</div></div></div>`;
+  if (k === 'poll') spec = `<div><div class="label">Command<span class="faint lc">runs in the project folder, 2 min timeout</span></div><textarea class="field mono" rows="2" data-s="command" spellcheck="false" placeholder="gh run list --status failure --limit 1">${esc(sp.command)}</textarea></div>
+      <div class="two"><div><div class="label">Every (min)</div><input class="field" type="number" min="1" data-s="every" value="${sp.every}"></div>
+      <div><div class="label">Fire when</div>${seg('s', 'when', [['change', 'output changes'], ['fail', 'it starts failing'], ['output', 'it prints something new']], sp.when)}</div></div>`;
+  if (k === 'webhook') spec = `<div class="thint">Saving creates a URL and a secret token. POST to it from CI, a git hook or a script; the body becomes <code>{payload}</code>. The server only listens on this computer, so remote services need a tunnel.</div>`;
+  $('#tmBody').innerHTML = `
+    <input class="field" data-f="name" placeholder="Name, e.g. Daily standup" value="${esc(f.name)}" maxlength="60" autocomplete="off">
+    <div><div class="label">Trigger</div><div class="seg">${Object.entries(TRIG_KIND).map(([v, i]) => `<button data-kind="${v}" class="${k === v ? 'on' : ''}">${i.ic} ${i.label}</button>`).join('')}</div><div class="thint">${esc(TRIG_KIND[k].hint)}</div></div>
+    ${spec}
+    <div class="tsep">${BOLT} Creates a task</div>
+    <input class="field" data-k="title" placeholder="Task title" value="${esc(f.task.title)}" autocomplete="off">
+    <textarea class="field" data-k="details" rows="4" placeholder="Details for the agent (optional)">${esc(f.task.details)}</textarea>
+    <div class="thint">Placeholders: <code>${TRIG_VARS[k]}</code> <code>{date}</code> <code>{time}</code> <code>{trigger}</code></div>
+    <div><div class="label">Tag</div>${seg('k', 'tag', [['', 'feature'], ...S.tags.filter(t => t !== 'feature').map(t => [t, t])], f.task.tag)}</div>
+    <div><div class="label">Give it to</div>${seg('k', 'agent', [['', 'whoever matches the tag'], ...S.agents.map(a => [a.name, a.name])], f.task.agent)}</div>`;
+  $('#tmFoot').innerHTML = `<button class="btn ghost" data-tr-back>Back</button><button class="btn primary" data-tr-save>${tv.id ? 'Save' : 'Create trigger'}</button>`;
+}
+$('#trigBtn').onclick = openTriggers;
+$('#trigModal').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b || b.hasAttribute('data-close')) return;
+  const d = b.dataset, find = id => S.triggers.find(t => t.id === id);
+  if ('trNew' in d) return editTrig(null);
+  if (d.trPreset) { tv = presetForm(+d.trPreset); return drawTriggers(); }
+  if (d.trEdit) return editTrig(find(d.trEdit));
+  if (d.trToggle) { const tr = find(d.trToggle); return act('trigger_update', {id: tr.id, enabled: !tr.enabled}); }
+  if (d.trRun) { const r = await act('trigger_run', {id: d.trRun}); if (r.ok) toast(`${find(d.trRun)?.name}: fired once`, 'var(--amber)'); return; }
+  if (d.trDel) { const tr = find(d.trDel); return askConfirm('Delete trigger?', `<b>${esc(tr.name)}</b> stops firing. Tasks it already created stay on the board.`, 'Delete', async () => { await act('trigger_delete', {id: tr.id}); openTriggers(); }, true); }
+  if ('trBack' in d) { tv = {mode: 'list'}; return drawTriggers(); }
+  if ('trSave' in d) {
+    const r = await act(tv.id ? 'trigger_update' : 'trigger_add', tv.id ? {...tv.f, id: tv.id} : tv.f);
+    if (r.ok) { toast(tv.id ? 'Trigger saved' : 'Trigger created', 'var(--amber)'); tv = {mode: 'list'}; drawTriggers(); }
+    return;
+  }
+  if (d.copy) { try { await navigator.clipboard.writeText(d.copy); toast('Copied', 'var(--green)'); } catch { toast('Copy failed: select the text instead', 'var(--red)'); } return; }
+  if (d.kind) { tv.f.kind = d.kind; tv.f.spec.every = d.kind === 'poll' ? 5 : d.kind === 'watch' ? 10 : tv.f.spec.every; return drawTrigForm(); }
+  if (d.cron) { tv.f.spec.cron = d.cron; return drawTrigForm(); }
+  if (d.s) { tv.f.spec[d.s] = d.v; return drawTrigForm(); }
+  if (d.k) { tv.f.task[d.k] = d.v; return drawTrigForm(); }
+});
+$('#trigModal').addEventListener('input', e => {
+  const el = e.target, d = el.dataset;
+  if (d.f) tv.f[d.f] = el.value;
+  if (d.k) tv.f.task[d.k] = el.value;
+  if (d.s) {
+    tv.f.spec[d.s] = el.type === 'number' ? +el.value : el.value;
+    if (d.s === 'cron') $('#cronHint').textContent = cronText(el.value);
+  }
+});
+
 // command palette
 let palItems = [], palIdx = 0;
 function openPalette() { $('#palette').classList.add('on'); $('#palIn').value = ''; buildPalette(); setTimeout(() => $('#palIn').focus(), 0); }
@@ -868,6 +1099,9 @@ function buildPalette() {
     {ic: '＋', label: 'New task', k: 'N', run: () => openTask()},
     {ic: '＋', label: 'Add agent', run: () => openAgentModal()},
     {ic: '⌂', label: 'Switch project…', run: () => openProjectModal()},
+    {ic: '⚡', label: 'Triggers…', k: 'T', run: () => openTriggers()},
+    {ic: '⚡', label: 'New trigger', run: () => { openTriggers(); editTrig(null); }},
+    ...(S.triggers || []).map(tr => ({ic: '⚡', label: `Run trigger: ${tr.name}`, run: () => act('trigger_run', {id: tr.id})})),
     {ic: '$', label: showCost ? 'Hide prices' : 'Show prices', run: () => document.querySelector('[data-toggle-cost]')?.click()},
     ...S.agents.map(a => ({ic: '⚙', label: `Model & role: ${a.name}`, run: () => { view.drawer = {agent: a.name}; view.showSettings = true; view.setSig = ''; render(); }})),
     ...S.agents.map(a => ({ic: '−', label: `Remove agent ${a.name}`, run: () => { view.drawer = {agent: a.name}; view.showSettings = true; render(); setTimeout(() => document.querySelector('[data-remove-agent]')?.click(), 0); }})),
@@ -895,6 +1129,7 @@ $('#mode').onclick = e => { e.stopPropagation(); openModeMenu($('#mode')); };
 // global keys
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette(); }
+  if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return openTriggers(); }
   if (e.key === 'Escape' && document.querySelector('.menu')) return closeMenu();
   if (e.key === 'Escape') { if (document.querySelector('.scrim.on')) return closeModals(); if (view.drawer) { view.drawer = null; render(); } return; }
   if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || document.querySelector('.scrim.on')) return;
@@ -914,6 +1149,7 @@ function applyDeepLink() {
   if (h.get('review')) { const t = h.get('review') === 'any' ? S.tasks.find(t => t.col === 'review') : task(+h.get('review')); if (t) view.drawer = {review: t.id}; }
   if (h.get('modal') === 'project') setTimeout(openProjectModal, 0);
   if (h.get('modal') === 'task') setTimeout(() => openTask(), 0);
+  if (h.get('modal') === 'triggers') setTimeout(() => { openTriggers(); if (h.get('preset')) { tv = presetForm(+h.get('preset')); drawTriggers(); } }, 0);
   if (h.has('palette')) setTimeout(openPalette, 0);
 }
 window.addEventListener('hashchange', () => { if (location.hash.length > 1 && S) { deepLink = new URLSearchParams(location.hash.slice(1)); applyDeepLink(); render(); } });

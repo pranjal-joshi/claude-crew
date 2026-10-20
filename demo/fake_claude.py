@@ -133,19 +133,66 @@ SCRIPTS = {
 }
 
 
+SCRIPTS |= {
+    "plan": ("planner", [
+        lambda: say(text("Reading how sessions work today before planning the JWT move."), tool("Grep", pattern="session|cookie", path="app")),
+        lambda: subagents(("Map every session read/write", "Explore", [tool("Grep", pattern="request.session"), text("14 call sites in 5 files.")]),
+                          lead="Mapping the blast radius with a subagent."),
+        lambda: (write("plans/jwt-migration.md", "# Move from session cookies to JWT\n\n1. Issue short-lived access + refresh tokens (builder, feature)\n2. Dual-read: accept cookie or JWT for one release (builder, feature)\n3. Tests for expiry and refresh (tester, test)\n4. Security review of token storage (reviewer, review)\n5. Remove cookie path (builder, refactor)\n"),
+         say(tool("Write", file_path="plans/jwt-migration.md"), tout=900)),
+    ], "Plan in plans/jwt-migration.md: 5 steps, dual-read for one release so nobody is logged out.\n\nRecommended tasks: 1-2 feature (builder), 3 test, 4 review, 5 refactor."),
+    "ui": ("designer", [
+        lambda: say(text("Building the settings page in the existing dark tokens."), tool("Read", file_path="app/static/theme.css")),
+        lambda: (write("app/static/settings.html", "<section class=\"settings\">\n  <h1>Settings</h1>\n  <label class=\"toggle\"><input type=\"checkbox\" id=\"theme\" checked> Dark theme</label>\n</section>\n"),
+         say(tool("Write", file_path="app/static/settings.html"), tout=700)),
+        lambda: say(tool("Bash", command="npx playwright screenshot --viewport-size=390,844 settings.html")),
+        lambda: say(text("Checked at phone width: no horizontal scroll, toggle reachable with keyboard.")),
+    ], "Added a dark settings page with an accessible theme toggle (app/static/settings.html). Checked at 390 px wide."),
+    "eval": ("evaluator", [
+        lambda: say(text("Running both models on the 400-ticket labelled set."), tool("Read", file_path="evals/tickets.jsonl")),
+        lambda: subagents(("Run Haiku on 400 tickets", "general-purpose", [tool("Bash", command="python evals/run.py --model haiku"), text("acc 0.912, p50 410 ms")]),
+                          ("Run Sonnet on 400 tickets", "general-purpose", [tool("Bash", command="python evals/run.py --model sonnet"), text("acc 0.931, p50 980 ms")]),
+                          lead="Two runs in parallel, same seed and prompt."),
+        lambda: (write("evals/report.md", "| model | accuracy | 95% CI | p50 latency | cost / 1k |\n|---|---|---|---|---|\n| Haiku | 91.2% | ±2.8 | 410 ms | $0.21 |\n| Sonnet | 93.1% | ±2.5 | 980 ms | $0.84 |\n"),
+         say(tool("Write", file_path="evals/report.md"))),
+    ], "Sonnet is +1.9 pts (93.1% vs 91.2%, n=400), but the intervals overlap. Haiku is 2.4x faster and 4x cheaper.\n\nRecommend Haiku, with Sonnet as fallback on low-confidence tickets. Table in evals/report.md."),
+    "incident": ("ops", [
+        lambda: say(text("Pulling the failed deploy run and pod events."), tool("Bash", command="gh run view --log-failed")),
+        lambda: say(tool("mcp__ops__pod_health", deployment="api", minutes=720)),
+        lambda: say(text("Readiness probe timed out: the new image runs migrations at startup and takes 94 s; the probe allows 60 s.")),
+    ], "Root cause: migrations moved into app startup, so the pod takes 94 s to become ready; the readiness probe gives up at 60 s and the rollout fails.\n\nFix: run migrations as a pre-deploy job (preferred) or raise initialDelaySeconds to 120. Nothing changed yet."),
+    "report": ("scribe", [
+        lambda: say(text("Collecting merged PRs and open reviews since yesterday."), tool("Bash", command="gh pr list --state merged --search \"merged:>=yesterday\"")),
+        lambda: (write("reports/standup.md", "**Merged**\n- #412 Rate limiting on login\n- #409 Settings page\n\n**In review**\n- #415 JWT dual-read\n\n**Blocked**\n- Deploy: readiness probe (ops on it)\n"),
+         say(tool("Write", file_path="reports/standup.md"))),
+    ], "Standup posted to reports/standup.md: 2 merged, 1 in review, 1 blocked (deploy probe, ops investigating)."),
+}
+
+
+SCRIPTS["bug"] = ("builder", [
+    lambda: say(text("Reproducing first: the parser assumes the server's time zone."), tool("Read", file_path="app/invoices.py")),
+    lambda: (write("app/invoices.py", "from datetime import datetime, timezone\n\n\ndef parse_due(s: str) -> datetime:\n"
+                                      "    return datetime.fromisoformat(s).astimezone(timezone.utc)\n"),
+     say(tool("Edit", file_path="app/invoices.py"))),
+    lambda: say(tool("Bash", command="python -m pytest tests/test_invoices.py -q")),
+], "Due dates were parsed in local time, so tests failed after 18:30 IST. Now parsed as UTC. Added a regression test with a +05:30 timestamp.")
+
+
 def pick(title):
     t = title.lower()
-    for key, words in (("test", ("test",)), ("review", ("review", "audit")), ("research", ("research", "compare", "evaluate", "queue")),
-                       ("docs", ("doc", "readme")), ("rate", ("rate", "limit", "login", "auth"))):
+    for key, words in (("test", ("test",)), ("review", ("review", "audit")), ("eval", ("evaluat", " eval", " vs ")),
+                       ("research", ("research", "compare", "queue")), ("plan", ("plan",)), ("report", ("standup", "report")),
+                       ("incident", ("deploy", "incident", "ci failed", "outage")), ("bug", ("fix", "flaky", "bug")), ("ui", ("dark", "page", "settings", "ui")),
+                       ("docs", ("doc", "readme", "proofread")), ("rate", ("rate", "limit", "login", "auth"))):
         if any(w in t for w in words):
             return SCRIPTS[key]
     return SCRIPTS["docs"]
 
 
 out({"type": "system", "subtype": "init", "session_id": sid, "model": model, "permissionMode": mode, "cwd": os.getcwd(),
-     "tools": ["Read", "Edit", "Write", "Bash", "Grep", "Agent", "WebSearch", "mcp__docs__search"],
+     "tools": ["Read", "Edit", "Write", "Bash", "Grep", "Agent", "WebSearch", "mcp__docs__search", "mcp__ops__pod_health"],
      "skills": ["ship-it", "deep-research", "code-review"],
-     "mcp_servers": [{"name": "docs", "status": "connected"}, {"name": "linear", "status": "connected"}]})
+     "mcp_servers": [{"name": "docs", "status": "connected"}, {"name": "ops", "status": "connected"}]})
 
 for line in sys.stdin:
     title = json.loads(line)["message"]["content"].splitlines()[0]

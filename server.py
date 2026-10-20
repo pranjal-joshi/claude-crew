@@ -9,10 +9,13 @@ git worktree of the target project. Standard library only.
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
+import hmac
 import json
 import re
 import os
+import secrets
 import shlex
 import shutil
 import signal
@@ -23,24 +26,51 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 APP_DIR = Path(__file__).resolve().parent
 WORK_ROOT = Path.home() / ".crew"  # short path: Windows git chokes on long worktree paths
 IS_WIN = os.name == "nt"
 
+# One agent per stage of the delivery loop: plan -> research -> design/build -> test -> review
+# -> evaluate -> ship/observe -> report. Tags route unassigned tasks; each tag belongs to one agent.
 DEFAULT_CONFIG = {
     "permission_mode": "acceptEdits",
-    "allowed_tools": ["Bash(git status:*)", "Bash(git diff:*)", "Bash(ls:*)", "Bash(npm test:*)", "Bash(pytest:*)", "Bash(python -m pytest:*)", "WebSearch", "WebFetch"],
+    "allowed_tools": ["Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(git merge:*)",
+                      "Bash(ls:*)", "Bash(npm test:*)", "Bash(pytest:*)", "Bash(python -m pytest:*)", "WebSearch", "WebFetch"],
     "agents": [
-        {"name": "builder", "role": "Implements features and fixes in application code.", "tags": ["api", "ui", "feature", "bug"], "model": None, "effort": None},
-        {"name": "tester", "role": "Writes and runs tests; reports failures precisely.", "tags": ["test"], "model": None, "effort": None},
-        {"name": "reviewer", "role": "Reviews code for bugs, security and clarity. Edits only to fix clear defects.", "tags": ["review"], "model": None, "effort": None},
-        {"name": "researcher", "role": "Investigates questions, compares options, writes findings to notes/*.md.", "tags": ["research"], "model": None, "effort": None},
-        {"name": "docs", "role": "Writes and updates documentation and READMEs.", "tags": ["docs"], "model": None, "effort": None},
+        {"name": "planner", "tags": ["plan", "triage"], "model": "opus", "effort": "high",
+         "role": "Turns requests and work items into small, testable tasks with acceptance criteria. Reads the code first. "
+                 "Writes the plan to plans/<slug>.md and lists the follow-up tasks it recommends, each with a tag. Does not implement."},
+        {"name": "researcher", "tags": ["research", "spike"], "model": "fable", "effort": "high",
+         "role": "Investigates tools, libraries and approaches. Compares options with evidence, cost and risk, and ends with one "
+                 "clear recommendation. Writes findings to notes/<slug>.md."},
+        {"name": "designer", "tags": ["ui", "design"], "model": "opus", "effort": "high",
+         "role": "Designs and builds UI: prototypes, components, dark-theme polish, accessibility and responsive layout. "
+                 "Ships working HTML/CSS/JS, checks it at phone width, and never leaves placeholder styling."},
+        {"name": "builder", "tags": ["feature", "bug", "api", "refactor"], "model": "opus", "effort": "high",
+         "role": "Implements features and fixes in application code. Makes the smallest change that meets the acceptance criteria, "
+                 "matches the surrounding code, and adds tests for new behaviour. Does not commit; Crew commits on approval."},
+        {"name": "tester", "tags": ["test", "qa"], "model": "sonnet", "effort": "medium",
+         "role": "Writes and runs tests. Reproduces a bug with a failing test before anyone fixes it. Reports failures with the exact "
+                 "command, output and file:line. When a task names another agent's branch, merges it into this worktree first."},
+        {"name": "reviewer", "tags": ["review", "security"], "model": "opus", "effort": "xhigh",
+         "role": "Reviews changes like a senior engineer: correctness, security, data and domain correctness, and clarity. "
+                 "Fixes only clear defects; reports everything else as findings ranked by severity, each with file:line."},
+        {"name": "evaluator", "tags": ["eval", "data", "ml"], "model": "opus", "effort": "high",
+         "role": "Runs model and prompt evaluations: datasets, A/B and shadow comparisons, regression checks. Reports numbers with "
+                 "sample sizes and spread, never anecdotes, and says plainly when the data is too thin to decide."},
+        {"name": "ops", "tags": ["ops", "deploy", "incident", "chore"], "model": "sonnet", "effort": "high",
+         "role": "Watches delivery and production: CI/CD runs, deployments, telemetry, cost and incidents, plus repo hygiene "
+                 "(stale branches, worktrees, dependencies). Diagnoses from logs and queries first; changes infrastructure "
+                 "only when the task says so."},
+        {"name": "scribe", "tags": ["docs", "report"], "model": "sonnet", "effort": "low",
+         "role": "Writes for people: daily standup reports, PR descriptions, release notes, work item comments and docs. "
+                 "Short, factual, linked to the PR or work item, no filler."},
     ],
 }
 
-TAGS = ["feature", "bug", "api", "ui", "test", "review", "research", "docs"]
+TAGS = ["plan", "research", "ui", "feature", "bug", "api", "test", "review", "eval", "ops", "incident", "docs", "report", "chore"]
 # acceptEdits: edits auto-approved, other tools only via allowed_tools.
 # auto: Claude Code's classifier approves safe actions. bypassPermissions: nothing is checked.
 MODES = ["acceptEdits", "auto", "bypassPermissions"]
@@ -62,6 +92,71 @@ def clean_tags(tags) -> list[str]:
 
 def now() -> float:
     return time.time()
+
+
+# ---- triggers: cron, templates ---------------------------------------------------
+TRIGGER_KINDS = ["schedule", "event", "watch", "poll", "webhook"]
+EVENT_ON = ["review", "done", "error"]
+POLL_WHEN = ["change", "fail", "output"]
+MAX_CHAIN = 5  # an event trigger never fires on a task that is already this many triggers deep
+
+
+def _cron_field(field: str, lo: int, hi: int) -> frozenset:
+    vals = set()
+    for part in field.split(","):
+        rng, _, st = part.partition("/")
+        step = int(st) if st else 1
+        if rng == "*":
+            a, b = lo, hi
+        elif "-" in rng:
+            a, b = (int(x) for x in rng.split("-", 1))
+        else:
+            a = int(rng)
+            b = hi if st else a
+        if step < 1 or a < lo or b > hi or a > b:
+            raise ValueError(f"'{part}' is out of range {lo}-{hi}")
+        vals.update(range(a, b + 1, step))
+    return frozenset(vals)
+
+
+@functools.lru_cache(maxsize=256)
+def parse_cron(expr: str) -> tuple:
+    f = expr.split()
+    if len(f) != 5:
+        raise ValueError("use 5 fields: minute hour day-of-month month weekday")
+    dow = frozenset(d % 7 for d in _cron_field(f[4], 0, 7))
+    return (_cron_field(f[0], 0, 59), _cron_field(f[1], 0, 23), _cron_field(f[2], 1, 31), _cron_field(f[3], 1, 12), dow,
+            not f[2].startswith("*"), not f[4].startswith("*"))
+
+
+def cron_error(expr: str) -> str | None:
+    try:
+        parse_cron(expr)
+        return None
+    except ValueError as e:
+        return f"bad cron: {e}"
+
+
+def cron_match(expr: str, lt: time.struct_time) -> bool:
+    mi, hr, dom, mon, dow, dom_set, dow_set = parse_cron(expr)
+    if lt.tm_min not in mi or lt.tm_hour not in hr or lt.tm_mon not in mon:
+        return False
+    d_ok, w_ok = lt.tm_mday in dom, (lt.tm_wday + 1) % 7 in dow
+    return (d_ok or w_ok) if (dom_set and dow_set) else (d_ok and w_ok)  # standard cron: either day field when both are set
+
+
+def cron_next(expr: str, after: float) -> float | None:
+    t = (int(after) // 60 + 1) * 60
+    for _ in range(60 * 24 * 8):  # look a week ahead; rarer schedules show as "later"
+        if cron_match(expr, time.localtime(t)):
+            return float(t)
+        t += 60
+    return None
+
+
+def fill(template: str, ctx: dict) -> str:
+    """{name} placeholders from ctx; unknown ones are left as they are."""
+    return re.sub(r"\{(\w+)\}", lambda m: str(ctx[m.group(1)]) if m.group(1) in ctx else m.group(0), template)
 
 
 def git(cwd: Path, *args: str, check: bool = False) -> subprocess.CompletedProcess:
@@ -91,6 +186,8 @@ class Crew:
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.procs: dict[str, subprocess.Popen] = {}
         self.mcp_allow: set[str] = set()   # MCP server prefixes seen in agents' tool lists
+        self.triggers: list[dict] = []
+        self.next_trig = 1
         self.agents: dict[str, dict] = {}
         for spec in config["agents"]:
             self.agents[spec["name"]] = self._new_agent(spec)
@@ -140,11 +237,17 @@ class Crew:
         if data.get("project") != str(self.project):
             return
         self.mcp_allow = set(data.get("mcp_allow", []))
+        self.triggers = data.get("triggers", [])
+        self.next_trig = data.get("next_trig", len(self.triggers) + 1)
+        for tr in self.triggers:
+            tr["next"] = cron_next(tr["spec"]["cron"], now()) if tr["kind"] == "schedule" else None
         self.tasks = data.get("tasks", [])
         self.next_id = data.get("next_id", len(self.tasks) + 1)
         for t in self.tasks:  # nothing is running after a restart
             if t["col"] == "doing":
                 t["col"] = "backlog"
+            if t["col"] == "backlog" and t.get("who") and t["who"] not in self.agents:
+                t["who"] = t["pinned"] = None  # its agent left the roster; let the tags route it
         for name, saved in data.get("agents", {}).items():
             if name in self.agents:
                 self.agents[name].update({k: saved[k] for k in ("session", "cost", "log", "tokens") if k in saved})
@@ -153,7 +256,7 @@ class Crew:
 
     def _save(self) -> None:
         data = {"project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
-                "mcp_allow": sorted(self.mcp_allow),
+                "mcp_allow": sorted(self.mcp_allow), "triggers": self._public_triggers(), "next_trig": self.next_trig,
                 "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:]} for n, a in self.agents.items()}}
         tmp = self.state_file.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
@@ -190,7 +293,8 @@ class Crew:
                     "permission_mode": self.config["permission_mode"], "modes": MODES,
                     "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
                     "project_name": self.project.name, "mcp_allow": sorted(self.mcp_allow),
-                    "allow_mcp": self.config.get("allow_mcp", True)}
+                    "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(),
+                    "trigger_kinds": TRIGGER_KINDS}
 
     # ---- worktrees -----------------------------------------------------------
     def _ensure_worktree(self, a: dict) -> None:
@@ -375,6 +479,7 @@ class Crew:
                     a["log"][-1]["kind"] = "error"
                 self.event("error", f"{a['name']}: {a['error'][:120]}", a["name"])
                 if task:
+                    self._task_event(task, "error", summary=a["error"])
                     task["col"], task["who"] = "backlog", task.get("pinned")
                     a["task"] = None
                 return
@@ -387,6 +492,7 @@ class Crew:
                 task["finished"] = now()
                 a["status"] = "review"
                 self.event("review", f"{a['name']} finished #{task['id']} · {task['title']}", a["name"])
+                self._task_event(task, "review")
             else:
                 a["status"] = "idle"
             a["activity"] = ""
@@ -451,6 +557,184 @@ class Crew:
             t["summary"] = ""
         t.pop("diff", None)
 
+    # ---- triggers -------------------------------------------------------------------
+    # Assigning a task is the manual trigger. These add the automatic ones: each firing adds a
+    # backlog task from the trigger's template, and the dispatcher hands it out like any other.
+    def _public_triggers(self) -> list[dict]:
+        return [{k: v for k, v in tr.items() if not k.startswith("_")} for tr in self.triggers]
+
+    def _trigger(self, tid) -> dict | None:
+        return next((tr for tr in self.triggers if tr["id"] == tid), None)
+
+    def _fire(self, tr: dict, ctx: dict, note: str = "") -> dict:
+        """Turn one firing into a backlog task. Caller holds the lock."""
+        lt = time.localtime()
+        ctx = {"date": time.strftime("%Y-%m-%d", lt), "time": time.strftime("%H:%M", lt),
+               "weekday": time.strftime("%A", lt), "trigger": tr["name"]} | ctx
+        spec = tr["task"]
+        title = fill(spec.get("title") or tr["name"], ctx).strip()[:200] or tr["name"]
+        who = spec.get("agent") if spec.get("agent") in self.agents else None
+        t = {"id": self.next_id, "title": title, "details": fill(spec.get("details") or "", ctx).strip()[:8000],
+             "tag": spec.get("tag") if spec.get("tag") in self._all_tags() else "feature", "col": "backlog",
+             "who": who, "pinned": who, "created": now(), "depth": ctx.get("depth", 0),
+             "source": {"trigger": tr["id"], "name": tr["name"], "kind": tr["kind"]}}
+        self.next_id += 1
+        self.tasks.append(t)
+        tr["fired"] = tr.get("fired", 0) + 1
+        tr["last"], tr["note"] = now(), note[:200]
+        self.event("trigger", f"⚡ {tr['name']} → #{t['id']} {title}" + (f" → {who}" if who else ""), who)
+        return t
+
+    def _task_event(self, t: dict, col: str, summary: str | None = None) -> None:
+        """Event triggers: a task reached review or done, or its agent hit an error."""
+        w = self.agents.get(t.get("who") or "")
+        for tr in self.triggers:
+            sp = tr["spec"]
+            if not tr["enabled"] or tr["kind"] != "event" or sp.get("on") != col:
+                continue
+            if (sp.get("tag") and sp["tag"] != t["tag"]) or (sp.get("agent") and sp["agent"] != t.get("who")):
+                continue
+            if (t.get("source") or {}).get("trigger") == tr["id"] or t.get("depth", 0) >= MAX_CHAIN:
+                continue  # no self-loops, no runaway chains
+            branch = w["branch"] if w and w.get("branch") else ""
+            self._fire(tr, {"id": t["id"], "title": t["title"], "tag": t["tag"], "who": t.get("who") or "",
+                            "summary": (summary if summary is not None else t.get("summary") or "")[:3000],
+                            "branch": branch, "commit": t.get("commit") or "",
+                            "merge": f"git merge {branch}" if branch and t.get("commit") else "",
+                            "depth": t.get("depth", 0) + 1}, f"#{t['id']} reached {col}")
+
+    def tick_triggers(self) -> None:
+        """Schedules, file watches and command polls. Called every second by the dispatcher thread."""
+        fired = False
+        with self.lock:
+            minute = int(now() // 60)
+            lt = time.localtime()
+            for tr in self.triggers:
+                if not tr["enabled"]:
+                    continue
+                kind, sp = tr["kind"], tr["spec"]
+                if kind == "schedule":
+                    if tr.get("minute") != minute and cron_match(sp["cron"], lt):
+                        tr["minute"] = minute
+                        self._fire(tr, {}, "on schedule")
+                        tr["next"] = cron_next(sp["cron"], now())
+                        fired = True
+                    elif tr.get("next") and tr["next"] < now() - 60:
+                        tr["next"] = cron_next(sp["cron"], now())
+                elif kind == "watch" and now() - tr.get("_checked", 0) >= sp["every"]:
+                    tr["_checked"] = now()
+                    fired |= self._check_watch(tr)
+                elif kind == "poll" and not tr.get("_running") and now() - tr.get("_checked", 0) >= sp["every"] * 60:
+                    tr["_checked"], tr["_running"] = now(), True
+                    threading.Thread(target=self._run_poll, args=(tr,), daemon=True).start()
+        if fired:
+            self.touch()
+
+    def _check_watch(self, tr: dict) -> bool:
+        sig: dict[str, float] = {}
+        for pat in (x.strip() for x in tr["spec"]["glob"].split(",")):
+            if not pat:
+                continue
+            for f in self.project.glob(pat):
+                if len(sig) >= 5000:
+                    break
+                if ".git" in f.parts or not f.is_file():
+                    continue
+                try:
+                    sig[f.relative_to(self.project).as_posix()] = f.stat().st_mtime
+                except OSError:
+                    pass
+        old = tr.get("_sig")
+        if old is None:  # first look is the baseline
+            tr["_sig"] = sig
+            return False
+        changed = sorted(k for k in sig.keys() | old.keys() if sig.get(k) != old.get(k))
+        if not changed or now() - (tr.get("last") or 0) < tr["spec"]["cooldown"]:
+            return False  # keep the old baseline so changes during the cooldown fire afterwards
+        tr["_sig"] = sig
+        self._fire(tr, {"files": "\n".join(changed[:40]) + ("\n…" if len(changed) > 40 else "")},
+                   f"{len(changed)} file{'s' if len(changed) != 1 else ''} changed")
+        return True
+
+    def _run_poll(self, tr: dict) -> None:
+        sp = tr["spec"]
+        try:
+            r = subprocess.run(sp["command"], shell=True, cwd=self.project, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=120)
+            out, code = (r.stdout + r.stderr).strip()[-4000:], r.returncode
+        except subprocess.TimeoutExpired:
+            out, code = "timed out after 120 s", -1
+        with self.lock:
+            tr["_running"] = False
+            if tr not in self.triggers:
+                return
+            prev, prev_code = tr.get("_out"), tr.get("_code")
+            tr["_out"], tr["_code"] = out, code
+            tr["checked"] = {"t": now(), "exit": code}
+            digest = hashlib.sha1(out.encode()).hexdigest()[:12]
+            fire = {"change": prev is not None and out != prev,
+                    "fail": code != 0 and prev_code in (0, None),
+                    # a command that errors, or prints an empty JSON list/object, has nothing new to say
+                    "output": code == 0 and out not in ("", "[]", "{}", "null") and digest != tr.get("seen")}[sp["when"]]
+            if fire:
+                tr["seen"] = digest
+                self._fire(tr, {"output": out, "exit": code}, f"exit {code}")
+        self.touch()
+
+    def hook(self, tid: str, token: str, body: str) -> dict:
+        with self.lock:
+            tr = self._trigger(tid)
+            if not tr or tr["kind"] != "webhook" or not hmac.compare_digest(tr["spec"]["token"], token or ""):
+                return {"error": "unknown hook or bad token"}
+            if not tr["enabled"]:
+                return {"error": "trigger is off"}
+            t = self._fire(tr, {"payload": body[:6000]}, "webhook")
+        self.touch()
+        return {"ok": True, "task": t["id"]}
+
+    def _clean_trigger(self, p: dict, old: dict | None) -> tuple[str | None, dict]:
+        kind = p.get("kind")
+        if kind not in TRIGGER_KINDS:
+            return "pick a trigger type", {}
+        name = str(p.get("name") or "").strip()[:60]
+        task = p.get("task") or {}
+        sp = p.get("spec") or {}
+        if not name:
+            return "name the trigger", {}
+        if not str(task.get("title") or "").strip():
+            return "the task needs a title", {}
+        if task.get("agent") and task["agent"] not in self.agents:
+            return f"no agent called {task['agent']}", {}
+        try:
+            if kind == "schedule":
+                cron = " ".join(str(sp.get("cron") or "").split())
+                if err := cron_error(cron):
+                    return err, {}
+                spec = {"cron": cron}
+            elif kind == "event":
+                if sp.get("on") not in EVENT_ON:
+                    return "pick when: review, done or error", {}
+                spec = {"on": sp["on"], "tag": sp.get("tag") or "", "agent": sp.get("agent") or ""}
+            elif kind == "watch":
+                glob = str(sp.get("glob") or "").strip()
+                if not glob or ".." in glob or glob.startswith(("/", "\\")) or ":" in glob:
+                    return "watch a pattern inside the project, e.g. src/**/*.py", {}
+                spec = {"glob": glob[:200], "every": max(5, int(sp.get("every") or 10)),
+                        "cooldown": max(0, int(sp.get("cooldown") if sp.get("cooldown") not in (None, "") else 60))}
+            elif kind == "poll":
+                cmd = str(sp.get("command") or "").strip()
+                if not cmd:
+                    return "the command to run is missing", {}
+                spec = {"command": cmd[:1000], "every": max(1, int(sp.get("every") or 5)),
+                        "when": sp.get("when") if sp.get("when") in POLL_WHEN else "change"}
+            else:
+                spec = {"token": (old or {}).get("spec", {}).get("token") or secrets.token_urlsafe(18)}
+        except (TypeError, ValueError):
+            return "numbers only for intervals", {}
+        return None, {"name": name, "kind": kind, "enabled": bool(p.get("enabled", True)), "spec": spec,
+                      "task": {"title": str(task["title"]).strip()[:200], "details": str(task.get("details") or "")[:4000],
+                               "tag": task.get("tag") or "", "agent": task.get("agent") or ""}}
+
     # ---- actions from the UI ---------------------------------------------------
     def act(self, action: str, p: dict) -> dict:
         with self.lock:
@@ -497,6 +781,8 @@ class Crew:
                                 self._kill_proc(owner["name"])
                             owner.update(status="idle", task=None, activity="", since=None)
                     t["col"] = p["col"]
+                    if p["col"] == "done":
+                        self._task_event(t, "done")
             elif action == "mode" and p.get("mode") in MODES:
                 self.config["permission_mode"] = p["mode"]
                 self._save_config()
@@ -591,6 +877,7 @@ class Crew:
                 if w:
                     w.update(status="idle", task=None)
                 self.event("approve", f"approved #{t['id']}" + (f" · commit {t.get('commit')} on {w['branch']}" if t.get("commit") else ""))
+                self._task_event(t, "done")
             elif action == "reject" and t and t["col"] == "review":
                 w = self.agents.get(t["who"])
                 fb = (p.get("text") or "Please revise.").strip()
@@ -604,6 +891,31 @@ class Crew:
                 self.log(w, "you", msg)
                 self._send(w, msg)
                 self.event("reject", f"#{t['id']} sent back to {w['name']}", w["name"])
+            elif action in ("trigger_add", "trigger_update"):
+                tr = self._trigger(p.get("id")) if action == "trigger_update" else None
+                if action == "trigger_update" and not tr:
+                    return {"error": "unknown trigger"}
+                if tr and set(p) <= {"id", "enabled"}:  # on/off switch
+                    tr["enabled"] = bool(p.get("enabled"))
+                else:
+                    err, clean = self._clean_trigger(p, tr)
+                    if err:
+                        return {"error": err}
+                    if tr:
+                        for k in [k for k in tr if k.startswith("_")] + ["minute", "seen", "checked"]:
+                            tr.pop(k, None)  # new settings, new baseline
+                        tr.update(clean)
+                    else:
+                        tr = clean | {"id": f"t{self.next_trig}", "fired": 0, "last": None, "created": now()}
+                        self.next_trig += 1
+                        self.triggers.append(tr)
+                tr["next"] = cron_next(tr["spec"]["cron"], now()) if tr["kind"] == "schedule" and tr["enabled"] else None
+                self.event("trigger", f"trigger {tr['name']} {'on' if tr['enabled'] else 'off'}")
+            elif action == "trigger_delete" and (tr := self._trigger(p.get("id"))):
+                self.triggers.remove(tr)
+            elif action == "trigger_run" and (tr := self._trigger(p.get("id"))):
+                self._fire(tr, {"payload": "(run by hand)", "output": "(run by hand)", "files": "(run by hand)", "exit": 0},
+                           "run by you")
             elif action == "diff" and t and t.get("who") in self.agents:
                 t["diff"] = self.diff(self.agents[t["who"]])
             else:
@@ -741,6 +1053,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self):
+        if self.path.startswith("/api/hook/"):  # webhook triggers: a per-trigger token, no browser header needed
+            u = urlsplit(self.path)
+            token = self.headers.get("X-Crew-Token") or (parse_qs(u.query).get("token") or [""])[0]
+            body = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 64_000)).decode("utf-8", "replace")
+            res = CREW.hook(u.path.rsplit("/", 1)[1], token, body)
+            return self._json(res, 403 if "error" in res else 200)
         # Custom header forces a CORS preflight, which this server never answers: other sites can't post here.
         if not self._host_ok() or self.headers.get("X-Crew") != "1":
             return self.send_error(HTTPStatus.FORBIDDEN)
@@ -762,17 +1080,27 @@ class Handler(BaseHTTPRequestHandler):
 
 DEMO_TASKS = [
     ("Add rate limiting to the login endpoint", "api"),
-    ("Write tests for the login rate limiter", "test"),
+    ("Plan the move from session cookies to JWT", "plan"),
     ("Compare background job queues for email sending", "research"),
     ("Review the auth module for security issues", "review"),
+    ("Build a dark settings page with a theme toggle", "ui"),
+    ("Evaluate Haiku vs Sonnet on the support-ticket classifier", "eval"),
+    ("Check last night's failed deploy", "incident"),
     ("Document the new login limits in the README", "docs"),
-    ("Add CSV export to the reports page", "feature"),
     ("Fix flaky date parsing on the invoices page", "bug"),
 ]
 
 
-DEMO_MODELS = {"builder": ("opus", "high"), "tester": ("sonnet", "medium"), "reviewer": ("opus", "xhigh"),
-               "researcher": ("fable", "high"), "docs": ("haiku", "low")}
+DEMO_TRIGGERS = [
+    {"name": "Daily standup", "kind": "schedule", "spec": {"cron": "0 11 * * 1-5"},
+     "task": {"title": "Standup report for {date}", "tag": "report", "agent": "scribe",
+              "details": "Summarise yesterday's merged PRs, what is in review, and anything blocked."}},
+    {"name": "Test what ships", "kind": "event", "spec": {"on": "done", "tag": "api"},
+     "task": {"title": "Write tests for #{id}: {title}", "tag": "test", "agent": "tester",
+              "details": "{who} finished this on {branch} (commit {commit}). Run `{merge}` in your worktree first.\n\nTheir summary:\n{summary}"}},
+    {"name": "Docs changed", "kind": "watch", "spec": {"glob": "**/*.md", "every": 10, "cooldown": 120},
+     "task": {"title": "Proofread changed docs", "tag": "docs", "agent": "scribe", "details": "Changed files:\n{files}"}},
+]
 
 
 def init_repo(project: Path, files: dict[str, str]) -> None:
@@ -808,9 +1136,6 @@ def main() -> None:
 
     if not cfg_path.exists():
         cfg = json.loads(json.dumps(DEFAULT_CONFIG))
-        if args.demo:  # show off per-agent models in the demo
-            for a in cfg["agents"]:
-                a["model"], a["effort"] = DEMO_MODELS.get(a["name"], (None, None))
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
     config = DEFAULT_CONFIG | json.loads(cfg_path.read_text(encoding="utf-8"))
@@ -831,10 +1156,13 @@ def main() -> None:
     if args.demo and not CREW.tasks:
         for title, tag in DEMO_TASKS:
             CREW.act("add", {"title": title, "tag": tag})
+        for tr in DEMO_TRIGGERS:
+            CREW.act("trigger_add", tr)
 
     def loop():
         while True:
             try:
+                CREW.tick_triggers()
                 CREW.dispatch()
             except Exception as e:  # keep the dispatcher alive
                 print("dispatch error:", e, file=sys.stderr)

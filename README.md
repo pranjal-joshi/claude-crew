@@ -11,13 +11,13 @@
 </p>
 
 <p align="center">
-  <b>Run five Claude Code agents at once, like a team.</b><br>
-  They pick tasks off a board, work in their own git worktrees, and hand you diffs to approve.<br>
+  <b>Run a crew of Claude Code agents, one for each stage of your SDLC.</b><br>
+  They pick tasks off a board or start on schedules and events, work in their own git worktrees, and hand you diffs to approve.<br>
   One Python file, one HTML file, no dependencies.
 </p>
 
 <p align="center">
-  <img src="assets/demo.gif" alt="Five agents working a board in parallel, with subagents" width="100%">
+  <img src="assets/demo.gif" alt="Nine agents working a board in parallel, with subagents and an event trigger" width="100%">
 </p>
 
 ## Try it in 10 seconds
@@ -39,12 +39,12 @@ You need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed an
 python server.py --project /path/to/your/repo
 ```
 
-That's it. Add tasks, and agents whose tags match pick them up.
+That's it. Add tasks or set up [triggers](#triggers), and the agent whose tags match picks each task up.
 
 ## Why
 
 Claude Code is great at one task at a time. Real work is a queue: a feature, its tests, a review, some research, the docs.
-Running five terminals means five places to watch, five sets of changes tangled in one checkout, and no single place to say yes or no.
+Running a terminal per task means many places to watch, changes tangled in one checkout, no single place to say yes or no, and nothing that starts work while you're away.
 
 Crew gives that queue a home:
 
@@ -52,13 +52,51 @@ Crew gives that queue a home:
 - **Agents that pull their own work.** Each agent has a role and tags; idle agents take matching tasks.
 - **No stepping on each other.** Every agent works in its own git worktree on its own `crew/<name>` branch.
 - **You stay the reviewer.** Finished work lands in Review with the agent's summary and a real diff. Approve commits it; Send back resumes the same session with your feedback.
+- **Work that starts itself.** Schedules, events, file watches, command polls and webhooks turn into tasks, so the standup gets written at 11:00 and every approved feature gets tests.
+
+## The crew
+
+Nine agents, one per stage of the delivery loop. Each owns a few tags, so an unassigned task goes to the right specialist. Change any of it from the UI.
+
+| Stage | Agent | Picks up | Default model | What it does |
+| --- | --- | --- | --- | --- |
+| Plan | **planner** | `plan` `triage` | Opus · high | Turns requests and work items into small, testable tasks with acceptance criteria. Plans, never implements. |
+| Research | **researcher** | `research` `spike` | Fable · high | Compares tools and approaches with evidence and cost, ends with one recommendation. |
+| Design | **designer** | `ui` `design` | Opus · high | Prototypes and builds UI: components, dark themes, accessibility, phone widths. |
+| Build | **builder** | `feature` `bug` `api` `refactor` | Opus · high | Smallest change that meets the criteria, with tests for new behaviour. |
+| Test | **tester** | `test` `qa` | Sonnet · medium | Reproduces bugs with failing tests first; reports exact commands and output. |
+| Review | **reviewer** | `review` `security` | Opus · xhigh | Correctness, security and domain review; fixes only clear defects, ranks the rest. |
+| Evaluate | **evaluator** | `eval` `data` `ml` | Opus · high | Model and prompt evals, A/B and shadow checks, with sample sizes, not anecdotes. |
+| Ship & observe | **ops** | `ops` `deploy` `incident` `chore` | Sonnet · high | CI/CD, deployments, telemetry, cost, incidents and repo hygiene. Diagnoses before it changes anything. |
+| Report | **scribe** | `docs` `report` | Sonnet · low | Standups, PR descriptions, release notes and docs. Short and linked. |
+
+## Triggers
+
+Assigning a task is the manual trigger. Press <kbd>T</kbd> for the automatic ones. Each firing adds a task from a template, and the dispatcher hands it out like any other.
+
+| Trigger | Fires when | Example |
+| --- | --- | --- |
+| ◷ **Schedule** | A cron expression matches, in local time | `0 11 * * 1-5`: the scribe writes the standup report |
+| ↯ **Event** | A task reaches Review, is approved, or fails (filter by tag or agent) | An approved `feature` becomes "Write tests for #{id}" for the tester |
+| ◉ **File watch** | Files matching a glob change in the project | `**/*prompt*` changes, so the evaluator reruns the evals |
+| ⟳ **Poll command** | A command's output changes, it starts failing, or it prints something new | `gh run list --status failure --limit 1` every 10 min goes to ops |
+| ⇢ **Webhook** | Something POSTs to the trigger's URL with its secret token | CI posts after a deploy, so ops checks telemetry |
+
+Task templates take placeholders: `{date}` `{time}` everywhere, plus `{id}` `{title}` `{who}` `{summary}` `{branch}` `{commit}` `{merge}` for events, `{files}` for watches, `{output}` `{exit}` for polls and `{payload}` for webhooks. Event chains stop after five hops, and a trigger never fires on its own tasks.
+
+```bash
+curl -X POST "http://127.0.0.1:8770/api/hook/t7" -H "X-Crew-Token: <token from the UI>" -d "deployed api v2.4 to preprod"
+```
+
+Nine presets cover the common loops: daily standup, test what ships, review what merges, plan then build, CI failure watch, nightly hygiene, deploy webhook, prompt changes trigger re-evals, and proofreading changed docs.
 
 ## Features
 
 | | |
 | --- | --- |
-| 🧑‍🤝‍🧑 **A real crew** | Builder, tester, reviewer, researcher and docs by default. Add or remove agents and edit roles from the UI. |
-| 🧠 **Model and effort per agent** | Opus for the builder, Haiku for docs, Fable for research: each agent gets its own model and effort level (low to max). |
+| 🧑‍🤝‍🧑 **An SDLC crew** | Planner, researcher, designer, builder, tester, reviewer, evaluator, ops and scribe by default. Add, remove and re-role agents from the UI. |
+| ⚡ **Triggers** | Schedules, task events, file watches, command polls and webhooks start work on their own. Presets included. |
+| 🧠 **Model and effort per agent** | Opus for the builder, Sonnet for the tester, Fable for research: each agent gets its own model and effort level (low to max). |
 | 🪢 **Subagents, visible** | When an agent fans out to subagents, you see each one live on the agent card, a count on the task, and a labelled thread in the transcript. |
 | 🌳 **Worktree isolation** | One worktree and branch per agent. Merge what you approve with `git merge crew/<name>`. |
 | 🔍 **Review gate** | Agent summary and colored diff side by side. Approve and commit, send back, or hand off to another agent. |
@@ -69,7 +107,7 @@ Crew gives that queue a home:
 | 🔢 **Tokens and cost** | Live token counts per agent, per task and in total. Hide the dollar amounts with one click. |
 | 🧩 **Your skills and MCP servers** | Agents are ordinary Claude Code sessions, so they load your skills, plugins and MCP servers. |
 | 📁 **Projects** | Switch repos from the header. Each project keeps its own board, sessions and worktrees. |
-| ⌨️ **Keyboard first** | `N` new task, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
+| ⌨️ **Keyboard first** | `N` new task, `T` triggers, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
 
 ## Screenshots
 
@@ -79,8 +117,12 @@ Crew gives that queue a home:
     <td width="50%"><img src="assets/review.png" alt="Review drawer with summary and diff"><br><sub><b>Review.</b> The agent's summary and its diff. Approve commits to its branch.</sub></td>
   </tr>
   <tr>
+    <td width="50%"><img src="assets/triggers.png" alt="Triggers list with schedules, events and watches"><br><sub><b>Triggers.</b> Schedules, events, watches, polls and webhooks, each with its next run and history.</sub></td>
+    <td width="50%"><img src="assets/trigger-form.png" alt="Trigger editor"><br><sub><b>Trigger editor.</b> Pick when it fires and the task it creates, with placeholders.</sub></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="assets/settings.png" alt="Per-agent model and effort settings"><br><sub><b>Model and role.</b> Per-agent model, effort, role and tags.</sub></td>
-    <td width="50%"><img src="assets/hero.png" alt="Board with five agents running"><br><sub><b>Board.</b> Agents in flight, subagents counted on each card.</sub></td>
+    <td width="50%"><img src="assets/hero.png" alt="Board with nine agents running"><br><sub><b>Board.</b> Agents in flight, subagents counted on each card.</sub></td>
   </tr>
 </table>
 
@@ -98,9 +140,9 @@ flowchart LR
 ```
 
 - Each agent is a long-lived `claude -p --input-format stream-json --output-format stream-json` process. Crew writes tasks and your messages to its stdin and reads every event from its stdout.
-- A one-second dispatcher gives idle agents work: tasks pinned to them first, then unassigned tasks whose tag matches the agent's tags.
+- A one-second loop checks triggers, then gives idle agents work: tasks pinned to them first, then unassigned tasks whose tag matches the agent's tags.
 - Subagents are tracked from the stream itself. An `Agent` tool call starts one, events tagged with its `parent_tool_use_id` belong to it, and its tool result ends it.
-- State (board, sessions, tokens, transcripts) is saved under `~/.crew/state/`. Worktrees live in `~/.crew/wt/`, which keeps paths short enough for Windows.
+- State (board, triggers, sessions, tokens, transcripts) is saved per project under `~/.crew/state/`. Worktrees live in `~/.crew/wt/`, which keeps paths short enough for Windows.
 
 ## Configuration
 
@@ -112,7 +154,7 @@ flowchart LR
   "allowed_tools": ["Bash(git status:*)", "Bash(npm test:*)", "Bash(pytest:*)", "WebSearch"],
   "allow_mcp": true,                         // auto-allow MCP servers agents discover (Accept edits mode)
   "agents": [
-    {"name": "builder", "role": "Implements features and fixes.", "tags": ["api", "ui", "feature", "bug"],
+    {"name": "builder", "role": "Implements features and fixes.", "tags": ["feature", "bug", "api", "refactor"],
      "model": "opus", "effort": "high"}
   ]
 }
@@ -136,6 +178,8 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 - The server binds to `127.0.0.1` only.
 - Every write needs a custom request header and a localhost `Host`, so other websites can't drive your agents (CSRF and DNS rebinding).
 - Agents are told to stay inside the project folder unless a task names another path.
+- Webhooks are the one write path without the browser header. Each needs its own random token, compared in constant time.
+- Poll triggers run the command you typed, in your shell, in the project folder. Treat them like a cron job you wrote yourself.
 
 ## FAQ
 
@@ -153,8 +197,10 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 
 - [ ] Shared crew memory: a notes file every agent reads at start and adds to at the end
 - [ ] Hand-offs that merge the previous agent's branch into the next agent's worktree
+- [x] Live subagent indicators
 - [ ] Background-job and monitor indicators, and holding a task until its jobs finish
-- [ ] Task dependencies ("tests after feature")
+- [x] Event triggers chain work ("tests after feature")
+- [ ] Full task dependencies (wait for several tasks)
 - [ ] One-click merge of approved branches
 
 Ideas and PRs welcome. Open an issue first for anything big.
