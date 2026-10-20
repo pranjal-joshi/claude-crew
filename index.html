@@ -423,7 +423,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .bossdot{width:7px;height:7px;border-radius:50%;background:var(--faint)}.bossdot.on{background:var(--green);animation:pulse 1.4s infinite}
 .chathead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 /* auto workflow builder */
-.awb{border:1px solid rgba(224,122,82,.35);background:linear-gradient(135deg,rgba(224,122,82,.08),rgba(79,209,197,.04));border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.awb{border:1px solid var(--line);background:var(--bg2);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .awb textarea{min-height:76px}
 .awb .row{display:flex;align-items:center;gap:10px}
 /* mobile app shell */
@@ -578,6 +578,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .card[data-card]{cursor:pointer}
 .agent.dropb{box-shadow:inset 0 3px 0 var(--accent)}.agent.dropa{box-shadow:inset 0 -3px 0 var(--accent)}
 .agent.dragging{opacity:.45}
+.btn.run i{font-style:normal;color:var(--green);font-size:11px}
 </style>
 </head>
 <body>
@@ -1472,11 +1473,11 @@ function renderFlows() {
   $('#flows').innerHTML = `
     ${awbHtml()}
     <div><h3>Workflows <span class="faint">Run agents in a fixed order. ✋ waits for your approval, ⚡ continues on its own.</span>
-      <button class="btn sm primary" data-wf-new style="margin-left:auto">＋ New workflow</button></h3></div>
+      <button class="btn sm" data-wf-new style="margin-left:auto">＋ New workflow</button></h3></div>
     <div class="wfgrid">${flows.map(w => `
       <div class="wf">
         <div class="wh"><b>${esc(w.name)}</b><span class="faint" style="font:11px var(--mono)">${w.steps.length} steps</span>
-          <span style="margin-left:auto;display:flex;gap:6px">${wfTrigChip(w)}<button class="btn sm primary" data-wf-run="${w.id}">▶ Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="iconbtn danger" data-wf-del="${w.id}" title="Delete workflow">✕</button></span></div>
+          <span style="margin-left:auto;display:flex;gap:6px">${wfTrigChip(w)}<button class="btn sm run" data-wf-run="${w.id}"><i>▶</i>Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="iconbtn danger" data-wf-del="${w.id}" title="Delete workflow">✕</button></span></div>
         ${w.description ? `<div class="wd">${esc(w.description)}</div>` : ''}
         <div class="chain">${chainHtml(w.steps)}</div>
       </div>`).join('') || '<div class="empty">No workflows yet.</div>'}</div>
@@ -1878,7 +1879,7 @@ $('#chatTo').onclick = e => {
 function awbHtml() {
   return `<div class="awb"><h3 style="margin:0">✦ Auto Workflow Builder <span class="faint">Describe how work should flow. The boss creates or updates agents, workflows and triggers to match.</span></h3>
     <textarea class="field" id="awbIn" placeholder="e.g. Every weekday at 10, triage new ADO bugs: reproduce with a failing test, fix, review, and post a summary to the work item. Model changes must be evaluated before and after.">${esc(view.awb || '')}</textarea>
-    <div class="row"><span class="faint" style="font-size:12px">Reuses existing agents where they fit. You'll see what it did in the boss chat.</span><button class="btn primary sm" data-awb style="margin-left:auto">✦ Build with the boss</button></div></div>`;
+    <div class="row"><span class="faint" style="font-size:12px">Reuses existing agents where they fit. You'll see what it did in the boss chat.</span><button class="btn sm run" data-awb style="margin-left:auto"><i style="color:var(--accent)">✦</i>Build with the boss</button></div></div>`;
 }
 document.addEventListener('input', e => { if (e.target.id === 'awbIn') view.awb = e.target.value; });
 function runAwb() {
