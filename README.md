@@ -100,13 +100,25 @@ Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on it
 | Model change | evaluator (baseline) ⚡ → builder ✋ → evaluator (re-eval) |
 | Incident | ops (diagnose) ✋ → builder ✋ → tester ⚡ → scribe (post-mortem) |
 
-Edit or add workflows in the UI: pick an agent per step, write its instruction (`{input}`, `{prev_summary}`, `{prev_branch}` and more), set its gate, reorder. Runs show live progress per step, and click through to each step's task.
+Edit workflows on a **canvas**, n8n-style: a **When** block (▶ Run by hand, or any trigger), one block per agent step, and an **Output** block. Drag blocks to reorder, drag an agent from the left onto the canvas (or press ＋ on a line) to add a step, and click ✋ / ⚡ on a line to switch its gate. Click a block to edit its instruction (`{input}`, `{prev_summary}`, `{prev_branch}` and more). Runs show live progress per step, and click through to each step's task.
+
+The **Output** block decides what a finished run delivers:
+
+| Output | What happens |
+|---|---|
+| 📋 Board (default) | Nothing extra; the last step's card holds the result. |
+| 📄 Report file | A markdown report of every step (who, branch, commit, summary) is saved in the project, `crew-reports/` by default. |
+| 🔗 Webhook | The run report is POSTed as JSON (`workflow, run, title, status, report, steps`) to a URL, e.g. a Slack or Teams hook. |
+| ⛓ Next workflow | Another workflow starts with the same goal and this run's last summary (at most 5 in a chain). |
 
 ## Stop, kill, clear
 
 - **■ Stop** (agent card, drawer, or **Stop all** in the header) ends the current run at once. The session is kept, the task goes back to the backlog **on hold**, and the agent pauses until you press **▶ Resume** or give it work.
 - **Kill** disables an agent until you respawn it. Use it for an agent that misbehaves.
 - **Clear ▾** removes Done tasks, or the whole board (running agents are stopped first). Branches and commits are kept.
+- **⌫** in the chat bar clears the conversation with the boss or the agent you're talking to, and empties its context: the next message starts a fresh session.
+
+Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`.
 
 ## Context per task
 
@@ -164,7 +176,7 @@ Nine presets cover the common loops: daily standup, test what ships, review what
   </tr>
   <tr>
     <td width="50%"><img src="assets/flows.png" alt="Workflows tab with five workflows and two live runs"><br><sub><b>Workflows.</b> Agents in a fixed order; runs show each step live.</sub></td>
-    <td width="50%"><img src="assets/wf-edit.png" alt="Workflow editor"><br><sub><b>Workflow editor.</b> Agent, instruction and gate per step.</sub></td>
+    <td width="50%"><img src="assets/wf-edit.png" alt="Workflow editor"><br><sub><b>Workflow editor.</b> Trigger → agents → output on a canvas.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="assets/triggers.png" alt="Triggers list with schedules, events and watches"><br><sub><b>Triggers.</b> Schedules, events, watches, polls and webhooks, each with its next run and history.</sub></td>
@@ -260,6 +272,16 @@ Ideas and PRs welcome. Open an issue first for anything big.
 ## Contributing
 
 The whole app is two files: `server.py` (Python standard library) and `index.html` (vanilla JS). `python server.py --demo` is the fastest loop; `demo/fake_claude.py` speaks the same stream-json protocol as Claude Code.
+
+## Star history
+
+<a href="https://www.star-history.com/#pranjal-joshi/claude-crew&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=pranjal-joshi/claude-crew&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=pranjal-joshi/claude-crew&type=date&legend=top-left" />
+   <img alt="Star history chart" src="https://api.star-history.com/svg?repos=pranjal-joshi/claude-crew&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 

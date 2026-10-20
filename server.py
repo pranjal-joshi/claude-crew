@@ -1000,6 +1000,57 @@ class Crew:
             else:
                 run.update(status="done", ended=now())
                 self.event("workflow", f"⛓ {run['name']} finished: {run['title']}")
+                self._wf_output(run)
+
+    def _run_report(self, run: dict) -> str:
+        out = [f"# {run['name']}: {run['title']}", "", f"Finished {time.strftime('%Y-%m-%d %H:%M', time.localtime(run['ended']))}"
+               f" · {len(run['steps'])} steps", ""]
+        if run["details"]:
+            out += [run["details"], ""]
+        for k, r in enumerate(run["results"]):
+            if r:
+                where = f" · `{r['branch']}` @ `{r['commit']}`" if r.get("commit") else ""
+                out += [f"## {k + 1}. {r['who']}{where}", "", r["summary"] or "(no summary)", ""]
+        return "\n".join(out)
+
+    def _wf_output(self, run: dict) -> None:
+        """Deliver a finished run: a markdown report, a webhook, or the next workflow."""
+        w = self._workflow(run["wf"]) or {}
+        o = w.get("output") or {}
+        kind = o.get("kind") or "board"
+        try:
+            if kind == "report":
+                d = self.project / (o.get("path") or "crew-reports")
+                d.mkdir(parents=True, exist_ok=True)
+                slug = re.sub(r"[^a-z0-9]+", "-", run["title"].lower()).strip("-")[:40] or "run"
+                f = d / f"{time.strftime('%Y%m%d-%H%M')}-{run['id']}-{slug}.md"
+                f.write_text(self._run_report(run), encoding="utf-8")
+                run["output"] = str(f.relative_to(self.project)) if f.is_relative_to(self.project) else str(f)
+                self.event("workflow", f"⛓ {run['name']} report saved: {run['output']}")
+            elif kind == "webhook" and o.get("url"):
+                body = json.dumps({"workflow": run["name"], "run": run["id"], "title": run["title"], "status": run["status"],
+                                   "report": self._run_report(run), "steps": run["results"]}).encode()
+
+                def post(url=o["url"], name=run["name"]):
+                    import urllib.request
+                    try:
+                        urllib.request.urlopen(urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}), timeout=20).close()
+                    except OSError as e:
+                        with self.lock:
+                            self.event("error", f"⛓ {name} webhook failed: {e}")
+                threading.Thread(target=post, daemon=True).start()
+                run["output"] = "webhook sent"
+            elif kind == "workflow" and (nxt := self._workflow(o.get("workflow"))):
+                if run.get("depth", 0) >= MAX_CHAIN:
+                    self.event("error", f"⛓ {run['name']} did not start {nxt['name']}: too many chained workflows")
+                    return
+                last = next((r for r in reversed(run["results"]) if r), None)
+                nr = self._start_run(nxt, run["title"], ((run["details"] + "\n\n") if run["details"] else "")
+                                     + (f"From {run['name']}: {last['summary'][:2000]}" if last else ""), {"workflow": run["id"]})
+                nr["depth"] = run.get("depth", 0) + 1
+                run["output"] = f"started {nxt['name']}"
+        except OSError as e:
+            self.event("error", f"⛓ {run['name']} output failed: {e}")
 
     def _clean_workflow(self, p: dict) -> tuple[str | None, dict]:
         name = str(p.get("name") or "").strip()[:60]
@@ -1013,14 +1064,29 @@ class Crew:
                           "details": str(st.get("details") or "")[:3000], "gate": "auto" if st.get("gate") == "auto" else "approve"})
         if not steps:
             return "add at least one step", {}
-        return None, {"name": name, "description": str(p.get("description") or "").strip()[:300], "steps": steps[:12]}
+        o = p.get("output") or {}
+        kind = o.get("kind") if o.get("kind") in ("board", "report", "webhook", "workflow") else "board"
+        out = {"kind": kind}
+        if kind == "report":
+            out["path"] = str(o.get("path") or "crew-reports").strip().strip("/\\")[:120] or "crew-reports"
+            if ".." in Path(out["path"]).parts or Path(out["path"]).is_absolute():
+                return "the report folder must be inside the project", {}
+        elif kind == "webhook":
+            out["url"] = str(o.get("url") or "").strip()[:500]
+            if not re.match(r"https?://", out["url"]):
+                return "the webhook needs an http(s) URL", {}
+        elif kind == "workflow":
+            out["workflow"] = str(o.get("workflow") or "")
+            if not self._workflow(out["workflow"]) or out["workflow"] == p.get("id"):
+                return "pick another workflow to start", {}
+        return None, {"name": name, "description": str(p.get("description") or "").strip()[:300], "steps": steps[:12], "output": out}
 
     # ---- actions from the UI ---------------------------------------------------
     def act(self, action: str, p: dict) -> dict:
         with self.lock:
             a = self.agents.get(p.get("agent", ""))
             t = self._task(p.get("task"))
-            if action in ("tell", "stop", "compact", "respawn", "resume") and p.get("agent") == "boss":
+            if action in ("tell", "stop", "compact", "respawn", "resume", "clear_chat") and p.get("agent") == "boss":
                 a = self.boss
             if action == "add":
                 title = (p.get("title") or "").strip()
@@ -1217,6 +1283,20 @@ class Crew:
                 a.update(status="killed", task=None, activity="", since=None)
                 self.log(a, "error", "killed by you")
                 self.event("kill", f"{a['name']} killed", a["name"])
+            elif action == "clear_chat" and a:
+                if a["status"] == "running":
+                    return {"error": f"{a['name']} is working: stop it first"}
+                self._kill_proc(a["name"])
+                a.update(session=None, log=[], ctx=0, activity="", error=None,
+                         status="idle" if a["status"] in ("idle", "paused", "review", "error") else a["status"])
+                self.log(a, "sys", "chat cleared · the next message starts a fresh session")
+            elif action == "reorder_agents":
+                names = [n for n in p.get("names") or [] if n in self.agents]
+                order = names + [n for n in self.agents if n not in names]
+                ordered = [(n, self.agents[n]) for n in order]
+                self.agents.clear()
+                self.agents.update(ordered)
+                self._save_config()
             elif action == "respawn" and a:
                 self._kill_proc(a["name"])
                 if p.get("fresh"):
@@ -1273,8 +1353,10 @@ class Crew:
                     w.update(clean)
                 else:
                     ids = [int(x["id"][1:]) for x in flows if x["id"][1:].isdigit()]
-                    flows.append(clean | {"id": f"w{max(ids, default=0) + 1}"})
+                    flows.append(w := clean | {"id": f"w{max(ids, default=0) + 1}"})
                 self._save_config()
+                self.touch()
+                return {"ok": True, "id": w["id"]}
             elif action == "wf_delete" and self._workflow(p.get("id")):
                 self.config["workflows"] = [w for w in self.config["workflows"] if w["id"] != p["id"]]
                 self._save_config()

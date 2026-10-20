@@ -502,6 +502,82 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
   .toast{max-width:none}
 }
 @keyframes sheet{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+/* workflow canvas */
+.scrim.wfs{padding-top:4vh}
+.modal.wfc{width:min(1320px,calc(100vw - 32px));height:min(88vh,940px);display:flex;flex-direction:column}
+.wfc .mh{gap:10px;justify-content:flex-start}
+.wfc .wfname{flex:1;min-width:0;background:transparent;border:1px solid transparent;border-radius:7px;color:var(--text);font:600 15px var(--sans);padding:5px 8px;outline:none}
+.wfc .wfname:hover{border-color:var(--line)}.wfc .wfname:focus{border-color:var(--accent-line);background:var(--bg)}
+.wfwrap{flex:1;min-height:0;display:grid;grid-template-columns:156px 1fr 320px}
+.wfpal{border-right:1px solid var(--line);padding:12px 10px;overflow:auto;display:flex;flex-direction:column;gap:6px;background:var(--bg2)}
+.wfpal h4,.wfins h4{margin:0 0 2px;font:600 10.5px var(--sans);text-transform:uppercase;letter-spacing:.08em;color:var(--faint)}
+.wfpal .ph{font-size:11px;color:var(--faint);line-height:1.45;margin-top:6px}
+.wfchip{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:9px;border:1px solid var(--line);background:var(--surface);cursor:grab;font-size:12.5px;user-select:none;touch-action:none;white-space:nowrap;min-width:0}
+.wfchip span{overflow:hidden;text-overflow:ellipsis}
+.wfchip:hover{border-color:var(--line2);background:var(--raised)}
+.av2{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font:600 12.5px var(--sans);text-transform:uppercase;color:hsl(var(--h) 75% 74%);background:hsl(var(--h) 40% 20%);border:1px solid hsl(var(--h) 40% 32%);flex:none}
+.wfchip .av2{width:22px;height:22px;font-size:11px;border-radius:6px}
+.wfcv{position:relative;overflow:auto;background-color:#18191e;background-image:radial-gradient(circle,#30313b 1px,transparent 1.3px);background-size:20px 20px}
+.wfstage{position:relative;margin:0 auto}
+.wfedges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.wfedges path{fill:none;stroke:#5a5c69;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.wfedges path.auto{stroke:rgba(79,209,197,.6);stroke-dasharray:6 5;animation:wfflow 1s linear infinite}
+@keyframes wfflow{to{stroke-dashoffset:-11}}
+.wfn{position:absolute;width:184px;height:76px;display:flex;align-items:center;gap:11px;padding:0 14px;background:#25262e;border:1.5px solid #3b3c48;border-radius:12px;cursor:pointer;user-select:none;transition:left .2s ease,top .2s ease,border-color .12s,box-shadow .12s}
+.wfn.step{touch-action:none}
+.wfn:hover{border-color:#555764}
+.wfn.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.wfn.drag{transition:none;z-index:5;cursor:grabbing;box-shadow:0 16px 34px rgba(0,0,0,.55),0 0 0 3px var(--accent-soft);border-color:var(--accent)}
+.wfn.off{border-color:rgba(255,93,100,.55)}
+.wfn .tx{display:flex;flex-direction:column;gap:3px;min-width:0}
+.wfn .tx b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wfn .tx span{font:10.5px var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wfn .num{position:absolute;top:-9px;left:12px;font:600 10px var(--mono);color:var(--muted);background:var(--raised);border:1px solid var(--line2);border-radius:999px;padding:0 6px;line-height:16px}
+.wfn .hi,.wfn .ho{position:absolute;top:50%;background:#8b8d9a}
+.wfn .hi{left:-5px;width:8px;height:14px;margin-top:-7px;border-radius:2px}
+.wfn .ho{right:-7px;width:13px;height:13px;margin-top:-6.5px;border-radius:50%;border:2px solid #18191e}
+.wfstage.v .wfn .hi{left:50%;top:-5px;width:14px;height:8px;margin:0 0 0 -7px}
+.wfstage.v .wfn .ho{right:auto;left:50%;top:auto;bottom:-7px;margin:0 0 0 -6.5px}
+.wfn.trig{border-radius:40px 12px 12px 40px}.wfn.out{border-radius:12px 40px 40px 12px}
+.wfn .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:16px;flex:none;background:var(--amber-soft);border:1px solid rgba(242,180,65,.3)}
+.wfn.out .ic{background:var(--violet-soft);border-color:rgba(169,139,255,.3)}
+.wfbadge{position:absolute;transform:translate(-50%,-50%);display:flex;gap:4px;z-index:2}
+.wfbadge button{height:22px;min-width:22px;border-radius:999px;border:1px solid var(--line2);background:var(--surface);color:var(--muted);font:500 11px var(--mono);cursor:pointer;display:grid;place-items:center;padding:0 6px;transition:opacity .12s,transform .12s}
+.wfbadge .g.approve{color:var(--amber);border-color:rgba(242,180,65,.45)}.wfbadge .g.auto{color:var(--teal);border-color:rgba(79,209,197,.45)}
+.wfbadge .plus{opacity:.35}.wfcv:hover .wfbadge .plus{opacity:.85}.wfbadge .plus:hover{color:var(--accent);border-color:var(--accent);opacity:1}
+.wfbadge.hot .plus{opacity:1;color:var(--accent);border-color:var(--accent);transform:scale(1.35)}
+.wfins{border-left:1px solid var(--line);padding:14px;overflow:auto;display:flex;flex-direction:column;gap:12px;background:var(--bg2)}
+.wfins .lab{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.wfins .hd{display:flex;align-items:center;gap:10px}
+.wfins .hd b{font-size:14px}
+.wfins .role{font-size:12px;color:var(--faint);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.seg{display:flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);padding:8px 6px;font:500 12px var(--sans);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on.approve{background:var(--amber-soft);color:var(--amber)}.seg button.on.auto{background:var(--teal-soft);color:var(--teal)}
+.okind{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.okind button{text-align:left;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);cursor:pointer;color:var(--text);font:500 12.5px var(--sans);display:flex;flex-direction:column;gap:3px}
+.okind button span{font-size:11px;color:var(--faint);font-weight:400;line-height:1.35}
+.okind button.on{border-color:var(--accent);background:var(--accent-soft)}
+.wftr{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-width:0}
+.wftr .faint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wfghost{position:fixed;pointer-events:none;z-index:100;opacity:.9;transform:translate(-50%,-50%) rotate(-2deg);box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.wfc .mf{justify-content:space-between;align-items:center}
+.wfc .mf .hint{font-size:11.5px;color:var(--faint)}
+@media (max-width:760px){
+  .modal.wfc{height:92dvh}
+  .wfwrap{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}
+  .wfpal{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto;padding:8px 10px;flex:none}
+  .wfpal h4,.wfpal .ph{display:none}
+  .wfins{border-left:0;border-top:1px solid var(--line);max-height:38dvh}
+  .wfpal .wfchip{flex:none}
+  .scrim{z-index:28}
+  .wfc .mf .hint{display:none}
+  .wfn.step{touch-action:pan-y}
+}
+.card[data-card]{cursor:pointer}
+.agent.dropb{box-shadow:inset 0 3px 0 var(--accent)}.agent.dropa{box-shadow:inset 0 -3px 0 var(--accent)}
+.agent.dragging{opacity:.45}
 </style>
 </head>
 <body>
@@ -540,6 +616,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
           <button class="chatto boss" id="chatTo" title="Who you're talking to"></button>
           <textarea id="chatIn" rows="1" placeholder="Ask the boss to plan, delegate or run a workflow…"></textarea>
           <button class="btn primary sm" id="chatSend" style="height:36px">Send</button>
+          <button class="iconbtn" id="chatClear" title="Clear this chat and start a fresh session (frees its context)">⌫</button>
           <button class="iconbtn" id="chatToggle" title="Show conversation">▴</button>
         </div>
       </div>
@@ -599,11 +676,16 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
   </div>
 </div>
 
-<div class="scrim" id="wfModal">
-  <div class="modal tm" role="dialog" aria-label="Workflow">
-    <div class="mh"><span id="wfTitle">New workflow</span><span class="faint" style="font-weight:400;font-size:12px;margin-left:auto;margin-right:12px">Steps run in order; each one builds on the last</span><button class="iconbtn" data-close>✕</button></div>
-    <div class="mb" id="wfBody"></div>
-    <div class="mf" id="wfFoot"></div>
+<div class="scrim wfs" id="wfModal">
+  <div class="modal wfc" role="dialog" aria-label="Workflow">
+    <div class="mh"><input class="wfname" id="wfName" data-w="name" placeholder="Name this workflow" maxlength="60" autocomplete="off"><button class="iconbtn" data-close>✕</button></div>
+    <div class="wfwrap">
+      <div class="wfpal" id="wfPal"></div>
+      <div class="wfcv" id="wfCanvas"><div class="wfstage" id="wfStage"></div></div>
+      <div class="wfins" id="wfIns"></div>
+    </div>
+    <div class="mf"><span class="hint">Drag blocks to reorder · drag an agent onto the canvas to add a step · ＋ on a line inserts one · Del removes the selected block</span>
+      <span style="display:flex;gap:8px"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="wfSave">Save</button></span></div>
   </div>
 </div>
 
@@ -731,7 +813,7 @@ function renderRail() {
       const t = a.task ? task(a.task) : null;
       const sel = view.drawer?.agent === a.name;
       const live = a.status === 'running';
-      return `<div class="agent ${sel ? 'sel' : ''}" data-agent="${a.name}" data-drop-agent="${a.name}">
+      return `<div class="agent ${sel ? 'sel' : ''}" data-agent="${a.name}" data-drop-agent="${a.name}" draggable="true" title="Drag to reorder · drop a task here to hand it over">
         <div class="row1">
           <div class="av ${a.status}">${esc(a.name[0])}</div>
           <div style="min-width:0"><div class="name">${esc(a.name)}</div><div class="role">${esc(a.role)}</div></div>
@@ -1033,6 +1115,39 @@ document.addEventListener('click', async e => {
 });
 
 // drag & drop: cards → columns (backlog/done) or → agents (assign)
+// clicking a card opens the agent that handled it (or is handling it)
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-card]');
+  if (!c || view.dragging || e.target.closest('button,a,input,textarea,select,[data-menu]')) return;
+  const t = task(+c.dataset.card); if (!t) return;
+  const who = t.who || t.history?.at(-1)?.who || t.handoff?.from;
+  if (!who || !agent(who)) return toast(t.col === 'backlog' ? 'Not picked up yet: it waits for an agent whose tags match' : 'No agent handled this task', 'var(--faint)');
+  view.drawer = {agent: who}; render();
+});
+// drag an agent in the rail to reorder the crew
+document.addEventListener('dragstart', e => { const c = e.target.closest('.agent[data-agent]'); if (!c || e.target.closest('[data-card]')) return; view.agentDrag = c.dataset.agent; view.dragging = true; c.classList.add('dragging'); e.dataTransfer.setData('crew/agent', c.dataset.agent); e.dataTransfer.effectAllowed = 'move'; });
+document.addEventListener('dragover', e => {
+  if (!view.agentDrag) return;
+  const c = e.target.closest('.agent[data-agent]'); if (!c) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const r = c.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+  document.querySelectorAll('.dropb,.dropa').forEach(x => x.classList.remove('dropb', 'dropa'));
+  if (c.dataset.agent !== view.agentDrag) c.classList.add(after ? 'dropa' : 'dropb');
+}, true);
+document.addEventListener('drop', e => {
+  if (!view.agentDrag) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const c = e.target.closest('.agent[data-agent]'), from = view.agentDrag;
+  view.agentDrag = null; view.dragging = false;
+  document.querySelectorAll('.dropb,.dropa').forEach(x => x.classList.remove('dropb', 'dropa'));
+  if (!c || c.dataset.agent === from) return render();
+  const after = e.clientY > c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2;
+  const names = S.agents.map(a => a.name).filter(n => n !== from);
+  names.splice(names.indexOf(c.dataset.agent) + (after ? 1 : 0), 0, from);
+  S.agents.sort((a, b) => names.indexOf(a.name) - names.indexOf(b.name)); render();
+  act('reorder_agents', {names});
+}, true);
+document.addEventListener('dragend', () => { if (view.agentDrag) { view.agentDrag = null; document.querySelectorAll('.dropb,.dropa').forEach(x => x.classList.remove('dropb', 'dropa')); } }, true);
 document.addEventListener('dragstart', e => { closeMenu(); const c = e.target.closest('[data-card]'); if (!c) return; view.dragging = true; c.classList.add('dragging'); e.dataTransfer.setData('text/plain', c.dataset.card); e.dataTransfer.effectAllowed = 'move'; });
 document.addEventListener('dragend', () => { view.dragging = false; document.querySelectorAll('.drop').forEach(x => x.classList.remove('drop')); render(); });
 document.addEventListener('dragover', e => { const z = e.target.closest('[data-col],[data-drop-agent]'); if (!z) return; e.preventDefault(); document.querySelectorAll('.drop').forEach(x => x !== z && x.classList.remove('drop')); z.classList.add('drop'); });
@@ -1403,53 +1518,214 @@ $('#rStart').onclick = async () => {
   if (r.ok) { closeModals(); toast(`${runWf.name} started: ${runWf.steps[0].agent} is up first`, 'var(--teal)'); }
 };
 $('#rTitle').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#rStart').click(); } };
-// editor
-let wfe = null;
+// ---- workflow canvas: trigger → agent → agent → … → output -------------------------------
+const NW = 184, NH = 76, GX = 58, PAD = 40;
+const OUT_KINDS = {
+  board: ['📋', 'Board', 'Run ends on the board; the last card holds the result'],
+  report: ['📄', 'Report file', 'Markdown report of every step, saved in the project'],
+  webhook: ['🔗', 'Webhook', 'POST the run report as JSON to a URL'],
+  workflow: ['⛓', 'Next workflow', 'Start another workflow with the same goal'],
+};
+let wfe = null, wfSel = null, wfKey = 0, wfDrag = null, wfL = null;
+const hueOf = s => [...(s || '?')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 17);
+const av2 = name => `<div class="av2" style="--h:${hueOf(name)}">${esc((name || '?')[0])}</div>`;
+const wfStepNode = k => wfe.steps.findIndex(st => st._k === k);
 function openWfEditor(w) {
-  wfe = w ? JSON.parse(JSON.stringify(w)) : {id: null, name: '', description: '', steps: [{agent: S.agents[0]?.name || '', title: '{input}', details: '', gate: 'approve'}]};
-  drawWfEditor(); $('#wfModal').classList.add('on');
+  wfe = w ? JSON.parse(JSON.stringify(w)) : {id: null, name: '', description: '', output: {kind: 'board'},
+    steps: [{agent: S.agents[0]?.name || '', title: '{input}', details: '', gate: 'approve'}]};
+  wfe.output = wfe.output || {kind: 'board'};
+  wfe.steps.forEach(st => st._k = ++wfKey);
+  wfSel = null;
+  $('#wfName').value = wfe.name;
+  $('#wfModal').classList.add('on');
+  drawWfEditor();
+  if (!w) setTimeout(() => $('#wfName').focus(), 0);
 }
-function drawWfEditor() {
-  $('#wfTitle').textContent = wfe.id ? 'Edit workflow' : 'New workflow';
-  const opts = cur => S.agents.map(a => `<option value="${a.name}" ${a.name === cur ? 'selected' : ''}>${a.name}</option>`).join('') + (cur && !S.agents.some(a => a.name === cur) ? `<option value="${esc(cur)}" selected>${esc(cur)} (missing)</option>` : '');
-  $('#wfBody').innerHTML = `
-    <input class="field" data-w="name" placeholder="Name, e.g. Feature delivery" value="${esc(wfe.name)}" maxlength="60" autocomplete="off">
-    <input class="field" data-w="description" placeholder="What it's for (optional)" value="${esc(wfe.description || '')}" maxlength="300" autocomplete="off">
-    <div class="chain">${chainHtml(wfe.steps)}</div>
-    ${wfe.steps.map((st, i) => `
-      <div class="steprow">
-        <div class="num">${i + 1}</div>
-        <select class="field" data-st="${i}" data-k="agent">${opts(st.agent)}</select>
-        <div class="sb">
-          <input class="field" data-st="${i}" data-k="title" value="${esc(st.title)}" placeholder="Task title, e.g. Build: {input}" autocomplete="off">
-          <textarea class="field" data-st="${i}" data-k="details" rows="2" placeholder="Instructions for this step (optional). Earlier steps' summaries are added automatically.">${esc(st.details)}</textarea>
-          <div><button class="gatebtn ${st.gate === 'auto' ? 'auto' : 'approve'}" data-gate="${i}">${st.gate === 'auto' ? '⚡ Continue automatically when done' : '✋ Wait for my approval'}</button></div>
-        </div>
-        <div class="sact">
-          <button class="iconbtn" data-mv="${i}" data-dir="-1" title="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
-          <button class="iconbtn" data-mv="${i}" data-dir="1" title="Move down" ${i === wfe.steps.length - 1 ? 'disabled' : ''}>↓</button>
-          <button class="iconbtn danger" data-rm="${i}" title="Remove step" ${wfe.steps.length === 1 ? 'disabled' : ''}>✕</button>
-        </div>
-      </div>`).join('')}
-    <div><button class="btn sm" data-add-step>＋ Add step</button></div>
-    <div class="thint">Placeholders: <code>{input}</code> <code>{details}</code> the run's goal · <code>{prev_summary}</code> <code>{prev_who}</code> <code>{prev_branch}</code> <code>{prev_commit}</code> · <code>{step}</code> <code>{steps}</code></div>`;
-  $('#wfFoot').innerHTML = `<button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-wf-save>${wfe.id ? 'Save' : 'Create workflow'}</button>`;
+function drawWfEditor() { drawWfPal(); drawWfStage(); drawWfIns(); }
+function drawWfPal() {
+  $('#wfPal').innerHTML = `<h4>Agents</h4>${S.agents.map(a => `<div class="wfchip" data-chip="${esc(a.name)}" title="${esc(a.role)}">${av2(a.name)}<span>${esc(a.name)}</span></div>`).join('')}
+    <div class="ph">Drag onto the canvas, or click to add at the end.</div>`;
 }
+function wfNodes() { return ['trigger', ...wfe.steps.map(st => 's' + st._k), 'output']; }
+function wfLayout() {
+  const cv = $('#wfCanvas'), W = cv.clientWidth || 900, n = wfe.steps.length + 2;
+  const v = W < 520, gy = v ? 56 : 84;
+  const per = v ? 1 : Math.max(2, Math.floor((W - PAD * 2 + GX) / (NW + GX)));
+  const cols = Math.min(n, per), gw = v ? NW : cols * (NW + GX) - GX;
+  const w = Math.max(W, gw + PAD * 2), ox = (w - gw) / 2;
+  const pos = Array.from({length: n}, (_, i) => ({x: ox + (i % per) * (NW + GX), y: PAD + Math.floor(i / per) * (NH + gy)}));
+  return {pos, per, v, gy, w, h: PAD * 2 + Math.ceil(n / per) * (NH + gy) - gy};
+}
+function wfEdge(a, b, L) {
+  if (L.v) { const x = a.x + NW / 2, y1 = a.y + NH, y2 = b.y; return {d: `M${x} ${y1} V${y2}`, mx: x, my: (y1 + y2) / 2}; }
+  const x1 = a.x + NW, y1 = a.y + NH / 2, x2 = b.x, y2 = b.y + NH / 2;
+  if (Math.abs(y1 - y2) < 1) return {d: `M${x1} ${y1} H${x2}`, mx: (x1 + x2) / 2, my: y1};
+  const my = a.y + NH + L.gy / 2, r = 12, xr = x1 + 22, xl = x2 - 22;
+  return {d: `M${x1} ${y1} H${xr - r} Q${xr} ${y1} ${xr} ${y1 + r} V${my - r} Q${xr} ${my} ${xr - r} ${my} H${xl + r} Q${xl} ${my} ${xl} ${my + r} V${y2 - r} Q${xl} ${y2} ${xl + r} ${y2} H${x2}`,
+    mx: (xr + xl) / 2, my};
+}
+function wfNodeHtml(id, i) {
+  const sel = wfSel === id ? 'sel' : '';
+  if (id === 'trigger') {
+    const trs = wfe.id ? (S.triggers || []).filter(t => t.task.workflow === wfe.id) : [];
+    return `<div class="wfn trig ${sel}" data-n="trigger"><div class="ic">⚡</div><div class="tx"><b>When</b><span>${trs.length ? `${trs.length} trigger${trs.length > 1 ? 's' : ''} · or ▶ Run` : '▶ Run by hand'}</span></div><i class="ho"></i></div>`;
+  }
+  if (id === 'output') {
+    const k = OUT_KINDS[wfe.output.kind] || OUT_KINDS.board, o = wfe.output;
+    const sub = o.kind === 'report' ? (o.path || 'crew-reports') + '/' : o.kind === 'webhook' ? (o.url || 'no URL yet').replace(/^https?:\/\//, '') : o.kind === 'workflow' ? ((S.workflows || []).find(w => w.id === o.workflow)?.name || 'pick one') : k[1];
+    return `<div class="wfn out ${sel}" data-n="output"><i class="hi"></i><div class="ic">${k[0]}</div><div class="tx"><b>Output</b><span>${esc(sub)}</span></div></div>`;
+  }
+  const st = wfe.steps[i - 1], a = S.agents.find(x => x.name === st.agent);
+  return `<div class="wfn step ${sel} ${a ? '' : 'off'}" data-n="${id}" title="${esc(st.title || '{input}')}"><i class="hi"></i><span class="num">${i}</span>${av2(st.agent)}
+    <div class="tx"><b>${esc(st.agent || 'pick an agent')}</b><span>${esc(st.title || '{input}')}</span></div><i class="ho"></i></div>`;
+}
+function drawWfStage() {
+  $('#wfStage').innerHTML = wfNodes().map(wfNodeHtml).join('') + '<svg class="wfedges"></svg><div id="wfBadges"></div>';
+  wfPlace();
+}
+function wfPlace(skip = null) {
+  const L = wfL = wfLayout(), st = $('#wfStage'), ids = wfNodes();
+  st.style.width = L.w + 'px'; st.style.height = L.h + 'px'; st.classList.toggle('v', L.v);
+  ids.forEach((id, i) => { if (id === skip) return; const el = st.querySelector(`[data-n="${id}"]`); if (el) { el.style.left = L.pos[i].x + 'px'; el.style.top = L.pos[i].y + 'px'; const nm = el.querySelector('.num'); if (nm) nm.textContent = i; } });
+  const svg = st.querySelector('.wfedges'); svg.setAttribute('width', L.w); svg.setAttribute('height', L.h);
+  let paths = '', badges = '';
+  for (let i = 0; i < ids.length - 1; i++) {
+    const e = wfEdge(L.pos[i], L.pos[i + 1], L), step = i >= 1 ? wfe.steps[i - 1] : null;
+    paths += `<path d="${e.d}" class="${step && step.gate === 'auto' ? 'auto' : ''}"/>`;
+    badges += `<div class="wfbadge" data-edge="${i}" style="left:${e.mx}px;top:${e.my}px">${step ? `<button class="g ${step.gate === 'auto' ? 'auto' : 'approve'}" data-g="${step._k}" title="${step.gate === 'auto' ? 'Continues automatically when step ' + i + ' is done · click to require approval' : 'Waits for your approval of step ' + i + ' · click to continue automatically'}">${step.gate === 'auto' ? '⚡' : '✋'}</button>` : ''}<button class="plus" data-ins="${i}" title="Add a step here">＋</button></div>`;
+  }
+  svg.innerHTML = paths; st.querySelector('#wfBadges').innerHTML = badges;
+}
+function wfInsert(at, agent) {
+  if (wfe.steps.length >= 12) return toast('A workflow has at most 12 steps', 'var(--red)');
+  const st = {agent, title: '{input}', details: '', gate: 'approve', _k: ++wfKey};
+  wfe.steps.splice(at, 0, st); wfSel = 's' + st._k; drawWfStage(); drawWfIns();
+}
+function wfRemove(k) {
+  if (wfe.steps.length === 1) return toast('A workflow needs at least one step', 'var(--red)');
+  wfe.steps.splice(wfStepNode(k), 1); wfSel = null; drawWfStage(); drawWfIns();
+}
+function wfField(label, inner) { return `<label class="lab">${label}${inner}</label>`; }
+function drawWfIns() {
+  const box = $('#wfIns');
+  if (wfSel && wfSel[0] === 's') {
+    const i = wfStepNode(+wfSel.slice(1)); if (i < 0) { wfSel = null; return drawWfIns(); }
+    const st = wfe.steps[i], a = S.agents.find(x => x.name === st.agent);
+    const opts = S.agents.map(x => `<option value="${esc(x.name)}" ${x.name === st.agent ? 'selected' : ''}>${esc(x.name)}</option>`).join('') + (a ? '' : `<option selected>${esc(st.agent)} (missing)</option>`);
+    box.innerHTML = `<h4>Step ${i + 1} of ${wfe.steps.length}</h4>
+      <div class="hd">${av2(st.agent)}<div style="min-width:0;flex:1"><select class="field" data-s="agent" style="padding:7px 9px">${opts}</select></div></div>
+      ${a ? `<div class="role">${esc(a.role)}</div>` : '<div class="role" style="color:var(--red)">This agent is not in the crew any more.</div>'}
+      ${wfField('Task title', `<input class="field" data-s="title" value="${esc(st.title)}" placeholder="Build: {input}" autocomplete="off">`)}
+      ${wfField('Instructions', `<textarea class="field" data-s="details" rows="5" placeholder="Optional. Earlier steps' summaries are added automatically.">${esc(st.details)}</textarea>`)}
+      ${wfField('When this step is done', `<div class="seg"><button class="approve ${st.gate !== 'auto' ? 'on' : ''}" data-sg="approve">✋ Wait for me</button><button class="auto ${st.gate === 'auto' ? 'on' : ''}" data-sg="auto">⚡ Continue</button></div>`)}
+      <div style="display:flex;gap:6px"><button class="btn sm" data-smv="-1" ${i === 0 ? 'disabled' : ''}>← Earlier</button><button class="btn sm" data-smv="1" ${i === wfe.steps.length - 1 ? 'disabled' : ''}>Later →</button><button class="btn sm danger" data-srm style="margin-left:auto" ${wfe.steps.length === 1 ? 'disabled' : ''}>Delete</button></div>
+      <div class="thint">Placeholders: <code>{input}</code> <code>{details}</code> the run's goal · <code>{prev_summary}</code> <code>{prev_who}</code> <code>{prev_branch}</code> <code>{prev_commit}</code> · <code>{step}</code> <code>{steps}</code></div>`;
+  } else if (wfSel === 'trigger') {
+    const trs = wfe.id ? (S.triggers || []).filter(t => t.task.workflow === wfe.id) : [];
+    box.innerHTML = `<h4>Start</h4>
+      <div class="role" style="-webkit-line-clamp:unset">A run starts by hand with ▶ Run, or by a trigger: a schedule, a finished task, a file change, a poll or a webhook. The trigger's task title becomes the run's goal (<code>{input}</code>).</div>
+      ${trs.map(t => `<div class="wftr"><span>${TRIG_KIND[t.kind].ic}</span><b style="font-weight:600;white-space:nowrap">${esc(t.name)}</b><span class="faint">${esc(trigWhat(t))}</span>${t.enabled ? '' : '<span class="faint">off</span>'}</div>`).join('') || '<div class="faint" style="font-size:12px">No triggers yet.</div>'}
+      <div style="display:flex;gap:6px"><button class="btn sm" data-wf-addtrig>⚡ Add trigger</button><button class="btn sm primary" data-wf-runnow>▶ Run now</button></div>
+      ${wfe.id ? '' : '<div class="faint" style="font-size:11.5px">Both save the workflow first.</div>'}`;
+  } else if (wfSel === 'output') {
+    const o = wfe.output, flows = (S.workflows || []).filter(w => w.id !== wfe.id);
+    box.innerHTML = `<h4>Output</h4><div class="role" style="-webkit-line-clamp:unset">What happens when the last step is done${wfe.steps.at(-1).gate === 'auto' ? '' : ' and approved'}.</div>
+      <div class="okind">${Object.entries(OUT_KINDS).map(([k, v]) => `<button class="${o.kind === k ? 'on' : ''}" data-ok="${k}">${v[0]} ${v[1]}<span>${v[2]}</span></button>`).join('')}</div>
+      ${o.kind === 'report' ? wfField('Folder in the project', `<input class="field" data-o="path" value="${esc(o.path || 'crew-reports')}" autocomplete="off">`) : ''}
+      ${o.kind === 'webhook' ? wfField('URL', `<input class="field" data-o="url" value="${esc(o.url || '')}" placeholder="https://hooks.slack.com/…" autocomplete="off">`) + '<div class="faint" style="font-size:11.5px">Body: {workflow, run, title, status, report, steps}</div>' : ''}
+      ${o.kind === 'workflow' ? wfField('Start', `<select class="field" data-o="workflow"><option value="">Pick a workflow</option>${flows.map(w => `<option value="${w.id}" ${w.id === o.workflow ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}</select>`) : ''}`;
+  } else {
+    box.innerHTML = `<h4>Workflow</h4>
+      ${wfField('What it\'s for', `<textarea class="field" data-w="description" rows="3" placeholder="Optional">${esc(wfe.description || '')}</textarea>`)}
+      <div class="role" style="-webkit-line-clamp:unset">${wfe.steps.length} step${wfe.steps.length > 1 ? 's' : ''}: ${wfe.steps.map(st => esc(st.agent)).join(' → ')}. Each step is a task for one agent; it gets the goal plus every earlier step's summary and merges the previous branch.</div>
+      <div class="thint">Click a block to edit it. ✋ on a line waits for your approval, ⚡ continues on its own; click to switch.</div>`;
+  }
+}
+async function wfSaveNow(close) {
+  wfe.name = $('#wfName').value.trim();
+  if (!wfe.name) { $('#wfName').focus(); return toast('Name the workflow first', 'var(--red)'), null; }
+  const r = await act('wf_save', wfe);
+  if (!r.ok) return null;
+  const first = !wfe.id; wfe.id = r.id || wfe.id;
+  if (close) { closeModals(); toast(first ? 'Workflow created' : 'Workflow saved', 'var(--teal)'); }
+  return wfe.id;
+}
+$('#wfSave').onclick = () => wfSaveNow(true);
 $('#wfModal').addEventListener('click', async e => {
-  const b = e.target.closest('button'); if (!b || b.hasAttribute('data-close')) return;
+  const b = e.target.closest('button,[data-n],[data-chip]');
+  if (!b || b.hasAttribute('data-close') || b.id === 'wfSave') return;
   const d = b.dataset;
-  if (d.gate) { const st = wfe.steps[+d.gate]; st.gate = st.gate === 'auto' ? 'approve' : 'auto'; return drawWfEditor(); }
-  if (d.mv) { const i = +d.mv, j = i + +d.dir; [wfe.steps[i], wfe.steps[j]] = [wfe.steps[j], wfe.steps[i]]; return drawWfEditor(); }
-  if (d.rm) { wfe.steps.splice(+d.rm, 1); return drawWfEditor(); }
-  if ('addStep' in d) { wfe.steps.push({agent: S.agents[0]?.name || '', title: '{input}', details: '', gate: 'approve'}); return drawWfEditor(); }
-  if ('wfSave' in d) { const r = await act('wf_save', wfe); if (r.ok) { closeModals(); toast(wfe.id ? 'Workflow saved' : 'Workflow created', 'var(--teal)'); } }
+  if (d.n) { if (wfDrag?.moved) return; wfSel = d.n; $('#wfStage').querySelectorAll('.wfn').forEach(n => n.classList.toggle('sel', n.dataset.n === wfSel)); return drawWfIns(); }
+  if (d.chip) return wfInsert(wfe.steps.length, d.chip);
+  if (d.g) { const st = wfe.steps[wfStepNode(+d.g)]; st.gate = st.gate === 'auto' ? 'approve' : 'auto'; wfPlace(); return drawWfIns(); }
+  if (d.ins != null) {
+    MENU_ACTIONS = [];
+    showMenu(b, '<div class="mh">Add a step here</div>' + S.agents.map(a => item(`${esc(a.name)}<span class="faint"> · ${esc(a.tags.join(', '))}</span>`, () => wfInsert(+d.ins, a.name))).join(''));
+    return;
+  }
+  if (d.sg) { wfe.steps[wfStepNode(+wfSel.slice(1))].gate = d.sg; wfPlace(); return drawWfIns(); }
+  if (d.smv) { const i = wfStepNode(+wfSel.slice(1)), j = i + +d.smv; [wfe.steps[i], wfe.steps[j]] = [wfe.steps[j], wfe.steps[i]]; drawWfStage(); return drawWfIns(); }
+  if ('srm' in d) return wfRemove(+wfSel.slice(1));
+  if (d.ok) { wfe.output = {kind: d.ok, ...(d.ok === 'report' ? {path: wfe.output.path || 'crew-reports'} : {}), ...(d.ok === 'webhook' ? {url: wfe.output.url || ''} : {}), ...(d.ok === 'workflow' ? {workflow: wfe.output.workflow || ''} : {})}; drawWfStage(); return drawWfIns(); }
+  if ('wfAddtrig' in d) { const id = await wfSaveNow(false); if (id) newTrigFor({workflow: id}); return; }
+  if ('wfRunnow' in d) { const id = await wfSaveNow(false); if (id) { closeModals(); openRun({...wfe, id}); } return; }
 });
 $('#wfModal').addEventListener('input', e => {
   const el = e.target, d = el.dataset;
   if (d.w) wfe[d.w] = el.value;
-  if (d.st != null && d.k) { wfe.steps[+d.st][d.k] = el.value; if (d.k === 'agent') drawWfEditor(); }
+  if (d.o) wfe.output[d.o] = el.value;
+  if (d.s && wfSel?.[0] === 's') wfe.steps[wfStepNode(+wfSel.slice(1))][d.s] = el.value;
+  if (d.o || d.s) { drawWfStage(); if (d.s === 'agent') drawWfIns(); }
 });
-$('#wfModal').addEventListener('change', e => { const el = e.target, d = el.dataset; if (d.st != null && d.k === 'agent') { wfe.steps[+d.st].agent = el.value; drawWfEditor(); } });
+// drag: reorder steps on the canvas, or drop an agent from the palette between two blocks
+function wfNearest(cx, cy, from, to) {  // index of the slot (in wfL.pos) closest to a point
+  let best = from, bd = Infinity;
+  for (let i = from; i <= to; i++) { const p = wfL.pos[i], dd = (p.x + NW / 2 - cx) ** 2 + (p.y + NH / 2 - cy) ** 2; if (dd < bd) { bd = dd; best = i; } }
+  return best;
+}
+$('#wfModal').addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.target.closest('button')) return;
+  const node = e.target.closest('.wfn.step'), chip = e.target.closest('[data-chip]');
+  if (!node && !chip) return;
+  if (node && e.pointerType === 'touch') return;  // phones scroll the canvas; reorder with Earlier / Later
+  wfDrag = {node, chip, x0: e.clientX, y0: e.clientY, moved: false, id: node?.dataset.n};
+  if (node) { const r = node.getBoundingClientRect(); wfDrag.dx = e.clientX - r.left; wfDrag.dy = e.clientY - r.top; }
+});
+addEventListener('pointermove', e => {
+  if (!wfDrag) return;
+  if (!wfDrag.moved && Math.hypot(e.clientX - wfDrag.x0, e.clientY - wfDrag.y0) < 5) return;
+  const sr = $('#wfStage').getBoundingClientRect();
+  if (!wfDrag.moved) {
+    wfDrag.moved = true;
+    if (wfDrag.node) wfDrag.node.classList.add('drag');
+    else { const g = wfDrag.chip.cloneNode(true); g.classList.add('wfghost'); document.body.append(g); wfDrag.ghost = g; }
+  }
+  if (wfDrag.node) {
+    const x = e.clientX - sr.left - wfDrag.dx, y = e.clientY - sr.top - wfDrag.dy;
+    wfDrag.node.style.left = x + 'px'; wfDrag.node.style.top = y + 'px';
+    const k = +wfDrag.id.slice(1), cur = wfStepNode(k), to = wfNearest(x + NW / 2, y + NH / 2, 1, wfe.steps.length) - 1;
+    if (to !== cur) { const [st] = wfe.steps.splice(cur, 1); wfe.steps.splice(to, 0, st); wfPlace(wfDrag.id); }
+  } else {
+    wfDrag.ghost.style.left = e.clientX + 'px'; wfDrag.ghost.style.top = e.clientY + 'px';
+    const cr = $('#wfCanvas').getBoundingClientRect(), inside = e.clientX > cr.left && e.clientX < cr.right && e.clientY > cr.top && e.clientY < cr.bottom;
+    wfDrag.at = inside ? wfNearest(e.clientX - sr.left, e.clientY - sr.top, 1, wfe.steps.length + 1) - 1 : null;
+    $('#wfStage').querySelectorAll('.wfbadge').forEach(b => b.classList.toggle('hot', wfDrag.at != null && +b.dataset.edge === wfDrag.at));
+  }
+});
+addEventListener('pointerup', () => {
+  if (!wfDrag) return;
+  const dr = wfDrag;
+  if (dr.moved) {
+    if (dr.node) { dr.node.classList.remove('drag'); wfPlace(); drawWfIns(); }
+    else { dr.ghost.remove(); if (dr.at != null) wfInsert(dr.at, dr.chip.dataset.chip); else $('#wfStage').querySelectorAll('.wfbadge.hot').forEach(b => b.classList.remove('hot')); }
+    setTimeout(() => { wfDrag = null; }, 0);  // swallow the click that follows a drag
+  } else wfDrag = null;
+});
+addEventListener('keydown', e => {
+  if (!$('#wfModal').classList.contains('on') || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && wfSel?.[0] === 's') { e.preventDefault(); wfRemove(+wfSel.slice(1)); }
+});
+new ResizeObserver(() => { if (wfe && $('#wfModal').classList.contains('on')) wfPlace(); }).observe($('#wfCanvas'));
 
 
 // ---- inherited Claude Code setup (skills, plugins, MCP) -------------------------------
@@ -1583,6 +1859,12 @@ $('#chatSend').onclick = sendChat;
 $('#chatIn').addEventListener('input', autosize);
 $('#chatIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
 $('#chatIn').addEventListener('focus', () => { if (!view.chatOpen) { view.chatOpen = true; renderChat(); } });
+$('#chatClear').onclick = () => {
+  const t = chatTarget(), name = t === S.boss ? 'the boss' : t.name;
+  if (t.status === 'running') return toast(`${name} is working: stop it first`, 'var(--amber)');
+  askConfirm('Clear this chat?', `The conversation with <b>${esc(name)}</b> is removed and its context is emptied; the next message starts a fresh session. Tasks, branches and commits are kept.`, 'Clear chat',
+    async () => { const r = await act('clear_chat', {agent: t === S.boss ? 'boss' : t.name}); if (r.ok) { $('#chatlog').dataset.sig = ''; toast('Chat cleared', 'var(--green)'); } }, true);
+};
 $('#chatToggle').onclick = () => { view.chatOpen = !view.chatOpen; renderChat(); };
 $('#chatTo').onclick = e => {
   e.stopPropagation();

@@ -30,6 +30,16 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
 - [x] Test on the demo + real boss calls, refresh the app, README, push
 - [ ] Refresh README screenshots/GIF for boss chat and the phone layout
 
+## Batch: canvas editor and small asks
+
+- [x] **Workflow canvas** (n8n-style): When (trigger) → one block per agent → Output; drag to reorder, drag agents from the palette or ＋ on a line to insert, ✋/⚡ toggles on lines, inspector panel, Del removes; phone: vertical canvas, Earlier/Later buttons
+- [x] **Workflow output**: board (default), markdown report file, webhook (JSON), or start the next workflow; saved with the workflow, boss can set it too
+- [x] **Click a board card** to open the agent that handled it
+- [x] **Clear chat** (⌫ in the chat bar): wipes the conversation and context of the boss or the selected agent
+- [x] **Reorder agents** by dragging in the rail (saved to crew.json)
+- [x] **Star history** chart in the README (Haiku subagent)
+- [ ] Refresh `assets/wf-edit.png` with the canvas editor
+
 ## Later
 
 - [ ] Parallel workflow steps (fan out, then join)

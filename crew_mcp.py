@@ -43,8 +43,11 @@ TOOLS = [
     tool("update_agent", "Change an agent's role, tags, model or effort.",
          {"name": S, "role": S, "tags": {"type": "array", "items": S}, "model": S, "effort": S}, ["name"], boss=True),
     tool("save_workflow", "Create a workflow, or replace one when `id` is given. Steps run in order; gate 'approve' waits for "
-         "the user, 'auto' continues when the step is done. Step titles may use {input}.",
-         {"id": S, "name": S, "description": S, "steps": {"type": "array", "items": STEP}}, ["name", "steps"], boss=True),
+         "the user, 'auto' continues when the step is done. Step titles may use {input}. `output` says what happens when a "
+         "run finishes: {kind: board} (default), {kind: report, path: folder in the project} (markdown report), "
+         "{kind: webhook, url}, or {kind: workflow, workflow: id} (start another workflow with the same goal).",
+         {"id": S, "name": S, "description": S, "steps": {"type": "array", "items": STEP}, "output": {"type": "object"}},
+         ["name", "steps"], boss=True),
     tool("add_trigger", "Create a trigger. kind: schedule (spec.cron, 5-field local time), event (spec.on: review|done|error, "
          "optional spec.tag/spec.agent), watch (spec.glob, spec.every seconds), poll (spec.command, spec.every minutes, "
          "spec.when: change|fail|output) or webhook. It creates `task` (title, details, tag, agent) or, with task.workflow "
