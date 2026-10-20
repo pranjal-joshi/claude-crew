@@ -88,14 +88,13 @@ Crew gives that queue a home:
 
 ```mermaid
 flowchart LR
-    UI["Browser UI<br/>index.html"] <-- "SSE + JSON" --> S["server.py<br/>127.0.0.1 only"]
-    S -- "stream-json over stdin/stdout" --> A1["claude -p<br/>builder"]
-    S --> A2["claude -p<br/>tester"]
-    S --> A3["claude -p<br/>reviewer"]
-    S --> A4["..."]
-    A1 --- W1[("worktree<br/>crew/builder")]
-    A2 --- W2[("worktree<br/>crew/tester")]
-    A3 --- W3[("worktree<br/>crew/reviewer")]
+    UI["Browser UI (index.html)"] <-->|SSE + JSON| S["server.py on 127.0.0.1"]
+    S -->|stream-json| A1["claude -p: builder"]
+    S -->|stream-json| A2["claude -p: tester"]
+    S -->|stream-json| A3["claude -p: reviewer"]
+    A1 --- W1[("worktree crew/builder")]
+    A2 --- W2[("worktree crew/tester")]
+    A3 --- W3[("worktree crew/reviewer")]
 ```
 
 - Each agent is a long-lived `claude -p --input-format stream-json --output-format stream-json` process. Crew writes tasks and your messages to its stdin and reads every event from its stdout.
