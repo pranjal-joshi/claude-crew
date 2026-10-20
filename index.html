@@ -322,7 +322,8 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .slashpop .empty{padding:10px;color:var(--faint);font-size:12.5px}
 .kebab{flex:none;width:26px;height:26px;margin:-4px -5px 0 0;border-radius:7px;display:grid;place-items:center;border:0;background:transparent;color:var(--muted);cursor:pointer;opacity:.7;transition:opacity .12s,background .12s,color .12s;font-size:16px;font-weight:700;line-height:1}
 .card:hover .kebab,.agent:hover .kebab,.kebab:focus-visible{opacity:1}.kebab:hover{background:var(--hover);color:var(--text)}
-.card .th{display:flex;align-items:flex-start;gap:10px}.card .th .t{flex:1;min-width:0}
+.card .th{display:flex;align-items:flex-start;gap:10px}.cbtns{display:flex;gap:2px;flex:none;margin:-4px -5px 0 0}.cbtns .kebab{margin:0}
+.fwdb{color:var(--muted)}.fwdb .fwd{width:14px;height:14px}.fwdb:hover{color:var(--accent)}.card .th .t{flex:1;min-width:0}
 .fwd{flex:none;vertical-align:-2px}.fwdi{display:inline-flex;vertical-align:-1px}
 .handoff,.hofrom{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .handoff{display:inline-flex;align-items:center;gap:4px;font:10.5px var(--mono);color:var(--amber)}
@@ -922,7 +923,7 @@ function card(t) {
   return `<div class="card ${t.col}" draggable="true" data-card="${t.id}">
     ${t.source ? `<div class="srcl" title="Created by trigger: ${esc(t.source.name)}">${BOLT}${esc(t.source.name)}</div>` : ''}
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
-    <div class="th"><div class="t">${esc(t.title)}</div><button class="kebab" data-menu="${t.id}" title="Hand off, move or delete">⋮</button></div>
+    <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Forward (hand off) to an agent">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete">⋮</button></span></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
     <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${hand}${subs}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}from ${esc(t.handoff.from)}</span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
@@ -1097,7 +1098,7 @@ function renderReviewDrawer(d, t) {
     </div>
     <div class="reviewbar">
       <div class="inputwrap"><textarea id="fb" rows="1" placeholder="Feedback for ${esc(t.who)} if you send it back…"></textarea></div>
-      <div style="display:flex;gap:8px"><button class="btn green" data-approve="${t.id}">✓ Approve &amp; commit</button><button class="btn" data-reject="${t.id}">↺ Send back</button><button class="btn ghost" data-menu="${t.id}" style="margin-left:auto"><span class="fwdi">${FWD}</span> Hand off ▾</button></div>
+      <div style="display:flex;gap:8px"><button class="btn green" data-approve="${t.id}">✓ Approve &amp; commit</button><button class="btn" data-reject="${t.id}">↺ Send back</button><button class="btn ghost" data-fwd="${t.id}" style="margin-left:auto"><span class="fwdi">${FWD}</span> Hand off ▾</button></div>
     </div></div>`;
   $('#fb').addEventListener('input', autosize);
 }
@@ -1134,10 +1135,11 @@ async function sendMsg() {
 /* ── interactions ──────────────────────────────────── */
 document.addEventListener('click', async e => {
   if (!e.target.closest('.menu')) closeMenu();
-  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-mi],[data-kill],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-filter],[data-agent],[data-close]');
+  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-kill],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-filter],[data-agent],[data-close]');
   if (!el) return;
   const ds = el.dataset;
   if (ds.menu) { e.stopPropagation(); return openTaskMenu(+ds.menu, el); }
+  if (ds.fwd) { e.stopPropagation(); return openFwdMenu(+ds.fwd, el); }
   if ('addAgent' in ds) return openAgentModal();
   if ('toggleCost' in ds) { showCost = !showCost; try { localStorage.setItem('crew.showCost', showCost ? '1' : '0'); } catch {} return render(); }
   if (ds.browse !== undefined) return browseTo(ds.browse);
@@ -1219,12 +1221,10 @@ function item(label, run, {sub = '', cls = '', disabled = false} = {}) {
   MENU_ACTIONS.push(run);
   return `<div class="mi ${cls}" data-mi="${MENU_ACTIONS.length - 1}" ${disabled ? 'aria-disabled="true"' : ''}><span>${label}${sub ? `<span class="sub">${sub}</span>` : ''}</span></div>`;
 }
-function openTaskMenu(id, anchor) {
+function openFwdMenu(id, anchor) {
   const t = task(id); if (!t) return;
   MENU_ACTIONS = [];
-  let h = '';
-  if (t.hold) h += item('▶ Resume: let it run again', () => act('resume', {task: id}));
-  h += `<div class="mh"><span class="fwdi">${FWD}</span> Forward #${t.id} to · as a to-do</div>`;
+  let h = `<div class="mh"><span class="fwdi">${FWD}</span> Forward #${t.id} to · as a to-do</div>`;
   h += item(`<span class="mini" style="display:inline-grid;margin-right:8px;vertical-align:-4px;background:linear-gradient(135deg,#f0a07f,#c9532a);color:#1a0d07">✦</span>Auto<span class="faint"> · the boss picks the best agent</span>`,
     () => bossSays(`Pick the best agent for task #${t.id} "${t.title}" and assign it with assign_task. One line on why.`));
   for (const a of S.agents) {
@@ -1233,6 +1233,14 @@ function openTaskMenu(id, anchor) {
     h += item(`<span class="mini" style="display:inline-grid;margin-right:8px;vertical-align:-4px">${esc(a.name[0])}</span>${esc(a.name)}<span class="faint">${self ? ' · working on it' : note}</span>`,
       () => handTo(id, a.name), {disabled: self || a.status === 'killed' || a.status === 'error'});
   }
+  showMenu(anchor, h);
+}
+function openTaskMenu(id, anchor) {
+  const t = task(id); if (!t) return;
+  MENU_ACTIONS = [];
+  let h = `<div class="mh">#${t.id} · ${esc(t.col === 'doing' ? 'in progress' : t.col)}</div>`;
+  if (t.hold) h += item('▶ Resume: let it run again', () => act('resume', {task: id}));
+  if (t.who || t.history?.length || t.handoff) h += item('Open its agent', () => { view.drawer = {agent: t.who || t.history?.at(-1)?.who || t.handoff?.from}; render(); });
   h += '<div class="sep"></div>';
   h += item('Backlog · anyone with a matching role', () => moveTo(id, 'backlog'), {disabled: t.col === 'backlog' && !t.who});
   h += item('Mark done', () => moveTo(id, 'done'), {disabled: t.col === 'done'});

@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - ⋮ menu on every agent: rename (moves its worktree and branch, updates tasks, triggers and workflows), settings, stop, kill, delete.
 
 ### Changed
-- Card ⋮ is always visible at the top right; hand-offs show a forward arrow.
+- Cards get a forward button (hand off to an agent) next to an always-visible ⋮ (move, mark done, delete); hand-offs show a forward arrow.
 
 ## [0.1.0] - 2026-10-20
 
