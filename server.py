@@ -17,6 +17,7 @@ import re
 import os
 import secrets
 import shlex
+import socket
 import shutil
 import signal
 import subprocess
@@ -119,6 +120,62 @@ def clean_tags(tags) -> list[str]:
 
 def now() -> float:
     return time.time()
+
+
+# Claude Code files that git doesn't carry into a worktree (ignored or never committed) but that
+# shape a session: local settings, project skills/agents/commands, project MCP servers, local memory.
+CLAUDE_LOCAL = [".claude/settings.local.json", ".claude/skills", ".claude/agents", ".claude/commands",
+                ".claude/rules", ".mcp.json", "CLAUDE.local.md"]
+
+
+def sync_claude_files(src: Path, dst: Path) -> list[str]:
+    """Copy the project's untracked Claude Code files into an agent's worktree. Tracked files come with git."""
+    tracked = set(git(src, "ls-files", "--", *CLAUDE_LOCAL).stdout.split("\n"))
+    copied = []
+    for rel in CLAUDE_LOCAL:
+        s_path = src / rel
+        files = [s_path] if s_path.is_file() else [f for f in s_path.rglob("*") if f.is_file()] if s_path.is_dir() else []
+        for f in files:
+            r = f.relative_to(src).as_posix()
+            if r in tracked:
+                continue
+            d = dst / r
+            try:
+                if d.exists() and d.stat().st_mtime >= f.stat().st_mtime and d.stat().st_size == f.stat().st_size:
+                    continue
+                d.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, d)
+                copied.append(r)
+            except OSError:
+                pass
+    return copied
+
+
+def local_mcp_servers(project: Path) -> dict:
+    """MCP servers added with `claude mcp add` (local scope) for the project or a folder above it.
+    Claude Code keys these by the folder it was started in, so an agent in a worktree would miss them."""
+    try:
+        cfg = json.loads((Path.home() / ".claude.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    want = [project, *project.parents]
+    servers: dict = {}
+    for key, entry in (cfg.get("projects") or {}).items():
+        try:
+            k = Path(key).resolve()
+        except OSError:
+            continue
+        if k in want:
+            for name, spec in (entry.get("mcpServers") or {}).items():
+                servers.setdefault(name, spec)  # nearest folder wins: `want` starts at the project
+    mcp = project / ".mcp.json"
+    if mcp.is_file():  # project-scope servers, whether or not .mcp.json is committed
+        try:
+            for name, spec in (json.loads(mcp.read_text(encoding="utf-8")).get("mcpServers") or {}).items():
+                servers.setdefault(name, spec)
+        except ValueError:
+            pass
+    return servers
 
 
 # ---- triggers: cron, templates ---------------------------------------------------
@@ -285,7 +342,7 @@ class Crew:
                 t["who"] = t["pinned"] = None  # its agent left the roster; let the tags route it
         for name, saved in data.get("agents", {}).items():
             if name in self.agents:
-                self.agents[name].update({k: saved[k] for k in ("session", "cost", "log", "tokens") if k in saved})
+                self.agents[name].update({k: saved[k] for k in ("session", "cost", "log", "tokens", "mcp", "skills", "skill_names", "plugins") if k in saved})
                 if self.agents[name]["status"] != "idle":
                     self.agents[name]["status"] = "idle"
 
@@ -293,7 +350,9 @@ class Crew:
         data = {"project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
                 "mcp_allow": sorted(self.mcp_allow), "triggers": self._public_triggers(), "next_trig": self.next_trig,
                 "runs": self.runs[-50:], "next_run": self.next_run,
-                "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:]} for n, a in self.agents.items()}}
+                "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
+                           "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", [])}
+                       for n, a in self.agents.items()}}
         tmp = self.state_file.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
         tmp.replace(self.state_file)
@@ -391,6 +450,16 @@ class Crew:
             cmd += ["--model", a["model"]]
         if a["session"]:
             cmd += ["--resume", a["session"]]
+        # Same setup as `claude` in a terminal: user-level skills, plugins, MCP servers and claude.ai
+        # connectors load on their own; these add what is tied to the project folder.
+        if a["branch"]:
+            if copied := sync_claude_files(self.project, Path(a["cwd"])):
+                self.log(a, "sys", f"synced {len(copied)} local Claude file{'s' if len(copied) != 1 else ''} into the worktree")
+        if servers := local_mcp_servers(self.project):
+            f = WORK_ROOT / "mcp" / f"{self.key}.json"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(json.dumps({"mcpServers": servers}, indent=1), encoding="utf-8")
+            cmd += [f"--mcp-config={f}"]  # "=" form: the flag is variadic and would swallow what follows
         flags = subprocess.CREATE_NEW_PROCESS_GROUP if IS_WIN else 0
         try:
             p = subprocess.Popen(cmd, cwd=a["cwd"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -459,6 +528,8 @@ class Crew:
         if t == "system" and st == "init":
             a["mcp"] = [{"name": m.get("name"), "status": m.get("status")} for m in d.get("mcp_servers") or []]
             a["skills"] = len(d.get("skills") or [])
+            a["skill_names"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("skills") or [])[:200]
+            a["plugins"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("plugins") or [])[:100]
             found = {"__".join(tool.split("__")[:2]) for tool in d.get("tools") or [] if tool.startswith("mcp__")}
             if found - self.mcp_allow:
                 self.mcp_allow |= found  # other agents pick these up when they next (re)start
@@ -1149,15 +1220,72 @@ def switch_project(path: str) -> dict:
     return {"ok": True}
 
 
+LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
+
+
+def lan_ips() -> list[str]:
+    ips = []
+    try:  # the address of the default route; no packet is sent
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sk:
+            sk.connect(("10.255.255.255", 1))
+            ips.append(sk.getsockname()[0])
+    except OSError:
+        pass
+    try:
+        ips += [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if ip not in ips]
+    except OSError:
+        pass
+    return [ip for ip in ips if not ip.startswith("127.")]
+
+
+def lan_key() -> str:
+    """One key per machine, kept across restarts so a phone stays signed in."""
+    f = WORK_ROOT / "lan-key"
+    try:
+        if len(k := f.read_text(encoding="utf-8").strip()) >= 20:
+            return k
+    except OSError:
+        pass
+    k = secrets.token_urlsafe(24)
+    WORK_ROOT.mkdir(parents=True, exist_ok=True)
+    f.write_text(k, encoding="utf-8")
+    return k
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "crew/1"
 
     def log_message(self, *args):  # quiet
         pass
 
+    def _local(self) -> bool:
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
+        return host in LOCAL_HOSTS and self.client_address[0] in ("127.0.0.1", "::1")
+
     def _host_ok(self) -> bool:
-        host = (self.headers.get("Host") or "").split(":")[0]
-        return host in ("127.0.0.1", "localhost")
+        """Local requests always pass. LAN requests need a bare-IP Host (no DNS rebinding) and the key cookie."""
+        if self._local():
+            return True
+        if not LAN_KEY:
+            return False
+        host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
+        if not re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", host) and host.lower() not in (socket.gethostname().lower(), socket.gethostname().lower() + ".local"):
+            return False
+        cookie = next((c.split("=", 1)[1] for c in (self.headers.get("Cookie") or "").split("; ") if c.startswith("crew_key=")), "")
+        return hmac.compare_digest(cookie, LAN_KEY)
+
+    def _login(self) -> bool:
+        """/?key=<key> from the LAN: set the cookie and redirect to a clean URL."""
+        u = urlsplit(self.path)
+        key = (parse_qs(u.query).get("key") or [""])[0]
+        if not (LAN_KEY and key and hmac.compare_digest(key, LAN_KEY)):
+            return False
+        self.send_response(303)
+        self.send_header("Set-Cookie", f"crew_key={LAN_KEY}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict")
+        self.send_header("Location", "/")
+        self.end_headers()
+        return True
 
     def _json(self, obj, code=200):
         body = json.dumps(obj).encode()
@@ -1169,8 +1297,15 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if urlsplit(self.path).path == "/" and "key=" in self.path and self._login():
+            return
         if not self._host_ok():
-            return self.send_error(HTTPStatus.FORBIDDEN)
+            return self.send_error(HTTPStatus.FORBIDDEN, "Open the link with ?key= from the Crew window on your computer")
+        if self.path == "/api/lan":  # only the computer itself may read the key
+            if not self._local():
+                return self.send_error(HTTPStatus.FORBIDDEN)
+            port = self.server.server_address[1]
+            return self._json({"enabled": bool(LAN_KEY), "urls": [f"http://{ip}:{port}/?key={LAN_KEY}" for ip in lan_ips()] if LAN_KEY else []})
         if self.path in ("/", "/index.html"):
             body = (APP_DIR / "index.html").read_bytes()
             self.send_response(200)
@@ -1278,6 +1413,7 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=8770)
     ap.add_argument("--config", help="crew config (default: crew.json next to server.py)")
     ap.add_argument("--demo", action="store_true", help="simulated agents with sample tasks: no Claude CLI, no tokens")
+    ap.add_argument("--lan", action="store_true", help="also serve other devices on your network (phone, tablet), behind a key")
     args = ap.parse_args()
 
     if args.demo:
@@ -1328,9 +1464,14 @@ def main() -> None:
             time.sleep(1)
 
     threading.Thread(target=loop, daemon=True).start()
-    srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    global LAN_KEY
+    if args.lan:
+        LAN_KEY = lan_key()
+    srv = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
     srv.daemon_threads = True
     print(f"crew{' (demo)' if args.demo else ''} · project {project} · http://127.0.0.1:{args.port}", flush=True)
+    for ip in lan_ips() if args.lan else []:
+        print(f"  on your network: http://{ip}:{args.port}/?key={LAN_KEY}", flush=True)
     try:
         srv.serve_forever()
     finally:

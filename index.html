@@ -357,7 +357,19 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .tok{font-variant-numeric:tabular-nums}
 .stat .eye{border:0;background:transparent;color:var(--faint);cursor:pointer;padding:0 0 0 4px;font-size:12px}
 .stat .eye:hover{color:var(--text)}
-.mcpchip{color:var(--muted)}
+.mcpchip{color:var(--muted);cursor:pointer}.mcpchip:hover{color:var(--text);border-color:var(--line2)}
+.inherit{border-bottom:1px solid var(--line);padding:10px 16px 12px;display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto;background:var(--bg2)}
+.inherit .grp{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.inherit .grp .k{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:600;width:62px;flex:none}
+.inherit .pill2{font:11px var(--mono);padding:2px 8px;border-radius:999px;background:var(--raised);border:1px solid var(--line);color:var(--muted)}
+.inherit .pill2.ok{color:var(--green);border-color:rgba(63,212,143,.3)}.inherit .pill2.auth{color:var(--amber);border-color:rgba(242,180,65,.3)}
+.phonebtn svg{color:var(--muted)}
+.lan{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
+.lan .qr{background:#fff;padding:10px;border-radius:10px;width:200px;height:200px}
+.lan .qr img,.lan .qr canvas{width:180px!important;height:180px!important}
+.lan code{display:block;font:12px var(--mono);color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;word-break:break-all}
+.lan ol{margin:0;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.6}
+@media (max-width:560px){.lan{grid-template-columns:1fr}}
 
 /* banner & toasts */
 .banner{display:none;align-items:center;gap:10px;margin:12px 18px 0;padding:10px 13px;border-radius:10px;border:1px solid rgba(242,180,65,.35);background:var(--amber-soft);color:#f6d38c;font-size:12.5px}
@@ -394,6 +406,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       <span class="pn" id="projName">…</span><span class="pb" id="projGit"></span><span class="faint">▾</span>
     </button>
     <button class="chip modebtn" id="mode" title="Permission mode for all agents"></button>
+    <button class="chip phonebtn" id="phoneBtn" title="Open Crew on your phone" hidden><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg> Phone</button>
     <button class="chip trigbtn" id="trigBtn" title="Triggers: schedules, events, file watches, polls and webhooks"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> Triggers <b id="trigN">0</b></button>
     <div class="stats" id="stats"></div>
     <button class="btn ghost" id="palBtn" title="Command palette">Search <kbd>Ctrl K</kbd></button>
@@ -476,6 +489,13 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       <textarea class="field" id="rDetails" rows="4" placeholder="Context, links, acceptance criteria (optional)"></textarea>
     </div>
     <div class="mf"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="rStart">Start run</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="lanModal">
+  <div class="modal" role="dialog" aria-label="Open on your phone">
+    <div class="mh">Open Crew on your phone <button class="iconbtn" data-close>✕</button></div>
+    <div class="mb" id="lanBody"></div>
   </div>
 </div>
 
@@ -664,6 +684,7 @@ function renderAgentDrawer(d, a) {
   if (!shell || shell.dataset.name !== a.name) {
     d.innerHTML = `<div data-shell="agent" data-name="${a.name}" style="display:contents">
       <div class="dh" id="dh"></div>
+      <div class="inherit" id="dinh" hidden></div>
       <div class="dset" id="dset" hidden></div>
       <div class="stream" id="stream"></div>
       <div class="composer">
@@ -679,13 +700,14 @@ function renderAgentDrawer(d, a) {
       <div style="min-width:0"><h3>${esc(a.name)}</h3><div class="muted" style="font-size:12px">${esc(a.role)}</div></div>
       <span class="pill ${a.status}" style="margin-left:auto"><span class="dot" style="background:currentColor"></span>${a.status}</span>
       <button class="iconbtn" data-close-drawer title="Close">✕</button></div>
-    <div class="kv"><span>${a.branch ? '⎇ ' + esc(a.branch) : 'shared folder'}</span><span>${esc(MODEL_INFO[a.model || '']?.[0] || a.model)} · ${esc(a.effort || 'default')} effort</span><span class="tok" title="input · cache reads · output">${fmtTok(a.tokens?.in)} in · ${fmtTok(a.tokens?.cache)} cached · ${fmtTok(a.tokens?.out)} out${costTxt(a.cost)}</span>${a.mcp?.length || a.skills ? `<span class="mcpchip" title="${esc((a.mcp || []).map(m => m.name + ': ' + m.status).join('\n'))}">${a.skills || 0} skills · ${(a.mcp || []).filter(m => m.status === 'connected').length} MCP</span>` : ''}${a.session ? `<span title="${esc(a.session)}">session ${esc(a.session.slice(0, 8))}</span>` : ''}${t ? `<span>#${t.id} ${esc(t.title.slice(0, 32))}</span>` : ''}</div>
+    <div class="kv"><span>${a.branch ? '⎇ ' + esc(a.branch) : 'shared folder'}</span><span>${esc(MODEL_INFO[a.model || '']?.[0] || a.model)} · ${esc(a.effort || 'default')} effort</span><span class="tok" title="input · cache reads · output">${fmtTok(a.tokens?.in)} in · ${fmtTok(a.tokens?.cache)} cached · ${fmtTok(a.tokens?.out)} out${costTxt(a.cost)}</span>${a.mcp?.length || a.skills ? `<span class="mcpchip" data-inherit title="Skills, plugins and MCP servers this agent loaded: click to list">${a.skills || 0} skills · ${(a.mcp || []).filter(m => m.status === 'connected').length} MCP</span>` : ''}${a.session ? `<span title="${esc(a.session)}">session ${esc(a.session.slice(0, 8))}</span>` : ''}${t ? `<span>#${t.id} ${esc(t.title.slice(0, 32))}</span>` : ''}</div>
     <div class="dactions">
       ${a.status === 'killed' || a.status === 'error'
         ? `<button class="btn sm" data-respawn="${a.name}">↻ Respawn</button><button class="btn sm ghost" data-respawn-fresh="${a.name}">Respawn with fresh session</button>`
         : `<button class="btn sm danger" data-kill="${a.name}">✕ Kill</button>`}
       <button class="btn sm ${view.showSettings ? 'on' : ''}" data-toggle-settings style="margin-left:auto">⚙ Model &amp; role</button>
     </div>`;
+  const inh = $('#dinh'); if (inh) { inh.hidden = !view.showInherit; if (view.showInherit) { const h = inheritHtml(a); if (inh.dataset.sig !== h) { inh.innerHTML = h; inh.dataset.sig = h; } } }
   renderSettings(a);
   const st = $('#stream'), atBottom = st.scrollHeight - st.scrollTop - st.clientHeight < 40;
   st.innerHTML = a.log.length ? renderLog(a.log) : `<div class="empty">No activity yet. Assign a task or send a message.</div>`;
@@ -1285,6 +1307,46 @@ $('#wfModal').addEventListener('input', e => {
 });
 $('#wfModal').addEventListener('change', e => { const el = e.target, d = el.dataset; if (d.st != null && d.k === 'agent') { wfe.steps[+d.st].agent = el.value; drawWfEditor(); } });
 
+
+// ---- inherited Claude Code setup (skills, plugins, MCP) -------------------------------
+function inheritHtml(a) {
+  const pills = (xs, cls = () => '') => xs.length ? xs.map(x => `<span class="pill2 ${cls(x)}">${esc(typeof x === 'string' ? x : x.name)}</span>`).join('') : '<span class="faint" style="font-size:12px">none</span>';
+  const mcp = [...(a.mcp || [])].sort((x, y) => (x.status === 'connected' ? 0 : 1) - (y.status === 'connected' ? 0 : 1));
+  return `<div class="grp"><span class="k">MCP</span>${pills(mcp, m => m.status === 'connected' ? 'ok' : /auth/.test(m.status) ? 'auth' : '')}</div>
+    <div class="grp"><span class="k">Plugins</span>${pills(a.plugins || [])}</div>
+    <div class="grp"><span class="k">Skills</span>${pills(a.skill_names || [])}</div>
+    <div class="faint" style="font-size:11.5px">Loaded from your Claude Code setup when the session started. Amber servers need a one-time sign-in: <code>claude</code> → <code>/mcp</code>.</div>`;
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-inherit]')) return;
+  view.showInherit = !view.showInherit; render();
+});
+
+// ---- open on phone -----------------------------------------------------------------------
+async function openLan() {
+  const r = await fetch('/api/lan').then(r => r.ok ? r.json() : null).catch(() => null);
+  if (!r) return;
+  const body = $('#lanBody');
+  if (!r.enabled || !r.urls.length) {
+    body.innerHTML = `<p style="margin:0;color:var(--muted);font-size:13px;line-height:1.6">Crew is only listening on this computer. Restart it with <code>--lan</code> to reach it from your phone:</p><code style="font:12px var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px">python server.py --lan</code>`;
+  } else {
+    const url = r.urls[0];
+    body.innerHTML = `<div class="lan"><div class="qr" id="lanQr"></div><div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <ol><li>Join the same Wi-Fi as this computer.</li><li>Scan the code, or open the link.</li><li>The link signs that browser in; keep it private.</li></ol>
+      ${r.urls.map(u => `<code>${esc(u)}</code>`).join('')}
+      <div style="display:flex;gap:8px"><button class="btn sm" data-copy-lan="${esc(url)}">Copy link</button></div>
+      <div class="faint" style="font-size:11.5px;line-height:1.5">Can't connect? Windows Firewall must allow Python on private networks. If several links are shown, use the one on your Wi-Fi (usually 192.168.x.x).</div></div></div>`;
+    const draw = () => { $('#lanQr').innerHTML = ''; new QRCode($('#lanQr'), {text: url, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M}); };
+    if (window.QRCode) draw();
+    else { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'; sc.onload = draw; sc.onerror = () => { $('#lanQr').innerHTML = '<div style="color:#333;font-size:12px;padding:10px">QR unavailable offline; use the link.</div>'; }; document.head.append(sc); }
+  }
+  $('#lanModal').classList.add('on');
+}
+$('#phoneBtn').onclick = openLan;
+$('#lanModal').addEventListener('click', async e => { const b = e.target.closest('[data-copy-lan]'); if (!b) return; try { await navigator.clipboard.writeText(b.dataset.copyLan); toast('Link copied', 'var(--green)'); } catch { toast('Copy failed: select the link instead', 'var(--red)'); } });
+// the phone button only makes sense on the computer itself
+if (['localhost', '127.0.0.1'].includes(location.hostname)) $('#phoneBtn').hidden = false;
+
 // command palette
 let palItems = [], palIdx = 0;
 function openPalette() { $('#palette').classList.add('on'); $('#palIn').value = ''; buildPalette(); setTimeout(() => $('#palIn').focus(), 0); }
@@ -1294,6 +1356,7 @@ function buildPalette() {
     {ic: '＋', label: 'New task', k: 'N', run: () => openTask()},
     {ic: '＋', label: 'Add agent', run: () => openAgentModal()},
     {ic: '⌂', label: 'Switch project…', run: () => openProjectModal()},
+    ...(['localhost', '127.0.0.1'].includes(location.hostname) ? [{ic: '▯', label: 'Open on phone…', run: () => openLan()}] : []),
     {ic: '⚡', label: 'Triggers…', k: 'T', run: () => openTriggers()},
     {ic: '⛓', label: 'Workflows', k: 'W', run: () => document.querySelector('[data-tab="flows"]').click()},
     {ic: '⛓', label: 'New workflow', run: () => openWfEditor(null)},

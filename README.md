@@ -39,6 +39,12 @@ You need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed an
 python server.py --project /path/to/your/repo
 ```
 
+To use it from your phone or another computer on the same Wi-Fi, add `--lan`, then click **Phone** in the header and scan the QR code:
+
+```bash
+python server.py --project /path/to/your/repo --lan
+```
+
 That's it. Add tasks or set up [triggers](#triggers), and the agent whose tags match picks each task up.
 
 ## Why
@@ -203,6 +209,7 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 
 - The server binds to `127.0.0.1` only.
 - Every write needs a custom request header and a localhost `Host`, so other websites can't drive your agents (CSRF and DNS rebinding).
+- `--lan` listens on your network, but every request from another device needs a secret key (set as a cookie by the QR link) and a bare-IP `Host`. The key lives in `~/.crew/lan-key`; delete it to sign every device out. Traffic is plain HTTP, so use it on networks you trust.
 - Agents are told to stay inside the project folder unless a task names another path.
 - Webhooks are the one write path without the browser header. Each needs its own random token, compared in constant time.
 - Poll triggers run the command you typed, in your shell, in the project folder. Treat them like a cron job you wrote yourself.
@@ -211,7 +218,7 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 
 **Does it cost extra?** No. Agents use your own Claude Code login, so usage counts against your plan or API key like any other Claude Code session. The token counter shows what each agent used.
 
-**Can agents use my skills and MCP servers?** Yes. Each agent loads what `claude` loads in your terminal. Connectors that need sign-in must be signed in once with `claude` → `/mcp`.
+**Can agents use my skills and MCP servers?** Yes. Each agent loads what `claude` loads in your terminal: user skills, plugins, user MCP servers and claude.ai connectors. Crew also brings along what git leaves out of a worktree: local-scope MCP servers (`claude mcp add` without `--scope user`), an uncommitted `.mcp.json`, `.claude/settings.local.json`, untracked project skills, agents and commands, and `CLAUDE.local.md`. Click the skills · MCP chip in an agent's drawer to see exactly what it loaded. Connectors that need sign-in must be signed in once with `claude` → `/mcp`.
 
 **Can an agent spawn its own subagents or background jobs?** Yes, they're full Claude Code sessions. Crew shows subagents live. Kill ends the whole process tree, background jobs included.
 
