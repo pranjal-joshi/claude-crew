@@ -28,17 +28,17 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
   - [x] server: `handoff` action, depth limit, crew MCP server (`crew_mcp.py`)
   - [x] UI: "Auto (boss picks)" in the hand-off menu, ↪ from <agent> on handed-off cards
 - [x] Test on the demo + real boss calls, refresh the app, README, push
-- [ ] Refresh README screenshots/GIF for boss chat and the phone layout
+- [x] Refresh README screenshots for boss chat, slash picker and the phone layout (the demo GIF is unchanged)
 
 ## Batch: canvas editor and small asks
 
 - [x] **Workflow canvas** (n8n-style): When (trigger) → one block per agent → Output; drag to reorder, drag agents from the palette or ＋ on a line to insert, ✋/⚡ toggles on lines, inspector panel, Del removes; phone: vertical canvas, Earlier/Later buttons
 - [x] **Workflow output**: board (default), markdown report file, webhook (JSON), or start the next workflow; saved with the workflow, boss can set it too
 - [x] **Click a board card** to open the agent that handled it
-- [x] **Clear chat** (⌫ in the chat bar): wipes the conversation and context of the boss or the selected agent
+- [x] **Clear chat** (Clear button on the open chat panel): wipes the conversation and context of the boss or the selected agent
 - [x] **Reorder agents** by dragging in the rail (saved to crew.json)
 - [x] **Star history** chart in the README (Haiku subagent)
-- [ ] Refresh `assets/wf-edit.png` with the canvas editor
+- [x] Refresh `assets/wf-edit.png` with the canvas editor
 
 ## Later
 
@@ -46,3 +46,16 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
 - [ ] Background-job and monitor indicators; hold a task until its jobs finish
 - [ ] One-click merge of approved branches
 - [ ] Shared crew memory (qmd or plain markdown) once execution is allowed
+
+## Batch: packaging and releases
+
+- [x] **`pip`/`pipx` install**: `pyproject.toml` (hatchling), `crew` command, flat source tree mapped into `claude_crew/` in the wheel
+- [x] Installed runs keep config in the current folder, never in site-packages
+- [x] **Versioning**: `__version__` in `server.py`, `--version`, version in the header, `CHANGELOG.md`
+- [x] **Tests**: stdlib `unittest` for helpers, workflows, config, reorder, clear chat, plus an HTTP smoke test
+- [x] **Lint**: ruff (E/F/W, conservative ignores)
+- [x] **CI**: lint, tests on Linux/Windows/macOS x Python 3.10-3.13, build and install the wheel
+- [x] **Release pipeline**: `v*` tag runs tests, checks the version, builds, creates the GitHub Release
+- [x] README: Install and Releasing sections
+- [ ] First tagged release (`v0.1.0`)
+- [ ] Set up the PyPI trusted publisher, then set repo variable `PUBLISH_PYPI=true`

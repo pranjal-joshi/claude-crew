@@ -31,6 +31,18 @@ python server.py --demo
 
 Open **http://127.0.0.1:8770**.
 
+## Install
+
+Crew is pure standard-library Python (3.10 or newer) and installs as a `crew` command. [pipx](https://pipx.pypa.io/) keeps it isolated:
+
+```bash
+pipx install claude-crew                      # from PyPI, once published
+pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.1.0/claude_crew-0.1.0-py3-none-any.whl   # a release wheel
+pipx install git+https://github.com/pranjal-joshi/claude-crew   # latest main
+```
+
+Then `crew --demo` or `crew --project /path/to/your/repo` behaves exactly like `python server.py ...`. When installed, the default `crew.json` lives in the folder you run `crew` from; state and worktrees stay in `~/.crew`. `crew --version` prints the version.
+
 ## Use it on your code
 
 You need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed and signed in (`claude` works in your terminal).
@@ -63,6 +75,8 @@ Crew gives that queue a home:
 ## The boss
 
 A chat bar at the bottom (<kbd>/</kbd>) talks to the **boss**: a Claude session that runs the crew instead of writing code. Ask it to "plan and build CSV export, then have it tested and reviewed" and it creates tasks, assigns agents, starts workflows, messages or stops agents, and adds triggers, through a small set of crew tools (`crew_mcp.py`). Switch the chat to any agent to talk to it directly.
+
+Type <kbd>/</kbd> in the chat bar (or in an agent's message box) for a picker of commands and skills: Crew's own `/clear` `/compact` `/stop`, plus that agent's Claude Code slash commands and skills with their descriptions. <kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>Tab</kbd> or <kbd>Enter</kbd> to pick, <kbd>Esc</kbd> to close.
 
 The boss runs with only the crew tools and a few read-only ones, so a turn costs about 10k tokens of context instead of your full setup.
 
@@ -116,9 +130,9 @@ The **Output** block decides what a finished run delivers:
 - **■ Stop** (agent card, drawer, or **Stop all** in the header) ends the current run at once. The session is kept, the task goes back to the backlog **on hold**, and the agent pauses until you press **▶ Resume** or give it work.
 - **Kill** disables an agent until you respawn it. Use it for an agent that misbehaves.
 - **Clear ▾** removes Done tasks, or the whole board (running agents are stopped first). Branches and commits are kept.
-- **⌫** in the chat bar clears the conversation with the boss or the agent you're talking to, and empties its context: the next message starts a fresh session.
+- **Clear** (red button, top right of an open boss or agent chat) wipes that conversation and empties its context: the next message starts a fresh session.
 
-Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`.
+Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
 
 ## Context per task
 
@@ -149,7 +163,7 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 | | |
 | --- | --- |
 | 🧑‍🤝‍🧑 **An SDLC crew** | Planner, researcher, designer, builder, tester, reviewer, evaluator, ops and scribe by default. Add, remove and re-role agents from the UI. |
-| ⛓ **Workflows** | Chain agents in order (plan → build → test → review → write-up), with an approval or auto gate per step. |
+| ⛓ **Workflows** | Chain agents in order (plan → build → test → review → write-up) on an n8n-style canvas, with an approval or auto gate per step and a choice of output: board, report file, webhook or next workflow. |
 | ⚡ **Triggers** | Schedules, task events, file watches, command polls and webhooks start work on their own. Presets included. |
 | 🧹 **Fresh context per task** | A new session per task keeps tokens down; send-back still resumes. Per-agent switch. |
 | 🧠 **Model and effort per agent** | Opus for the builder, Sonnet for the tester, Fable for research: each agent gets its own model and effort level (low to max). |
@@ -158,6 +172,7 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 | 🔍 **Review gate** | Agent summary and colored diff side by side. Approve and commit, send back, or hand off to another agent. |
 | ↪️ **Hand-offs** | Drag any card, in any column, onto another agent. The earlier summary, branch and commit go along as context. |
 | ✦ **Boss chat** | A chat bar that runs the crew: tasks, workflows, agents and triggers, from plain requests. |
+| ⌨ **Slash picker** | Type `/` in any chat box for Crew commands plus the agent's Claude Code commands and skills. **Clear** in the chat panel wipes a chat and its context. |
 | 💬 **Talk mid-run** | Message any agent while it works. The message lands in the running session. |
 | 📱 **Phone app feel** | `--lan` plus a QR code. On a phone: bottom navigation, swipeable columns, bottom sheets, Android back closes sheets. |
 | ■ **Stop, kill, clear** | Stop a run (session kept, task on hold), stop everything at once, or clear the board. |
@@ -165,7 +180,7 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 | 🔢 **Tokens and cost** | Live token counts per agent, per task and in total. Hide the dollar amounts with one click. |
 | 🧩 **Your skills and MCP servers** | Agents are ordinary Claude Code sessions, so they load your skills, plugins and MCP servers. |
 | 📁 **Projects** | Switch repos from the header. Each project keeps its own board, sessions and worktrees. |
-| ⌨️ **Keyboard first** | `N` new task, `T` triggers, `W` / `B` workflows / board, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
+| ⌨️ **Keyboard first** | `/` talk to the boss, `N` new task, `T` triggers, `W` / `B` workflows / board, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
 
 ## Screenshots
 
@@ -175,8 +190,8 @@ Nine presets cover the common loops: daily standup, test what ships, review what
     <td width="50%"><img src="assets/review.png" alt="Review drawer with summary and diff"><br><sub><b>Review.</b> The agent's summary and its diff. Approve commits to its branch.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="assets/flows.png" alt="Workflows tab with five workflows and two live runs"><br><sub><b>Workflows.</b> Agents in a fixed order; runs show each step live.</sub></td>
-    <td width="50%"><img src="assets/wf-edit.png" alt="Workflow editor"><br><sub><b>Workflow editor.</b> Trigger → agents → output on a canvas.</sub></td>
+    <td width="50%"><img src="assets/flows.png" alt="Workflows tab with five workflows"><br><sub><b>Workflows.</b> Agents in a fixed order; runs show each step live. Run has a green ▶.</sub></td>
+    <td width="50%"><img src="assets/wf-edit.png" alt="Workflow editor"><br><sub><b>Workflow editor.</b> When → agents → Output on a canvas; drag to reorder, ✋ / ⚡ on each line.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="assets/triggers.png" alt="Triggers list with schedules, events and watches"><br><sub><b>Triggers.</b> Schedules, events, watches, polls and webhooks, each with its next run and history.</sub></td>
@@ -185,6 +200,10 @@ Nine presets cover the common loops: daily standup, test what ships, review what
   <tr>
     <td width="50%"><img src="assets/settings.png" alt="Per-agent model and effort settings"><br><sub><b>Model and role.</b> Per-agent model, effort, role and tags.</sub></td>
     <td width="50%"><img src="assets/hero.png" alt="Board with nine agents running"><br><sub><b>Board.</b> Agents in flight, subagents counted on each card.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/slash.png" alt="Slash picker in the chat bar"><br><sub><b>Slash picker.</b> Type <code>/</code> for Crew commands, plus an agent's commands and skills.</sub></td>
+    <td width="50%"><img src="assets/phone-board.png" alt="Crew on a phone" width="240"> <img src="assets/phone-canvas.png" alt="Workflow canvas on a phone" width="240"><br><sub><b>On a phone.</b> Bottom navigation, swipeable columns, and a vertical canvas.</sub></td>
   </tr>
 </table>
 
@@ -208,7 +227,7 @@ flowchart LR
 
 ## Configuration
 
-`crew.json` is created next to `server.py` on first run and saved whenever you change things in the UI.
+`crew.json` is created next to `server.py` on first run (in the current folder when installed with pipx) and saved whenever you change things in the UI.
 
 ```jsonc
 {
@@ -226,7 +245,8 @@ flowchart LR
 | --- | --- | --- |
 | `--project PATH` | a demo repo in `~/.crew` | The repo agents work on. |
 | `--port N` | `8770` | |
-| `--config PATH` | `./crew.json` | |
+| `--config PATH` | `crew.json` | Next to `server.py` from a clone, in the current folder when installed. |
+| `--version` | | Print the version and exit. |
 | `--demo` | off | Simulated agents and sample tasks. |
 
 `CREW_CLAUDE` overrides the command used to start agents.
@@ -272,6 +292,16 @@ Ideas and PRs welcome. Open an issue first for anything big.
 ## Contributing
 
 The whole app is two files: `server.py` (Python standard library) and `index.html` (vanilla JS). `python server.py --demo` is the fastest loop; `demo/fake_claude.py` speaks the same stream-json protocol as Claude Code.
+
+Tests are standard-library `unittest` (`python -m unittest discover`), lint is `ruff check .`, and CI runs both on Linux, Windows and macOS.
+
+## Releasing
+
+1. Bump `__version__` in `server.py` (the single source of the version) and add an entry to `CHANGELOG.md`.
+2. Commit, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. The **Release** workflow runs the tests, checks the tag matches `__version__`, builds the sdist and wheel, and creates a GitHub Release with both attached and generated notes.
+
+To also publish to PyPI: create a [trusted publisher](https://docs.pypi.org/trusted-publishers/) for the project `claude-crew` (owner `pranjal-joshi`, repo `claude-crew`, workflow `release.yml`, environment `pypi`), then set the repository variable `PUBLISH_PYPI` to `true`. Until then the PyPI job is skipped and releases still succeed.
 
 ## Star history
 

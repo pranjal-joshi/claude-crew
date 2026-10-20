@@ -14,6 +14,8 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 - Triggers: schedules, task events, file watches, command polls and webhooks, with presets.
 - Boss chat: a chat bar that runs the crew (tasks, workflows, agents, triggers) from plain requests; agents get a `handoff` tool through the bundled `crew_mcp.py` MCP server.
 - Stop, kill and clear controls; per-task fresh context or one kept session; context meter with Compact and New session; Clear chat.
+- A `/` picker in every chat box: Crew's `/clear` `/compact` `/stop` plus the agent's Claude Code commands and skills with descriptions.
+- Collapsible agents pane (avatars and status dots), and a Clear button on the open chat panel.
 - Permission modes (Accept edits, Auto, Bypass), token and cost tracking, multiple projects.
 - `--lan` mode with a key and QR code for phones and tablets, with an app-like mobile layout.
 - `--demo` mode with simulated agents: no Claude CLI, no tokens.

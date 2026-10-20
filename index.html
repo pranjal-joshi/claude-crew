@@ -306,19 +306,19 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .menu .mi.cur{color:var(--text)}.menu .mi.cur::after{content:"\2713";margin-left:auto;color:var(--accent)}
 .menu .sep{height:1px;background:var(--line);margin:5px 4px}
 .menu .mi[aria-disabled=true]{opacity:.38;pointer-events:none}
-.slash{position:fixed;z-index:41;background:var(--raised);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;animation:rise .12s ease-out}
-.slash[hidden]{display:none}
-.slash .sh{padding:4px 10px 6px;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:600;display:flex;gap:8px}
-.slash .sh span{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400}
-.slash .sl{overflow-y:auto;max-height:min(320px,42dvh)}
-.slash .si{display:flex;align-items:baseline;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:12.5px}
-.slash .si.on{background:var(--hover);color:var(--text)}
-.slash .si b{font:600 12.5px var(--mono);color:var(--text);white-space:nowrap}
-.slash .si b i{font-style:normal;color:var(--accent)}
-.slash .si .d{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint);font-size:12px}
-.slash .si .k{font-size:10.5px;color:var(--faint);border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap}
-.slash .si .k.crew{color:var(--accent);border-color:var(--accent-line)}
-.slash .empty{padding:10px;color:var(--faint);font-size:12.5px}
+.slashpop{position:fixed;z-index:41;background:var(--raised);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;animation:rise .12s ease-out}
+.slashpop[hidden]{display:none}
+.slashpop .sh{padding:4px 10px 6px;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:600;display:flex;gap:8px}
+.slashpop .sh span{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400}
+.slashpop .sl{overflow-y:auto;max-height:min(320px,42dvh)}
+.slashpop .si{display:flex;align-items:baseline;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:12.5px}
+.slashpop .si.on{background:var(--hover);color:var(--text)}
+.slashpop .si b{font:600 12.5px var(--mono);color:var(--text);white-space:nowrap}
+.slashpop .si b i{font-style:normal;color:var(--accent)}
+.slashpop .si .d{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint);font-size:12px}
+.slashpop .si .k{font-size:10.5px;color:var(--faint);border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap}
+.slashpop .si .k.crew{color:var(--accent);border-color:var(--accent-line)}
+.slashpop .empty{padding:10px;color:var(--faint);font-size:12.5px}
 .kebab{flex:none;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;border:0;background:transparent;color:var(--faint);cursor:pointer;opacity:0;transition:opacity .12s,background .12s;font-size:14px;line-height:1}
 .card:hover .kebab,.kebab:focus-visible{opacity:1}.kebab:hover{background:var(--hover);color:var(--text)}
 .card .th{display:flex;align-items:flex-start;gap:4px}.card .th .t{flex:1;min-width:0}
@@ -591,6 +591,24 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .card[data-card]{cursor:pointer}
 .agent.dropb{box-shadow:inset 0 3px 0 var(--accent)}.agent.dropa{box-shadow:inset 0 -3px 0 var(--accent)}
 .agent.dragging{opacity:.45}
+.railbtn{border:0;background:transparent;color:var(--faint);cursor:pointer;border-radius:6px;padding:2px 6px;font-size:13px;line-height:1}
+.railbtn:hover{color:var(--text);background:var(--hover)}
+.sec .sr{display:flex;align-items:center;gap:4px}
+@media (min-width:761px){
+  .body.rail-min{grid-template-columns:60px 1fr}
+  .body.rail-min.drawer-open{grid-template-columns:60px 1fr 440px}
+  .rail-min .rail{padding:12px 6px;overflow-x:hidden}
+  .rail-min .sec{justify-content:center;margin:2px 0 12px}
+  .ravs{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .rmini{cursor:pointer;border-radius:50%;padding:2px;position:relative}
+  .rmini .av{width:36px;height:36px}
+  .rmini.sel .av{box-shadow:0 0 0 2px var(--accent)}
+  .rmini .sd{position:absolute;right:1px;bottom:1px;width:9px;height:9px;border-radius:50%;border:2px solid var(--bg);background:var(--faint)}
+  .rmini .sd.running{background:var(--green)}.rmini .sd.review{background:var(--blue,#6aa0ff)}.rmini .sd.error,.rmini .sd.killed{background:var(--red)}.rmini .sd.paused{background:var(--amber)}
+}
+@media (min-width:761px) and (max-width:1100px){.body.rail-min.drawer-open{grid-template-columns:60px 1fr}}
+.clearbtn{border:1px solid rgba(255,107,114,.55);color:#ff8a90;background:transparent;border-radius:8px;padding:3px 11px;font-size:12px;font-weight:500;cursor:pointer;margin-left:10px;flex:none}
+.clearbtn:hover{background:var(--red-soft);border-color:#ff8a90}
 .btn.run i{font-style:normal;color:var(--green);font-size:11px}
 </style>
 </head>
@@ -604,8 +622,8 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       <span class="pn" id="projName">…</span><span class="pb" id="projGit"></span><span class="faint">▾</span>
     </button>
     <button class="chip modebtn" id="mode" title="Permission mode for all agents"></button>
-    <button class="chip phonebtn" id="phoneBtn" title="Open Crew on your phone" hidden><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg> Phone</button>
     <button class="chip trigbtn" id="trigBtn" title="Triggers: schedules, events, file watches, polls and webhooks"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> <span class="tl">Triggers</span> <b id="trigN">0</b></button>
+    <button class="chip phonebtn" id="phoneBtn" title="Open Crew on your phone" hidden><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg> Phone</button>
     <div class="stats" id="stats"></div>
     <button class="btn ghost" id="palBtn" title="Command palette">Search <kbd>Ctrl K</kbd></button>
     <button class="btn primary" id="newBtn">＋ New task <kbd style="background:rgba(0,0,0,.18);border-color:rgba(0,0,0,.2);color:#3a1a0c">N</kbd></button>
@@ -631,7 +649,6 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
           <button class="chatto boss" id="chatTo" title="Who you're talking to"></button>
           <textarea id="chatIn" rows="1" placeholder="Ask the boss to plan, delegate or run a workflow…"></textarea>
           <button class="btn primary sm" id="chatSend" style="height:36px">Send</button>
-          <button class="iconbtn" id="chatClear" title="Clear this chat and start a fresh session (frees its context)">⌫</button>
           <button class="iconbtn" id="chatToggle" title="Show conversation">▴</button>
         </div>
       </div>
@@ -824,7 +841,15 @@ function render() {
 }
 
 function renderRail() {
-  $('#rail').innerHTML = `<div class="sec"><span>Agents · ${S.agents.length} <span style="font-weight:500;letter-spacing:0;text-transform:none">· ${S.agents.filter(a => a.alive).length} live</span></span><button class="add" data-add-agent title="Add an agent">＋ Add</button></div>` +
+  const mini = view.railMin && !matchMedia('(max-width:760px)').matches;
+  $('#body').classList.toggle('rail-min', mini);
+  if (mini) {
+    $('#rail').innerHTML = `<div class="sec"><button class="railbtn" data-rail-toggle title="Expand the agents pane">»</button></div><div class="ravs">` +
+      S.agents.map(a => `<div class="rmini ${view.drawer?.agent === a.name ? 'sel' : ''}" data-agent="${a.name}" data-drop-agent="${a.name}" title="${esc(a.name)} · ${a.status}${a.activity ? ' · ' + esc(a.activity) : ''}"><div class="av ${a.status}">${esc(a.name[0])}</div><span class="sd ${a.status}"></span></div>`).join('') +
+      `<button class="railbtn" data-add-agent title="Add an agent" style="font-size:16px">＋</button></div>`;
+    return;
+  }
+  $('#rail').innerHTML = `<div class="sec"><span>Agents · ${S.agents.length} <span style="font-weight:500;letter-spacing:0;text-transform:none">· ${S.agents.filter(a => a.alive).length} live</span></span><span class="sr"><button class="add" data-add-agent title="Add an agent">＋ Add</button><button class="railbtn" data-rail-toggle title="Collapse the agents pane">«</button></span></div>` +
     S.agents.map((a, i) => {
       const t = a.task ? task(a.task) : null;
       const sel = view.drawer?.agent === a.name;
@@ -1856,7 +1881,7 @@ function renderChat() {
   if (lg.dataset.sig === sig) return;
   const atBottom = lg.scrollHeight - lg.scrollTop - lg.clientHeight < 60;
   lg.dataset.sig = sig;
-  lg.innerHTML = `<div class="chathead">${boss ? `<b style="color:var(--text)">Boss</b> · ${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : `<b style="color:var(--text)">${esc(t.name)}</b> · ${esc(t.role.slice(0, 80))}`}${busy ? ' · <span style="color:var(--green)">working…</span>' : ''}<span style="margin-left:auto">${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span></div>` +
+  lg.innerHTML = `<div class="chathead">${boss ? `<b style="color:var(--text)">Boss</b> · ${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : `<b style="color:var(--text)">${esc(t.name)}</b> · ${esc(t.role.slice(0, 80))}`}${busy ? ' · <span style="color:var(--green)">working…</span>' : ''}<span style="margin-left:auto">${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear</button></div>` +
     (t.log.length ? renderLog(t.log.slice(-120)) : `<div class="empty">${boss ? 'Try: “Plan and build CSV export for reports, then have it tested and reviewed.”' : 'No messages yet.'}</div>`);
   if (atBottom || lg.dataset.jump) { lg.scrollTop = lg.scrollHeight; delete lg.dataset.jump; }
 }
@@ -1886,7 +1911,15 @@ function clearChat(who) {
   askConfirm('Clear this chat?', `The conversation with <b>${esc(name)}</b> is removed and its context is emptied; the next message starts a fresh session. Tasks, branches and commits are kept.`, 'Clear chat',
     async () => { const r = await act('clear_chat', {agent: who}); if (r.ok) { $('#chatlog').dataset.sig = ''; toast('Chat cleared', 'var(--green)'); } }, true);
 }
-$('#chatClear').onclick = () => clearChat(chatWho());
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-chat-clear]')) return clearChat(chatWho());
+  if (e.target.closest('[data-rail-toggle]')) {
+    view.railMin = !view.railMin;
+    try { localStorage.setItem('crew.railMin', view.railMin ? '1' : ''); } catch {}
+    renderRail();
+  }
+});
+try { view.railMin = !!localStorage.getItem('crew.railMin'); } catch {}
 
 // ---- / commands: the crew's own, plus whatever the agent's Claude session can run ----------
 const CREW_CMDS = [
@@ -1926,7 +1959,7 @@ function slashItems(data) {
   for (const n of names) add(n, skills.has(n) || cat[n]?.kind === 'skill' ? 'skill' : 'command', cat[n]?.desc || CC_DESC[n]);
   return out;
 }
-const sl = Object.assign(document.createElement('div'), {className: 'slash', hidden: true, id: 'slash'});
+const sl = Object.assign(document.createElement('div'), {className: 'slashpop', hidden: true, id: 'slash'});
 document.body.append(sl);
 let slash = null; // {el, who, items, sel}
 const slashWho = el => el.id === 'msg' ? view.drawer?.agent : el.id === 'chatIn' ? chatWho() : null;
