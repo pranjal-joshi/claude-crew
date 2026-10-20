@@ -1,0 +1,73 @@
+import json
+import unittest
+
+from tests.helpers import TempCrewCase, server
+
+
+class Workflows(TempCrewCase):
+    def test_clean_workflow_ok(self):
+        err, wf = self.crew._clean_workflow({"name": " Ship it ", "steps": [
+            {"agent": "builder", "title": "Build", "gate": "auto"}, {"agent": "tester"}]})
+        self.assertIsNone(err)
+        self.assertEqual(wf["name"], "Ship it")
+        self.assertEqual([s["gate"] for s in wf["steps"]], ["auto", "approve"])
+        self.assertEqual(wf["output"], {"kind": "board"})
+
+    def test_clean_workflow_rejects(self):
+        c = self.crew._clean_workflow
+        self.assertIn("name", c({"name": "", "steps": []})[0])
+        self.assertIn("agent", c({"name": "x", "steps": [{"agent": "nobody"}]})[0])
+        self.assertIn("at least one", c({"name": "x", "steps": []})[0])
+        step = [{"agent": "builder"}]
+        self.assertIn("inside the project", c({"name": "x", "steps": step, "output": {"kind": "report", "path": "../out"}})[0])
+        self.assertIn("http", c({"name": "x", "steps": step, "output": {"kind": "webhook", "url": "ftp://a"}})[0])
+        self.assertIsNone(c({"name": "x", "steps": step, "output": {"kind": "webhook", "url": "https://a.example/h"}})[0])
+
+
+class Actions(TempCrewCase):
+    def test_snapshot_has_version(self):
+        snap = self.crew.snapshot()
+        self.assertEqual(snap["app_version"], server.__version__)
+        self.assertEqual(len(snap["agents"]), len(server.DEFAULT_CONFIG["agents"]))
+
+    def test_add_task(self):
+        self.assertIn("error", self.crew.act("add", {"title": "  "}))
+        self.crew.act("add", {"title": "Fix login", "tag": "bug"})
+        self.assertEqual(self.crew.tasks[0]["title"], "Fix login")
+        self.assertEqual(self.crew.tasks[0]["col"], "backlog")
+
+    def test_reorder_agents_saves_config(self):
+        names = list(self.crew.agents)
+        new = list(reversed(names))
+        self.crew.act("reorder_agents", {"names": new})
+        self.assertEqual(list(self.crew.agents), new)
+        saved = json.loads(self.cfg_path.read_text(encoding="utf-8"))
+        self.assertEqual([a["name"] for a in saved["agents"]], new)
+        self.assertEqual(saved["permission_mode"], "acceptEdits")
+
+    def test_reorder_ignores_unknown_and_keeps_rest(self):
+        names = list(self.crew.agents)
+        self.crew.act("reorder_agents", {"names": ["ghost", names[-1]]})
+        self.assertEqual(list(self.crew.agents)[0], names[-1])
+        self.assertEqual(sorted(self.crew.agents), sorted(names))
+
+    def test_clear_chat_idle_agent(self):
+        a = self.crew.agents[next(iter(self.crew.agents))]
+        a["session"], a["log"], a["ctx"] = "sess-1", [{"k": "x"}], 123
+        self.crew.act("clear_chat", {"agent": a["name"]})
+        self.assertIsNone(a["session"])
+        self.assertEqual(a["ctx"], 0)
+        self.assertEqual(a["status"], "idle")
+        self.assertTrue(any("chat cleared" in str(m) for m in a["log"]))
+
+    def test_clear_chat_running_agent_refused(self):
+        a = self.crew.agents[next(iter(self.crew.agents))]
+        a["status"] = "running"
+        self.assertIn("error", self.crew.act("clear_chat", {"agent": a["name"]}))
+
+    def test_state_is_written_under_work_root_only(self):
+        self.assertTrue(str(self.crew.state_file).startswith(str(server.WORK_ROOT)))
+
+
+if __name__ == "__main__":
+    unittest.main()

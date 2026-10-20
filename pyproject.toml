@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claude-crew"
+dynamic = ["version"]
+description = "A local web console for a team of Claude Code agents, each in its own git worktree"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+keywords = ["claude", "claude-code", "agents", "ai", "worktree"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/pranjal-joshi/claude-crew"
+Issues = "https://github.com/pranjal-joshi/claude-crew/issues"
+Changelog = "https://github.com/pranjal-joshi/claude-crew/blob/main/CHANGELOG.md"
+
+[project.scripts]
+crew = "claude_crew.server:main"
+
+[tool.hatch.version]
+path = "server.py"
+
+# The source tree is flat (python server.py works from a clone); the wheel maps the files into claude_crew/.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build.targets.wheel.force-include]
+"wheelfiles/__init__.py" = "claude_crew/__init__.py"
+"server.py" = "claude_crew/server.py"
+"crew_mcp.py" = "claude_crew/crew_mcp.py"
+"index.html" = "claude_crew/index.html"
+"demo/fake_claude.py" = "claude_crew/demo/fake_claude.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["/server.py", "/crew_mcp.py", "/index.html", "/demo", "/wheelfiles", "/tests",
+           "/README.md", "/LICENSE", "/CHANGELOG.md"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 140
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "E401", "E701", "E702", "E731", "E741"]

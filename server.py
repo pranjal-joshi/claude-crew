@@ -29,7 +29,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+__version__ = "0.1.0"
+
 APP_DIR = Path(__file__).resolve().parent
+# A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the
+# default crew.json lives in the current directory (never inside site-packages).
+IS_CLONE = (APP_DIR / "pyproject.toml").exists()
 WORK_ROOT = Path.home() / ".crew"  # short path: Windows git chokes on long worktree paths
 IS_WIN = os.name == "nt"
 
@@ -150,6 +155,40 @@ def sync_claude_files(src: Path, dst: Path) -> list[str]:
             except OSError:
                 pass
     return copied
+
+
+def _md_description(f: Path) -> str:
+    """The description from a command/skill file's front matter, else its first line of text."""
+    try:
+        txt = f.read_text(encoding="utf-8", errors="replace")[:6000]
+    except OSError:
+        return ""
+    body = txt
+    if txt.startswith("---"):
+        head, _, body = txt[3:].partition("\n---")
+        lines = head.splitlines()
+        for i, line in enumerate(lines):
+            if line.lower().startswith("description:"):
+                v = line.split(":", 1)[1].strip()
+                if v in ("", ">", "|", ">-", "|-"):  # folded / block scalar: the indented lines below
+                    v = " ".join(x.strip() for x in lines[i + 1:] if x.startswith((" ", "\t")))
+                return v.strip("\"'")[:220]
+    return next((x.strip("# ").strip() for x in body.splitlines() if x.strip() and not x.startswith("---")), "")[:220]
+
+
+def command_catalog(project: Path) -> dict:
+    """Slash commands and skills on disk (user, then project), with descriptions for the / picker."""
+    out = {}
+    for base, scope in ((Path.home() / ".claude", "user"), (project / ".claude", "project")):
+        cmds = base / "commands"
+        if cmds.is_dir():
+            for f in sorted(cmds.rglob("*.md"))[:300]:
+                out[":".join(f.relative_to(cmds).with_suffix("").parts)] = {"kind": "command", "scope": scope, "desc": _md_description(f)}
+        skills = base / "skills"
+        if skills.is_dir():
+            for f in sorted(skills.glob("*/SKILL.md"))[:300]:
+                out[f.parent.name] = {"kind": "skill", "scope": scope, "desc": _md_description(f)}
+    return out
 
 
 def local_mcp_servers(project: Path) -> dict:
@@ -353,7 +392,7 @@ class Crew:
             self.boss.update({k: b[k] for k in ("session", "cost", "log", "tokens", "ctx") if k in b})
         for name, saved in data.get("agents", {}).items():
             if name in self.agents:
-                self.agents[name].update({k: saved[k] for k in ("session", "cost", "log", "tokens", "mcp", "skills", "skill_names", "plugins") if k in saved})
+                self.agents[name].update({k: saved[k] for k in ("session", "cost", "log", "tokens", "mcp", "skills", "skill_names", "plugins", "commands") if k in saved})
                 if self.agents[name]["status"] != "idle":
                     self.agents[name]["status"] = "idle"
 
@@ -362,7 +401,7 @@ class Crew:
                 "mcp_allow": sorted(self.mcp_allow), "triggers": self._public_triggers(), "next_trig": self.next_trig,
                 "runs": self.runs[-50:], "next_run": self.next_run,
                 "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
-                           "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", [])}
+                           "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", []), "commands": a.get("commands", [])}
                        for n, a in self.agents.items()},
                 "boss": {k: self.boss[k] for k in ("session", "cost", "tokens", "ctx")} | {"log": self.boss["log"][-200:]}}
         tmp = self.state_file.with_suffix(".tmp")
@@ -400,7 +439,7 @@ class Crew:
                     "agents": agents, "tasks": self.tasks, "feed": self.feed[-30:],
                     "permission_mode": self.config["permission_mode"], "modes": MODES,
                     "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
-                    "project_name": self.project.name, "mcp_allow": sorted(self.mcp_allow),
+                    "project_name": self.project.name, "app_version": __version__, "mcp_allow": sorted(self.mcp_allow),
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(),
                     "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []),
                     "runs": self.runs[-30:], "contexts": CONTEXTS}
@@ -570,6 +609,7 @@ class Crew:
             a["skills"] = len(d.get("skills") or [])
             a["skill_names"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("skills") or [])[:200]
             a["plugins"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("plugins") or [])[:100]
+            a["commands"] = sorted({str(x if isinstance(x, str) else x.get("name", "")).lstrip("/") for x in d.get("slash_commands") or []} - {""})[:300]
             found = {"__".join(tool.split("__")[:2]) for tool in d.get("tools") or [] if tool.startswith("mcp__")}
             if found - self.mcp_allow:
                 self.mcp_allow |= found  # other agents pick these up when they next (re)start
@@ -1576,6 +1616,17 @@ class Handler(BaseHTTPRequestHandler):
             self._page()
         elif self.path == "/api/state":
             self._json(CREW.snapshot())
+        elif urlsplit(self.path).path == "/api/commands":  # the / picker: what this agent's session can run
+            who = (parse_qs(urlsplit(self.path).query).get("agent") or [""])[0]
+            c = CREW
+            with c.lock:
+                a = c.boss if who == "boss" else c.agents.get(who)
+                if not a:
+                    return self._json({"error": "no such agent"}, 404)
+                names, skills = list(a.get("commands") or []), list(a.get("skill_names") or [])
+            boss = who == "boss"  # the boss runs with slash commands off: only the crew's own
+            self._json({"boss": boss, "live": bool(names), "commands": [] if boss else names,
+                        "skills": [] if boss else skills, "catalog": {} if boss else command_catalog(c.project)})
         elif self.path == "/api/stream":
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
@@ -1671,9 +1722,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Local web console for a crew of Claude Code agents")
     ap.add_argument("--project", help="repo the agents work on (default: a demo git repo)")
     ap.add_argument("--port", type=int, default=8770)
-    ap.add_argument("--config", help="crew config (default: crew.json next to server.py)")
+    ap.add_argument("--config", help="crew config (default: crew.json next to server.py, or in the current folder when installed)")
     ap.add_argument("--demo", action="store_true", help="simulated agents with sample tasks: no Claude CLI, no tokens")
     ap.add_argument("--lan", action="store_true", help="also serve other devices on your network (phone, tablet), behind a key")
+    ap.add_argument("--version", action="version", version=f"crew {__version__}")
     args = ap.parse_args()
 
     if args.demo:
@@ -1682,7 +1734,7 @@ def main() -> None:
         claude = [sys.executable, str(APP_DIR / "demo" / "fake_claude.py")]
     else:
         project = Path(args.project or WORK_ROOT / "demo-project").resolve()
-        cfg_path = Path(args.config or APP_DIR / "crew.json")
+        cfg_path = Path(args.config or (APP_DIR if IS_CLONE else Path.cwd()) / "crew.json")
         # CREW_CLAUDE overrides the binary, e.g. "python demo/fake_claude.py"
         claude = shlex.split(os.environ["CREW_CLAUDE"], posix=False) if os.environ.get("CREW_CLAUDE") else [shutil.which("claude") or ""]
         if not claude[0]:

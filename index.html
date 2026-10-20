@@ -306,6 +306,19 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .menu .mi.cur{color:var(--text)}.menu .mi.cur::after{content:"\2713";margin-left:auto;color:var(--accent)}
 .menu .sep{height:1px;background:var(--line);margin:5px 4px}
 .menu .mi[aria-disabled=true]{opacity:.38;pointer-events:none}
+.slash{position:fixed;z-index:41;background:var(--raised);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;animation:rise .12s ease-out}
+.slash[hidden]{display:none}
+.slash .sh{padding:4px 10px 6px;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:600;display:flex;gap:8px}
+.slash .sh span{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400}
+.slash .sl{overflow-y:auto;max-height:min(320px,42dvh)}
+.slash .si{display:flex;align-items:baseline;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:12.5px}
+.slash .si.on{background:var(--hover);color:var(--text)}
+.slash .si b{font:600 12.5px var(--mono);color:var(--text);white-space:nowrap}
+.slash .si b i{font-style:normal;color:var(--accent)}
+.slash .si .d{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint);font-size:12px}
+.slash .si .k{font-size:10.5px;color:var(--faint);border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap}
+.slash .si .k.crew{color:var(--accent);border-color:var(--accent-line)}
+.slash .empty{padding:10px;color:var(--faint);font-size:12.5px}
 .kebab{flex:none;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;border:0;background:transparent;color:var(--faint);cursor:pointer;opacity:0;transition:opacity .12s,background .12s;font-size:14px;line-height:1}
 .card:hover .kebab,.kebab:focus-visible{opacity:1}.kebab:hover{background:var(--hover);color:var(--text)}
 .card .th{display:flex;align-items:flex-start;gap:4px}.card .th .t{flex:1;min-width:0}
@@ -596,6 +609,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
     <div class="stats" id="stats"></div>
     <button class="btn ghost" id="palBtn" title="Command palette">Search <kbd>Ctrl K</kbd></button>
     <button class="btn primary" id="newBtn">＋ New task <kbd style="background:rgba(0,0,0,.18);border-color:rgba(0,0,0,.2);color:#3a1a0c">N</kbd></button>
+    <span class="faint" id="ver" style="font-size:11px"></span>
     <span class="conn" id="conn" title="connection"></span>
   </header>
   <div class="body" id="body">
@@ -782,6 +796,7 @@ function render() {
   if (!S) return;
   queueMicrotask(renderChat);
   $('#projName').textContent = S.project_name || S.project; $('#projBtn').title = S.project + ' · switch project';
+  $('#ver').textContent = S.app_version ? 'v' + S.app_version : '';
   $('#projGit').textContent = S.git ? 'git' : 'no git';
   const pm = S.permission_mode, cls = pm === 'bypassPermissions' ? 'bypass' : pm === 'auto' ? 'auto' : '';
   $('#mode').className = 'chip modebtn ' + cls;
@@ -1081,6 +1096,7 @@ function autosize(e) { const t = e.target; t.style.height = 'auto'; t.style.heig
 async function sendMsg() {
   const t = $('#msg'), v = t.value.trim();
   if (!v || !view.drawer?.agent) return;
+  if (crewCmd(v, view.drawer.agent)) { t.value = ''; t.style.height = 'auto'; return; }
   t.value = ''; t.style.height = 'auto';
   await act('tell', {agent: view.drawer.agent, text: v});
 }
@@ -1853,6 +1869,7 @@ async function bossSays(text, open = true) {
 }
 async function sendChat() {
   const el = $('#chatIn'), text = el.value.trim(); if (!text) return;
+  if (crewCmd(text, chatWho())) { el.value = ''; autosize({target: el}); return; }
   const r = await act('tell', {agent: chatTarget().name, text});
   if (r.ok) { el.value = ''; autosize({target: el}); view.chatOpen = true; $('#chatlog').dataset.jump = '1'; render(); }
 }
@@ -1860,12 +1877,101 @@ $('#chatSend').onclick = sendChat;
 $('#chatIn').addEventListener('input', autosize);
 $('#chatIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
 $('#chatIn').addEventListener('focus', () => { if (!view.chatOpen) { view.chatOpen = true; renderChat(); } });
-$('#chatClear').onclick = () => {
-  const t = chatTarget(), name = t === S.boss ? 'the boss' : t.name;
+const chatWho = () => chatTarget() === S.boss ? 'boss' : chatTarget().name;
+const agentBy = who => who === 'boss' ? S.boss : S.agents.find(a => a.name === who);
+function clearChat(who) {
+  const t = agentBy(who); if (!t) return;
+  const name = who === 'boss' ? 'the boss' : t.name;
   if (t.status === 'running') return toast(`${name} is working: stop it first`, 'var(--amber)');
   askConfirm('Clear this chat?', `The conversation with <b>${esc(name)}</b> is removed and its context is emptied; the next message starts a fresh session. Tasks, branches and commits are kept.`, 'Clear chat',
-    async () => { const r = await act('clear_chat', {agent: t === S.boss ? 'boss' : t.name}); if (r.ok) { $('#chatlog').dataset.sig = ''; toast('Chat cleared', 'var(--green)'); } }, true);
-};
+    async () => { const r = await act('clear_chat', {agent: who}); if (r.ok) { $('#chatlog').dataset.sig = ''; toast('Chat cleared', 'var(--green)'); } }, true);
+}
+$('#chatClear').onclick = () => clearChat(chatWho());
+
+// ---- / commands: the crew's own, plus whatever the agent's Claude session can run ----------
+const CREW_CMDS = [
+  {name: 'clear', desc: 'Clear this chat and its context; the next message starts a fresh session'},
+  {name: 'compact', desc: 'Summarise the conversation so far to free up context'},
+  {name: 'stop', desc: 'Stop the current turn (the session is kept)'},
+];
+const CC_DESC = {context: 'Show what is filling the context window', cost: 'Token usage and cost of this session', init: 'Write a CLAUDE.md that describes the project',
+  review: 'Review a pull request', 'security-review': 'Security review of the pending changes', 'pr-comments': 'Fetch comments from a GitHub pull request',
+  'release-notes': 'Claude Code release notes', todos: 'Show the current todo list', insights: 'Report on how this session went', heapdump: 'Write a heap snapshot (debugging)',
+  simplify: 'Clean up the changed code', 'code-review': 'Review the current diff for bugs', 'fewer-permission-prompts': 'Allowlist common read-only commands', loop: 'Run a prompt on an interval'};
+function crewCmd(text, who) {
+  const m = /^\/(clear|compact|stop)\s*$/i.exec(text); if (!m) return false;
+  const c = m[1].toLowerCase(), t = agentBy(who), name = who === 'boss' ? 'the boss' : who;
+  if (c === 'clear') clearChat(who);
+  else if (c === 'compact') act('compact', {agent: who}).then(r => r.ok && toast(`Compacting ${name}…`, 'var(--accent)'));
+  else if (t?.status !== 'running') toast(`${name} is not running`, 'var(--amber)');
+  else act('stop', {agent: who}).then(r => r.ok && toast(`Stopped ${name}`, 'var(--amber)'));
+  return true;
+}
+const slashCache = {};
+async function slashData(who) {
+  const c = slashCache[who];
+  if (c && Date.now() - c.at < 30000) return c.data;
+  const data = await fetch('/api/commands?agent=' + encodeURIComponent(who)).then(r => r.json()).catch(() => ({}));
+  slashCache[who] = {at: Date.now(), data};
+  return data;
+}
+function slashItems(data) {
+  const cat = data.catalog || {}, seen = new Set(), out = [];
+  const add = (name, kind, desc) => { if (!name || seen.has(name)) return; seen.add(name); out.push({name, kind, desc: desc || ''}); };
+  for (const c of CREW_CMDS) add(c.name, 'crew', c.desc);
+  if (data.boss) return out;
+  const skills = new Set(data.skills || []);
+  // a live session reports exactly what it can run; before the first message, what is on disk
+  const names = data.live ? data.commands : [...Object.keys(cat), ...(data.skills || [])];
+  for (const n of names) add(n, skills.has(n) || cat[n]?.kind === 'skill' ? 'skill' : 'command', cat[n]?.desc || CC_DESC[n]);
+  return out;
+}
+const sl = Object.assign(document.createElement('div'), {className: 'slash', hidden: true, id: 'slash'});
+document.body.append(sl);
+let slash = null; // {el, who, items, sel}
+const slashWho = el => el.id === 'msg' ? view.drawer?.agent : el.id === 'chatIn' ? chatWho() : null;
+function slashClose() { sl.hidden = true; slash = null; }
+async function slashUpdate(el) {
+  const m = /^\/([^\s]*)$/.exec(el.value), who = slashWho(el);
+  if (!m || !who) return slashClose();
+  const q = m[1].toLowerCase(), data = await slashData(who);
+  if (document.activeElement !== el || !/^\/[^\s]*$/.test(el.value)) return;
+  const all = slashItems(data);
+  const items = [...all.filter(i => i.name.toLowerCase().startsWith(q)), ...all.filter(i => !i.name.toLowerCase().startsWith(q) && i.name.toLowerCase().includes(q))];
+  slash = {el, who, items, sel: Math.min(slash?.el === el ? slash.sel : 0, Math.max(0, items.length - 1)), q};
+  slashDraw();
+}
+function slashDraw() {
+  const {el, items, sel, q, who} = slash, r = el.getBoundingClientRect();
+  const hl = n => { const i = n.toLowerCase().indexOf(q); return i < 0 || !q ? esc(n) : esc(n.slice(0, i)) + '<i>' + esc(n.slice(i, i + q.length)) + '</i>' + esc(n.slice(i + q.length)); };
+  sl.innerHTML = `<div class="sh">${who === 'boss' ? 'Boss commands' : 'Commands &amp; skills · ' + esc(who)}<span>↑↓ · Tab / Enter · Esc</span></div><div class="sl">` +
+    (items.length ? items.map((it, i) => `<div class="si${i === sel ? ' on' : ''}" data-si="${i}"><b>/${hl(it.name)}</b><span class="d">${esc(it.desc)}</span><span class="k${it.kind === 'crew' ? ' crew' : ''}">${it.kind === 'crew' ? 'crew' : it.kind}</span></div>`).join('')
+      : `<div class="empty">No command matches /${esc(q)}</div>`) + '</div>';
+  const w = Math.min(Math.max(r.width, 320), innerWidth - 16);
+  sl.style.width = w + 'px';
+  sl.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+  sl.style.bottom = (innerHeight - r.top + 6) + 'px';
+  sl.hidden = false;
+  sl.querySelector('.si.on')?.scrollIntoView({block: 'nearest'});
+}
+function slashPick(i) {
+  const it = slash?.items[i]; if (!it) return;
+  const {el, who} = slash;
+  slashClose();
+  if (it.kind === 'crew') { el.value = ''; autosize({target: el}); crewCmd('/' + it.name, who); return; }
+  el.value = '/' + it.name + ' '; el.focus(); autosize({target: el});
+}
+document.addEventListener('input', e => { if (e.target.id === 'chatIn' || e.target.id === 'msg') slashUpdate(e.target); });
+document.addEventListener('keydown', e => {
+  if (!slash || e.target !== slash.el) return;
+  const n = slash.items.length;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!n) return; e.preventDefault(); slash.sel = (slash.sel + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; slashDraw(); }
+  else if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') { if (!n) return; e.preventDefault(); e.stopImmediatePropagation(); slashPick(slash.sel); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); slashClose(); }
+}, true);
+document.addEventListener('focusout', e => { if (slash && e.target === slash.el) setTimeout(() => { if (document.activeElement !== slash?.el) slashClose(); }, 150); });
+sl.addEventListener('pointerdown', e => { e.preventDefault(); const it = e.target.closest('[data-si]'); if (it) slashPick(+it.dataset.si); });
+addEventListener('resize', () => slash && slashDraw());
 $('#chatToggle').onclick = () => { view.chatOpen = !view.chatOpen; renderChat(); };
 $('#chatTo').onclick = e => {
   e.stopPropagation();

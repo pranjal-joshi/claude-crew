@@ -2,3 +2,9 @@ __pycache__/
 *.pyc
 crew.json
 .DS_Store
+dist/
+build/
+*.egg-info/
+.venv/
+venv/
+.ruff_cache/
