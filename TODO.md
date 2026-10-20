@@ -46,6 +46,8 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
 **User:** an experienced Claude Code user juggling 2+ terminals. **Job:** hand off well-scoped tasks, walk away, and come back to diffs you can trust and merge in under a minute.
 **Metrics (opt-in local counters, no telemetry):** time from install to first merged change (< 15 min) · first-pass approval rate (≥ 70%) and review time (< 60 s) · merged tasks per week and $ per merged task.
 
+*Released in v0.2.0 (Phases 1-3 shipped together).*
+
 ### Phase 1 · v0.1.1 safety hotfix (all small, ship first)
 - [x] Reuse an agent's branch when its worktree folder is missing. Today `git worktree add -B … HEAD` (server.py:466) resets it and orphans approved, unmerged commits
 - [x] Keep synced local Claude files (`.claude/settings.local.json`, `.mcp.json`, `CLAUDE.local.md`) out of commits by listing them in the worktree's `.git/info/exclude`. Approve runs `git add -A` today

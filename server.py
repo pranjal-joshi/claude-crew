@@ -30,7 +30,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the

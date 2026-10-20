@@ -29,7 +29,7 @@ git clone https://github.com/pranjal-joshi/claude-crew && cd claude-crew
 python server.py --demo
 ```
 
-Open **http://127.0.0.1:8770**.
+Open **http://127.0.0.1:8770**. On an empty board a first-run card offers one example task; a **Demo** badge in the header tells demo from a real project.
 
 ## Install
 
@@ -37,7 +37,7 @@ Crew is pure standard-library Python (3.10 or newer) and installs as a `crew` co
 
 ```bash
 pipx install claude-crew                      # from PyPI, once published
-pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.1.0/claude_crew-0.1.0-py3-none-any.whl   # a release wheel
+pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.2.0/claude_crew-0.2.0-py3-none-any.whl   # a release wheel
 pipx install git+https://github.com/pranjal-joshi/claude-crew   # latest main
 ```
 
@@ -51,7 +51,7 @@ You need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed an
 python server.py --project /path/to/your/repo
 ```
 
-To use it from your phone or another computer on the same Wi-Fi, add `--lan`, then click **Phone** in the header and scan the QR code. On a phone it lays out like an app:
+To use it from your phone or another computer on the same Wi-Fi, add `--lan`, then open the header **⋮** menu, choose **Phone**, and scan the QR code. On a phone it lays out like an app:
 
 ```bash
 python server.py --project /path/to/your/repo --lan
@@ -69,7 +69,7 @@ Crew gives that queue a home:
 - **One board** for every task, with Backlog, In progress, Review and Done columns.
 - **Agents that pull their own work.** Each agent has a role and tags; idle agents take matching tasks.
 - **No stepping on each other.** Every agent works in its own git worktree on its own `crew/<name>` branch.
-- **You stay the reviewer.** Finished work lands in Review with the agent's summary and a real diff. Approve commits it; Send back resumes the same session with your feedback.
+- **You stay the reviewer.** Finished work lands in Review as a decision sheet: the agent's summary, a verdict line (files, +/-, tests) and a per-file diff. Approve commits it, then one click merges the branch or opens a PR. Send back resumes the same session with your feedback.
 - **Work that starts itself.** Schedules, events, file watches, command polls and webhooks turn into tasks, so the standup gets written at 11:00 and every approved feature gets tests.
 
 ## The boss
@@ -125,12 +125,18 @@ The **Output** block decides what a finished run delivers:
 | 🔗 Webhook | The run report is POSTed as JSON (`workflow, run, title, status, report, steps`) to a URL, e.g. a Slack or Teams hook. |
 | ⛓ Next workflow | Another workflow starts with the same goal and this run's last summary (at most 5 in a chain). |
 
+## Review, merge, budgets
+
+A finished task lands in **Review** as a decision sheet: a verdict line, **Approve & commit** pinned at the bottom, the diff collapsed per file, and **Send back** beside it. Press <kbd>A</kbd> to approve; an undo toast lets you take it back. Once approved, **Merge into current branch** merges it in one click, or **Open PR** uses `gh` when the repo has a remote. On a conflict Crew lists the files and offers to send the task back to the agent. Done cards show merged or not merged.
+
+Every card shows its cost. Set a **per-task** and a **per-day** budget (click the tokens/$ stat). A task that hits its budget is flagged and can't be sent back; a spent day budget stops running agents until the next local day or a higher budget.
+
 ## Stop, kill, clear
 
 - **■ Stop** (agent card, drawer, or **Stop all** in the header) ends the current run at once. The session is kept, the task goes back to the backlog **on hold**, and the agent pauses until you press **▶ Resume** or give it work.
-- **Kill** disables an agent until you respawn it. Use it for an agent that misbehaves.
-- **Clear ▾** removes Done tasks, or the whole board (running agents are stopped first). Branches and commits are kept.
-- **Clear** (red button, top right of an open boss or agent chat) wipes that conversation and empties its context: the next message starts a fresh session.
+- **Kill** (agent ⋮ menu, behind a confirm) disables an agent until you respawn it. Use it for an agent that misbehaves.
+- **Clear board ▾** removes Done tasks, or the whole board (running agents are stopped first). Branches and commits are kept.
+- **Clear chat** (red button, top right of an open boss or agent chat) wipes that conversation and empties its context: the next message starts a fresh session.
 
 Give each agent an icon (two dozen dev line icons) and a colour in its settings; the glyph switches between black and white to stay readable. Every agent and every card has a **⋮** menu at its top right: rename, settings, stop, kill or delete an agent; move, mark done or delete a card. The forward button next to a card's ⋮ hands it to an agent (or lets the boss pick), and hand-offs show the same arrow with who it went to. Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
 
@@ -168,16 +174,20 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 | 🧹 **Fresh context per task** | A new session per task keeps tokens down; send-back still resumes. Per-agent switch. |
 | 🧠 **Model and effort per agent** | Opus for the builder, Sonnet for the tester, Fable for research: each agent gets its own model and effort level (low to max). |
 | 🪢 **Subagents, visible** | When an agent fans out to subagents, you see each one live on the agent card, a count on the task, and a labelled thread in the transcript. |
-| 🌳 **Worktree isolation** | One worktree and branch per agent. Merge what you approve with `git merge crew/<name>`. |
-| 🔍 **Review gate** | Agent summary and colored diff side by side. Approve and commit, send back, or hand off to another agent. |
+| 🌳 **Worktree isolation** | One worktree and branch per agent, kept even if the worktree folder goes missing. |
+| 🔍 **Review gate** | A decision sheet: summary, verdict line and per-file diff. Approve and commit (<kbd>A</kbd>, with undo), send back, or hand off. |
+| 🔀 **Merge or PR** | One click merges an approved branch, or opens a PR with `gh`. Conflicts are listed and can go back to the agent. |
+| 🚫 **Blocked inbox** | Tool calls the permission mode refused are listed: Allow & retry, Allow once, or Dismiss. |
+| 💲 **Budgets** | Cost on every card, plus a per-task and a per-day budget that stops runs. |
 | ↪️ **Hand-offs** | Drag any card, in any column, onto another agent. The earlier summary, branch and commit go along as context. |
 | ✦ **Boss chat** | A chat bar that runs the crew: tasks, workflows, agents and triggers, from plain requests. |
-| ⌨ **Slash picker** | Type `/` in any chat box for Crew commands plus the agent's Claude Code commands and skills. **Clear** in the chat panel wipes a chat and its context. |
+| ⌨ **Slash picker** | Type `/` in any chat box for Crew commands plus the agent's Claude Code commands and skills. **Clear chat** wipes a chat and its context. |
 | 💬 **Talk mid-run** | Message any agent while it works. The message lands in the running session. |
+| ☕ **Keep-awake** | `--awake` stops idle sleep while agents work, so runs and schedules aren't paused. |
 | 📱 **Phone app feel** | `--lan` plus a QR code. On a phone: bottom navigation, swipeable columns, bottom sheets, Android back closes sheets. |
-| ■ **Stop, kill, clear** | Stop a run (session kept, task on hold), stop everything at once, or clear the board. |
-| 🔐 **Permission modes** | Accept edits (default), Auto (Claude Code's safety classifier) or Bypass, for all agents from one switch. |
-| 🔢 **Tokens and cost** | Live token counts per agent, per task and in total. Hide the dollar amounts with one click. |
+| ■ **Stop, kill, clear** | Stop a run (session kept, task on hold), stop everything at once, or clear the board. Agent ⋮ menus rename, recolour and kill. |
+| 🔐 **Permission modes** | Accept edits (default), Auto (Claude Code's safety classifier) or Bypass, from the **Permissions** chip in the header. |
+| 🔢 **Tokens and cost** | Live token counts per agent, per task and in total. Hide the dollar amounts with one click. Totals are marked "this session". |
 | 🧩 **Your skills and MCP servers** | Agents are ordinary Claude Code sessions, so they load your skills, plugins and MCP servers. |
 | 📁 **Projects** | Switch repos from the header. Each project keeps its own board, sessions and worktrees. |
 | ⌨️ **Keyboard first** | `/` talk to the boss, `N` new task, `T` triggers, `W` / `B` workflows / board, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
@@ -187,7 +197,11 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 <table>
   <tr>
     <td width="50%"><img src="assets/agent.png" alt="Agent transcript with parallel subagents"><br><sub><b>Agent view.</b> Live transcript; subagents get their own labelled thread.</sub></td>
-    <td width="50%"><img src="assets/review.png" alt="Review drawer with summary and diff"><br><sub><b>Review.</b> The agent's summary and its diff. Approve commits to its branch.</sub></td>
+    <td width="50%"><img src="assets/review.png" alt="Review decision sheet with summary and diff"><br><sub><b>Review.</b> Verdict line, per-file diff and a pinned Approve & commit.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/review-merge.png" alt="Approved task with Merge and Open PR buttons"><br><sub><b>Merge or PR.</b> After Approve: merge into the current branch, open a PR, or undo.</sub></td>
+    <td width="50%"><img src="assets/blocked.png" alt="Blocked inbox in the agent drawer"><br><sub><b>Blocked inbox.</b> A refused command: Allow &amp; retry, Allow once, or Dismiss.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="assets/flows.png" alt="Workflows tab with five workflows"><br><sub><b>Workflows.</b> Agents in a fixed order; runs show each step live. Run has a green ▶.</sub></td>
@@ -199,7 +213,7 @@ Nine presets cover the common loops: daily standup, test what ships, review what
   </tr>
   <tr>
     <td width="50%"><img src="assets/settings.png" alt="Per-agent model and effort settings"><br><sub><b>Model and role.</b> Per-agent model, effort, role and tags.</sub></td>
-    <td width="50%"><img src="assets/hero.png" alt="Board with nine agents running"><br><sub><b>Board.</b> Agents in flight, subagents counted on each card.</sub></td>
+    <td width="50%"><img src="assets/hero.png" alt="Board with nine agents running"><br><sub><b>Board.</b> Agents in flight, with cost and subagents on each card.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="assets/slash.png" alt="Slash picker in the chat bar"><br><sub><b>Slash picker.</b> Type <code>/</code> for Crew commands, plus an agent's commands and skills.</sub></td>
@@ -223,7 +237,7 @@ flowchart LR
 - Each agent is a long-lived `claude -p --input-format stream-json --output-format stream-json` process. Crew writes tasks and your messages to its stdin and reads every event from its stdout.
 - A one-second loop checks triggers, then gives idle agents work: tasks pinned to them first, then unassigned tasks whose tag matches the agent's tags.
 - Subagents are tracked from the stream itself. An `Agent` tool call starts one, events tagged with its `parent_tool_use_id` belong to it, and its tool result ends it.
-- State (board, triggers, sessions, tokens, transcripts) is saved per project under `~/.crew/state/`. Worktrees live in `~/.crew/wt/`, which keeps paths short enough for Windows.
+- State (board, triggers, sessions, tokens, transcripts) is saved per project under `~/.crew/state/`. Agent process ids are kept in `~/.crew/pids/`, so leftovers from a crash are ended at startup. Worktrees live in `~/.crew/wt/`, which keeps paths short enough for Windows.
 
 ## Configuration
 
@@ -254,7 +268,7 @@ flowchart LR
 
 ### Permissions
 
-Headless agents can't answer permission prompts. In **Accept edits** mode, file edits are allowed and Bash commands outside `allowed_tools` are refused, and the agent is told why. Refused calls land in the **blocked** list in the header (and in the agent's drawer): **Allow & retry** adds a rule such as `Bash(npm test:*)` to `allowed_tools` for you, or **Allow once** keeps it until that task ends. You can also add commands to `allowed_tools` yourself, or switch to **Auto** to let Claude Code's classifier decide. **Bypass** skips all checks and asks you to confirm first.
+Headless agents can't answer permission prompts. In **Accept edits** mode, file edits are allowed and Bash commands outside `allowed_tools` are refused, and the agent is told why. Refused calls land in the **Blocked** inbox (the "N blocked" chip in the header, and the agent's drawer): **Allow & retry** adds a rule such as `Bash(npm test:*)` to `allowed_tools` for you, **Allow once** keeps it until that task ends, and **Dismiss** clears it. You can also add commands to `allowed_tools` yourself, or switch to **Auto** to let Claude Code's classifier decide. **Bypass** skips all checks and asks you to confirm first.
 
 ## Security
 
@@ -263,14 +277,15 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 - `--lan` listens on your network, but every request from another device needs a secret key (set as a cookie by the QR link) and a bare-IP `Host`. The key lives in `~/.crew/lan-key`; delete it to sign every device out. Traffic is plain HTTP, so use it on networks you trust.
 - Agents are told to stay inside the project folder unless a task names another path.
 - Webhooks are the one write path without the browser header. Each needs its own random token, compared in constant time.
-- Poll triggers run the command you typed, in your shell, in the project folder. Treat them like a cron job you wrote yourself.
+- Poll triggers run the command you typed, in your shell, in the project folder. They can only be created from the UI, after a confirm that shows the command. Treat them like a cron job you wrote yourself.
 
 ### Security model
 
 - **Local trust.** Anything that can read your user's files or run as you can drive Crew, the same as it can run `claude` itself. Crew does not defend against other software on your account.
 - **Per-run tokens.** The page gets one secret when it loads, and `crew_mcp` gets another through its environment. Every `POST /api/act/*` needs one of them (`X-Crew-Auth`), on top of the `X-Crew` header, so a random local process or an agent's Bash can't just call the API.
-- **Agents and the boss are limited.** The MCP token only allows the actions the crew tools use (tasks, hand-offs, agents, workflows, triggers). It can't create poll triggers (shell commands), change the permission mode, switch project or browse folders. Those need the page.
+- **Agents and the boss are limited.** The MCP token is checked against an allowlist of the actions the crew tools use (tasks, hand-offs, agents, workflows, non-poll triggers). It can't create poll triggers (shell commands), change the permission mode, switch project or browse folders. Those need the page.
 - **LAN.** With `--lan`, a device that signs in with the key gets the page, so it can use the board, but it can't browse the host's disk or switch projects.
+- **Your files.** `crew.json` and state are saved atomically with a `.bak`; a corrupt state file is set aside as `.corrupt`. Synced local files (`.mcp.json`, `settings.local.json`, `CLAUDE.local.md`) are kept out of commits.
 
 ## FAQ
 
@@ -280,7 +295,7 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 
 **Can an agent spawn its own subagents or background jobs?** Yes, they're full Claude Code sessions. Crew shows subagents live. Kill ends the whole process tree, background jobs included.
 
-**How do I merge an agent's work?** Approve commits to the agent's branch. Then `git merge crew/builder` (or open a PR) like any other branch.
+**How do I merge an agent's work?** Approve commits to the agent's branch, then **Merge into current branch** or **Open PR** on the card. Plain `git merge crew/builder` works too.
 
 **Which platforms?** Built and tested on Windows 11. macOS and Linux use the same code paths (process groups instead of `taskkill`); reports welcome.
 
@@ -293,7 +308,7 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 - [x] Event triggers chain work ("tests after feature")
 - [x] Workflows: agents in a fixed order with approval gates
 - [ ] Parallel steps in workflows (fan out, then join)
-- [ ] One-click merge of approved branches
+- [x] One-click merge of approved branches, or Open PR
 
 Ideas and PRs welcome. Open an issue first for anything big.
 

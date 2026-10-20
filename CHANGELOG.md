@@ -2,16 +2,45 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-21
+
+The review-to-merge loop, plus safety and polish.
 
 ### Added
-- Agent icons (24 dev line icons) and background colours; the glyph turns black or white for contrast.
-- Keep-awake while agents work (`--awake busy|always|off`, default `busy`), like the Claude desktop app: a locked screen never paused Crew, but idle sleep did. ☕ in the header while it holds.
-- Case-only agent renames (designer → Designer) carry the worktree and branch along.
-- ⋮ menu on every agent: rename (moves its worktree and branch, updates tasks, triggers and workflows), settings, stop, kill, delete.
+- Review decision sheet: a verdict line (files, +/-, tests), a pinned **Approve & commit**, a per-file diff, and `A` to approve with an undo toast.
+- One-click **Merge** of an approved branch into the base branch, or **Open PR** with `gh` when there is a remote. On a conflict it lists the files and offers to send the task back to the agent. Done cards show merged or not merged.
+- First-run card on an empty board and a **Demo** badge that tells demo and real projects apart.
+- Blocked inbox: tool calls the permission mode refused show as a "N blocked" chip, a list and a drawer section. **Allow & retry** adds an editable rule (such as `Bash(npm test:*)`) to `allowed_tools` and restarts the agent with the session kept; **Allow once** keeps it until the task ends; **Dismiss** clears it.
+- Cost on every task card, and budgets per task and per day (`budget_task_usd`, `budget_day_usd`). A task at its budget is flagged and can't be sent back; a spent daily budget stops running agents until the next local day or a higher budget.
+- Header summary pill, a ⋮ header menu (Phone, version and more) and a **Permissions: Auto** chip. Agent drawer **Details**, Kill behind a confirm, tooltips and a gate legend for ✋ / ⚡.
+- Agent ⋮ menu (rename, settings, stop, kill, delete). Rename moves the worktree and branch and updates tasks, triggers and workflows; case-only renames work.
+- Agent icons (24 dev line icons) and background colours.
+- Card forward button (hand off to an agent), next to an always-visible ⋮.
+- Keep-awake while agents work (`--awake busy|always|off`, default `busy`), with ☕ in the header.
+- Workflows page: ⋮ menu with delete, and a one-line Auto Workflow Builder.
+- Accessibility: focus ring, aria-labels, keyboard-operable cards and chips, reduced-motion support, better small-text contrast.
+- Agent processes are recorded in `~/.crew/pids/<project>.json`; leftovers from a crashed run are ended at startup.
+- Tests for git integration, the auth matrix and bad webhook tokens.
 
 ### Changed
-- Cards get a forward button (hand off to an agent) next to an always-visible ⋮ (move, mark done, delete); hand-offs show a forward arrow.
+- Clear buttons have specific names: **Clear board** and **Clear chat**.
+- Token totals are labelled "this session"; agent card numbers are labelled.
+- The header shows one running/review summary; Stop all appears only while something runs.
+- Clicking a board card opens the agent that handled it.
+
+### Fixed
+- Approve, undo, merge, Open PR and diff no longer run git under the global lock, so the live stream stays responsive. The task shows as busy and a second click is refused.
+- A hung agent stdin can no longer block Crew; a process that stops reading is ended with its session kept.
+- Stopping an agent sends SIGTERM to its process group and SIGKILL after 3 s on macOS and Linux; on Windows a failed `taskkill` is logged.
+- An agent's branch is reused when its worktree folder is missing, instead of being reset and orphaning approved commits.
+- A corrupt state file is renamed to `.corrupt` and reported, instead of silently starting empty.
+
+### Security
+- Synced local Claude files (`.claude/settings.local.json`, `.mcp.json`, `CLAUDE.local.md`) are kept out of commits.
+- Poll triggers (shell commands) can only be created from the UI, after a confirm that shows the command. The boss can't create them.
+- Per-run caller tokens (UI and MCP) on `POST /api/act/*`; the MCP token is limited to an allowlist of crew actions.
+- With `--lan`, clients can't browse folders or switch projects.
+- `crew.json` and state are written atomically with a `.bak`; the webhook `Content-Length` is guarded.
 
 ## [0.1.0] - 2026-10-20
 
@@ -37,3 +66,4 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 - When installed from a package, the default `crew.json` is read from (and created in) the current folder instead of next to `server.py`. From a clone, behavior is unchanged.
 
 [0.1.0]: https://github.com/pranjal-joshi/claude-crew/releases/tag/v0.1.0
+[0.2.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.1.0...v0.2.0
