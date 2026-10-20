@@ -551,10 +551,10 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .wfins .hd{display:flex;align-items:center;gap:10px}
 .wfins .hd b{font-size:14px}
 .wfins .role{font-size:12px;color:var(--faint);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.seg{display:flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
-.seg button{flex:1;border:0;background:transparent;color:var(--muted);padding:8px 6px;font:500 12px var(--sans);cursor:pointer}
-.seg button+button{border-left:1px solid var(--line2)}
-.seg button.on.approve{background:var(--amber-soft);color:var(--amber)}.seg button.on.auto{background:var(--teal-soft);color:var(--teal)}
+.wfseg{display:flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+.wfseg button{flex:1;border:0;background:transparent;color:var(--muted);padding:8px 6px;font:500 12px var(--sans);cursor:pointer}
+.wfseg button+button{border-left:1px solid var(--line2)}
+.wfseg button.on.approve{background:var(--amber-soft);color:var(--amber)}.wfseg button.on.auto{background:var(--teal-soft);color:var(--teal)}
 .okind{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .okind button{text-align:left;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);cursor:pointer;color:var(--text);font:500 12.5px var(--sans);display:flex;flex-direction:column;gap:3px}
 .okind button span{font-size:11px;color:var(--faint);font-weight:400;line-height:1.35}
@@ -1618,7 +1618,7 @@ function drawWfIns() {
       ${a ? `<div class="role">${esc(a.role)}</div>` : '<div class="role" style="color:var(--red)">This agent is not in the crew any more.</div>'}
       ${wfField('Task title', `<input class="field" data-s="title" value="${esc(st.title)}" placeholder="Build: {input}" autocomplete="off">`)}
       ${wfField('Instructions', `<textarea class="field" data-s="details" rows="5" placeholder="Optional. Earlier steps' summaries are added automatically.">${esc(st.details)}</textarea>`)}
-      ${wfField('When this step is done', `<div class="seg"><button class="approve ${st.gate !== 'auto' ? 'on' : ''}" data-sg="approve">✋ Wait for me</button><button class="auto ${st.gate === 'auto' ? 'on' : ''}" data-sg="auto">⚡ Continue</button></div>`)}
+      ${wfField('When this step is done', `<div class="wfseg"><button class="approve ${st.gate !== 'auto' ? 'on' : ''}" data-sg="approve">✋ Wait for me</button><button class="auto ${st.gate === 'auto' ? 'on' : ''}" data-sg="auto">⚡ Continue</button></div>`)}
       <div style="display:flex;gap:6px"><button class="btn sm" data-smv="-1" ${i === 0 ? 'disabled' : ''}>← Earlier</button><button class="btn sm" data-smv="1" ${i === wfe.steps.length - 1 ? 'disabled' : ''}>Later →</button><button class="btn sm danger" data-srm style="margin-left:auto" ${wfe.steps.length === 1 ? 'disabled' : ''}>Delete</button></div>
       <div class="thint">Placeholders: <code>{input}</code> <code>{details}</code> the run's goal · <code>{prev_summary}</code> <code>{prev_who}</code> <code>{prev_branch}</code> <code>{prev_commit}</code> · <code>{step}</code> <code>{steps}</code></div>`;
   } else if (wfSel === 'trigger') {
