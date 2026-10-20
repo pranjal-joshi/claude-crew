@@ -358,6 +358,7 @@ class Crew:
         self.feed: list[dict] = []
         self.next_id = 1
         self.git = is_git(project)
+        self.demo = False
         self.key = f"{project.name[:24]}-{hashlib.sha1(str(project).lower().encode()).hexdigest()[:6]}"
         self.state_file = WORK_ROOT / "state" / f"{self.key}.json"
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
@@ -512,7 +513,8 @@ class Crew:
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(),
                     "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []),
                     "runs": self.runs[-30:], "contexts": CONTEXTS,
-                    "awake": getattr(self, "awake", False)}
+                    "awake": getattr(self, "awake", False), "demo": self.demo,
+                    "scratch": self.project.parent.resolve() == WORK_ROOT.resolve()}
 
     # ---- worktrees -----------------------------------------------------------
     def _ensure_worktree(self, a: dict) -> None:
@@ -878,12 +880,113 @@ class Crew:
             r = git(Path(w["cwd"]), "-c", "user.name=crew", "-c", "user.email=crew@localhost",
                     "commit", "-m", f"#{t['id']} {t['title']}\n\n{(t.get('summary') or '')[:2000]}")
             t["commit"] = git(Path(w["cwd"]), "rev-parse", "--short", "HEAD").stdout.strip() if r.returncode == 0 else None
-            t["merge_hint"] = f"git merge {w['branch']}"
+            t["commit_full"] = git(Path(w["cwd"]), "rev-parse", "HEAD").stdout.strip() if t["commit"] else None
+            for k in ("merged", "merge_error", "pr"):
+                t.pop(k, None)
         t["col"] = "done"
         if w:
             w.update(status="idle", task=None)
         self.event("approve", f"{'auto-' if by != 'you' else ''}approved #{t['id']}" + (f" · commit {t.get('commit')} on {w['branch']}" if t.get("commit") else ""))
         self._task_event(t, "done")
+
+    def _unapprove(self, t: dict) -> dict:
+        """Undo an approval: soft-reset the agent's worktree and move the task back to Review. Caller holds the lock."""
+        w = self.agents.get(t.get("who") or "")
+        if t["col"] != "done" or not t.get("commit_full") or not w or not self.git:
+            return {"error": "nothing to undo"}
+        if t.get("merged") or t.get("pr"):
+            return {"error": "already merged or in a PR: can't undo"}
+        if w["status"] in ("running", "review") or w.get("task"):
+            return {"error": f"{w['name']} has moved on to other work: can't undo"}
+        cwd = Path(w["cwd"])
+        if git(cwd, "rev-parse", "HEAD").stdout.strip() != t["commit_full"]:
+            return {"error": "the branch has new commits since this approval: can't undo"}
+        r = git(cwd, "reset", "--soft", "HEAD~1")
+        if r.returncode != 0:
+            return {"error": "undo failed: " + r.stderr.strip()[:200]}
+        for k in ("commit", "commit_full"):
+            t.pop(k, None)
+        t["col"] = "review"
+        w.update(status="review", task=t["id"])
+        t["diff"] = self.diff(w)
+        self.event("reject", f"undid approval of #{t['id']}", w["name"])
+        return {"ok": True}
+
+    def _merge(self, t: dict) -> dict:
+        """Merge an approved task's branch into the project's current branch. Caller holds the lock."""
+        w = self.agents.get(t.get("who") or "")
+        if not self.git or t["col"] != "done" or not t.get("commit") or not w or not w.get("branch"):
+            return {"error": "only an approved task with a commit can be merged"}
+        if t.get("merged"):
+            return {"error": "already merged"}
+        base = git(self.project, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+        if not base:
+            return {"error": "the project folder is on a detached HEAD: check out a branch first"}
+        if git(self.project, "status", "--porcelain", "--untracked-files=no").stdout.strip():
+            return {"error": f"{self.project.name} has uncommitted changes to tracked files: commit or stash them, then merge"}
+        br = w["branch"]
+        head = lambda: git(self.project, "rev-parse", "--short", "HEAD").stdout.strip()
+        if git(self.project, "merge-base", "--is-ancestor", br, "HEAD").returncode == 0:
+            t["merged"] = {"commit": head(), "at": now(), "into": base}
+            t.pop("merge_error", None)
+            return {"ok": True, "merged": t["merged"]}
+        r = git(self.project, "-c", "user.name=crew", "-c", "user.email=crew@localhost", "merge", "--no-ff", "-m", f"Merge {br}: #{t['id']} {t['title']}", br)
+        if r.returncode != 0:
+            files = git(self.project, "diff", "--name-only", "--diff-filter=U").stdout.split()
+            git(self.project, "merge", "--abort")
+            msg = (r.stderr.strip() or r.stdout.strip())[:300]
+            t["merge_error"] = {"files": files, "base": base, "at": now(), "msg": msg}
+            self.event("error", f"merging #{t['id']} into {base} " + (f"conflicts in {len(files)} file(s)" if files else "failed"), w["name"])
+            return {"error": f"merge into {base} conflicts in: {', '.join(files)}" if files else f"merge failed: {msg}", "conflicts": files}
+        t["merged"] = {"commit": head(), "at": now(), "into": base}
+        t.pop("merge_error", None)
+        self.event("approve", f"merged #{t['id']} into {base} · {t['merged']['commit']}", w["name"])
+        return {"ok": True, "merged": t["merged"]}
+
+    def _open_pr(self, t: dict) -> dict:
+        """Push the task's branch (never forced) and open a PR with gh. Caller holds the lock."""
+        w = self.agents.get(t.get("who") or "")
+        if not self.git or t["col"] != "done" or not t.get("commit") or not w or not w.get("branch"):
+            return {"error": "only an approved task with a commit can open a PR"}
+        if t.get("pr"):
+            return {"error": "a PR is already open: " + t["pr"]}
+        if not shutil.which("gh"):
+            return {"error": "the GitHub CLI (gh) isn't installed or isn't on PATH"}
+        if git(self.project, "remote", "get-url", "origin").returncode != 0:
+            return {"error": "this repo has no 'origin' remote to push to"}
+        br, env = w["branch"], os.environ | {"GIT_TERMINAL_PROMPT": "0"}
+        run = lambda *cmd: subprocess.run(cmd, cwd=self.project, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90, env=env)
+        try:
+            r = run("git", "push", "-u", "origin", br)
+            if r.returncode != 0:
+                return {"error": "push failed: " + (r.stderr.strip() or r.stdout.strip())[-300:]}
+            body = (t.get("summary") or f"Task #{t['id']} from Crew.").strip()[:4000]
+            r = run("gh", "pr", "create", "--head", br, "--title", f"#{t['id']} {t['title']}"[:200], "--body", body)
+        except (subprocess.TimeoutExpired, OSError) as e:
+            return {"error": f"PR failed: {e}"}
+        m = re.search(r"https?://\S+", r.stdout + "\n" + r.stderr)
+        if not m:
+            return {"error": "gh pr create failed: " + (r.stderr.strip() or r.stdout.strip())[-300:]}
+        t["pr"] = m.group(0)  # also covers "a pull request already exists: <url>"
+        self.event("approve", f"opened a PR for #{t['id']}: {t['pr']}", w["name"])
+        return {"ok": True, "pr": t["pr"]}
+
+    def _merge_rebase(self, t: dict) -> dict:
+        """After a conflict: ask the owner to merge the base into its branch and resolve. Caller holds the lock."""
+        me, w = t.get("merge_error") or {}, self.agents.get(t.get("who") or "")
+        if not me.get("files") or not w or w["status"] == "killed":
+            return {"error": "no conflict to send back, or the agent is unavailable"}
+        files = "\n".join(f"- {f}" for f in me["files"])
+        nt = {"id": self.next_id, "title": f"Resolve merge conflicts for #{t['id']} against {me['base']}"[:200], "tag": t["tag"], "col": "backlog",
+              "details": (f"Merging {w['branch']} into {me['base']} conflicts in:\n{files}\n\nIn your worktree run `git merge {me['base']} --no-commit --no-ff`, "
+                          "resolve the conflicts keeping both sides' intent, and run the tests. Do not commit: leave the merge staged and Crew commits it when approved."),
+              "who": w["name"], "pinned": w["name"], "created": now(), "depth": t.get("depth", 0) + 1,
+              "handoff": {"from": "you", "task": t["id"]}}
+        self.next_id += 1
+        self.tasks.append(nt)
+        me["sent"] = nt["id"]
+        self.event("handoff", f"↪ #{t['id']} merge conflicts → {w['name']}: #{nt['id']}", w["name"])
+        return {"ok": True, "task": nt["id"]}
 
     def _task_event(self, t: dict, col: str, summary: str | None = None) -> None:
         """Event triggers and workflow runs: a task reached review or done, or its agent hit an error."""
@@ -1489,6 +1592,12 @@ class Crew:
                 self.event("respawn", f"{a['name']} respawned", a["name"])
             elif action == "approve" and t and t["col"] == "review":
                 self._approve(t)
+                self.touch()
+                return {"ok": True, "undo": bool(t.get("commit_full"))}
+            elif action in UI_TASK_ACTIONS and t:  # UI only: not in MCP_ACTIONS
+                res = getattr(self, UI_TASK_ACTIONS[action])(t)
+                self.touch()
+                return res
             elif action == "reject" and t and t["col"] == "review":
                 w = self.agents.get(t["who"])
                 fb = (p.get("text") or "Please revise.").strip()
@@ -1652,6 +1761,7 @@ PORT = 8770
 # tier may call just the actions crew_mcp.py uses (nothing that runs shell commands or changes mode, project or MCP trust).
 UI_TOKEN = secrets.token_urlsafe(24)
 MCP_TOKEN = secrets.token_urlsafe(24)
+UI_TASK_ACTIONS = {"unapprove": "_unapprove", "merge": "_merge", "open_pr": "_open_pr", "merge_rebase": "_merge_rebase"}
 MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add"}
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
@@ -1985,6 +2095,7 @@ def main() -> None:
 
     CREW = Crew(project, config, claude)
     CREW.config_path = cfg_path
+    CREW.demo = args.demo
     remember_project(project)
     if args.demo and not CREW.tasks:
         for title, tag in DEMO_TASKS:

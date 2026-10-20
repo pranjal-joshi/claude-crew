@@ -48,6 +48,8 @@ def subagents(*jobs, lead=""):
 
 def write(path, body, append=False):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    if append and os.path.exists(path) and body in open(path, encoding="utf-8").read():
+        return  # re-running a task must not stack the same edit again
     with open(path, "a" if append else "w", encoding="utf-8") as f:
         f.write(body)
 

@@ -56,9 +56,9 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
 - [x] Tests: git integration on a temp repo (approve, rename, remove, missing worktree), the auth matrix, bad webhook token
 
 ### Phase 2 · v0.2 core loop: from a queued task to a merged change
-- [ ] **Review as a decision sheet:** a verdict line (files · +/- · tests), Approve & commit pinned as the one primary, diff collapsed per file, Send back secondary, Hand off in ⋮, `A` approves with an undo toast. First check the "duplicated hunk" in review.png; it may just be demo data
-- [ ] **One-click merge** of approved branches into the base branch (or **Open PR** with `gh` when there is a remote). On a conflict, show the files and offer to send it back to the agent. Done shows merged / not merged
-- [ ] **First-run card** on an empty board: one example task, one primary action, a line on what the boss is. A clear **demo vs real project** badge
+- [x] **Review as a decision sheet:** a verdict line (files · +/- · tests), Approve & commit pinned as the one primary, diff collapsed per file, Send back secondary, Hand off in ⋮, `A` approves with an undo toast. First check the "duplicated hunk" in review.png; it may just be demo data
+- [x] **One-click merge** of approved branches into the base branch (or **Open PR** with `gh` when there is a remote). On a conflict, show the files and offer to send it back to the agent. Done shows merged / not merged
+- [x] **First-run card** on an empty board: one example task, one primary action, a line on what the boss is. A clear **demo vs real project** badge
 - [ ] **Permission inbox:** show tool calls the permission mode refused (stream-json permission denials) with Allow once / Always allow, instead of a silently stuck agent
 - [ ] **Cost caps:** cost on every card, a budget per task and per day, and an auto-stop with a note when hit
 - [ ] Move git out of the global lock (approve, diff). Record a pidfile per agent and reap orphans at startup; SIGTERM before SIGKILL

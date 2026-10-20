@@ -233,7 +233,26 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .diff .ad{color:#8fe9bb;background:rgba(63,212,143,.08)}
 .diff .rm{color:#ff9ea2;background:rgba(255,93,100,.08)}
 .diff .cx{color:#8a8a95}
-.reviewbar{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.reviewbar{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px;flex:none;background:var(--bg2)}
+.reviewbar .acts{display:flex;gap:8px;align-items:center}.reviewbar .acts .btn.green{flex:1;justify-content:center;font-weight:600;padding:9px 14px}
+.verdict{margin-top:9px;font-size:13px;color:var(--text);display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.verdict .ad,.diff .fc .ad{color:#8fe9bb;background:none}.verdict .rm,.diff .fc .rm{color:#ff9ea2;background:none}
+.verdict .ok{color:var(--green)}.verdict .bad{color:var(--red)}.verdict .sep{color:var(--faint)}
+.diff details{border-top:1px solid var(--line)}.diff details:first-child{border-top:0}
+.diff summary.fh{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;border-top:0;padding:6px 12px;user-select:none}
+.diff summary.fh::-webkit-details-marker{display:none}.diff summary.fh::before{content:"▸";color:var(--faint);font-size:10px;transition:transform .12s}
+.diff details[open]>summary.fh::before{transform:rotate(90deg)}.diff summary.fh:hover{background:var(--hover)}
+.diff .fp{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.diff .fc{display:flex;gap:7px;font-weight:400;font-size:11.5px}
+.rstate{font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:4px}.rstate b{color:var(--text)}.rstate a{color:var(--blue)}
+.cflict{border:1px solid rgba(242,180,65,.4);background:var(--amber-soft);border-radius:var(--r-sm);padding:8px 10px;font-size:12px;color:var(--text)}
+.cflict code{font:11.5px var(--mono);color:var(--amber)}
+.mst{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--faint)}.mst.ok{color:var(--green);border-color:rgba(63,212,143,.35);background:var(--green-soft)}.mst.warn{color:var(--amber);border-color:rgba(242,180,65,.4)}
+.firstrun{grid-column:1/-1;align-self:start;max-width:620px;margin:6vh auto 0;padding:26px 28px;border:1px solid var(--line);border-radius:14px;background:var(--bg2);display:flex;flex-direction:column;gap:14px}
+.firstrun h2{margin:0;font-size:18px;letter-spacing:-.01em}.firstrun p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+.firstrun .ex{border:1px solid var(--line2);border-radius:var(--r);background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.firstrun .ex .d{color:var(--muted);font-size:12.5px}.firstrun .row{display:flex;align-items:center;gap:12px}
+.demob{color:var(--amber)!important;border-color:rgba(242,180,65,.45)!important;background:var(--amber-soft)!important;font-weight:600;cursor:help}
+.toast .btn{margin-left:auto}
 .label{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin:4px 0 6px}
 
 /* modal / palette */
@@ -636,6 +655,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
       <span class="pn" id="projName">…</span><span class="pb" id="projGit"></span><span class="faint">▾</span>
     </button>
+    <span class="chip demob" id="demoB" hidden>Demo</span>
     <button class="chip modebtn" id="mode" title="Permission mode for all agents"></button>
     <button class="chip trigbtn" id="trigBtn" title="Triggers: schedules, events, file watches, polls and webhooks"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> <span class="tl">Triggers</span> <b id="trigN">0</b></button>
     <button class="chip phonebtn" id="phoneBtn" title="Open Crew on your phone" hidden><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg> Phone</button>
@@ -814,12 +834,13 @@ async function act(action, payload = {}) {
   return j;
 }
 
-function toast(text, color = 'var(--accent)') {
+function toast(text, color = 'var(--accent)', opt = null) {  // opt: {label, fn, ms} adds one action button
   const el = document.createElement('div');
   el.className = 'toast';
-  el.innerHTML = `<span class="dot" style="background:${color}"></span><span>${esc(text)}</span>`;
+  el.innerHTML = `<span class="dot" style="background:${color}"></span><span>${esc(text)}</span>${opt ? `<button class="btn sm">${esc(opt.label)}</button>` : ''}`;
+  if (opt) el.querySelector('button').onclick = () => { el.remove(); opt.fn(); };
   $('#toasts').append(el);
-  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, 3800);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, opt?.ms || 3800);
 }
 
 const agent = n => S.agents.find(a => a.name === n);
@@ -835,6 +856,8 @@ function render() {
   $('#projName').textContent = S.project_name || S.project; if (!LAN_CLIENT) $('#projBtn').title = S.project + ' · switch project';
   $('#ver').textContent = S.app_version ? 'v' + S.app_version : '';
   $('#projGit').textContent = S.git ? 'git' : 'no git';
+  const demoB = $('#demoB'); demoB.hidden = !(S.demo || S.scratch);
+  demoB.title = S.demo ? 'Demo mode: the agents are simulated, so no Claude calls or tokens are used. Tasks only edit a scratch repo under ~/.crew, never your own code.' : 'This is Crew\'s scratch demo repo under ~/.crew, not your code. Open your own project from the project menu to start real work.';
   const pm = S.permission_mode, cls = pm === 'bypassPermissions' ? 'bypass' : pm === 'auto' ? 'auto' : '';
   $('#mode').className = 'chip modebtn ' + cls;
   $('#mode').innerHTML = `${S.git ? '<span class="dot" style="background:var(--green)"></span><span class="wt"> worktrees ·</span>' : '<span class="dot" style="background:var(--amber)"></span><span class="wt"> no git ·</span>'} ${pm === 'bypassPermissions' ? '⚠ ' : ''}<b>${esc(MODE_INFO[pm]?.label || pm)}</b> ▾`;
@@ -917,6 +940,7 @@ function renderBoard() {
   const tags = ['all', ...S.tags];
   $('#filters').innerHTML = tags.map(t => `<button class="fbtn ${view.filter === t ? 'on' : ''}" data-filter="${t}">${t}</button>`).join('');
   const show = t => view.filter === 'all' || t.tag === view.filter;
+  if (!S.tasks.length) { $('#board').innerHTML = firstRunHtml(); return; }
   $('#board').innerHTML = COLS.map(([k, label, c]) => {
     const items = S.tasks.filter(t => t.col === k && show(t)).sort((a, b) => k === 'done' ? b.id - a.id : a.id - b.id);
     return `<div class="col" data-col="${k}">
@@ -924,6 +948,15 @@ function renderBoard() {
       <div class="cards">${items.length ? items.map(card).join('') : `<div class="empty">${k === 'backlog' ? 'No tasks yet. Press <kbd>N</kbd> to add one.' : 'Nothing here'}</div>`}</div>
     </div>`;
   }).join('');
+}
+
+const FIRST_TASK = {title: 'Add rate limiting to the login endpoint', tag: 'feature', details: 'Limit login attempts per IP, return 429 with a Retry-After header, and add a test.'};
+function firstRunHtml() {
+  return `<div class="firstrun"><h2>Welcome to Crew</h2>
+    <p>Crew runs a team of Claude Code agents, each on its own git branch. You queue a task, an agent does the work, and you review the diff before anything is committed.</p>
+    <div class="ex"><div class="row"><span class="tag ${FIRST_TASK.tag}">${FIRST_TASK.tag}</span><b>${esc(FIRST_TASK.title)}</b></div><div class="d">${esc(FIRST_TASK.details)}</div></div>
+    <div class="row"><button class="btn primary" data-try>Try it</button><span class="faint">opens the New task dialog with this example filled in</span></div>
+    <p style="font-size:12.5px"><b style="color:var(--text)">The boss</b>: the chat bar at the bottom plans and delegates for you. Ask it for something big and it creates the tasks.</p></div>`;
 }
 
 // agent looks: simple line icons (Lucide-style, drawn here) and background colours; the glyph turns black or white
@@ -970,7 +1003,10 @@ function card(t) {
   const who = t.who ? `<span class="who"><span class="mini" ${avPaint(t.who)}>${avFace(t.who, 11)}</span>${esc(t.who)}</span>` : `<span class="who faint">anyone</span>`;
   let cta = '';
   if (t.col === 'review') cta = `<div class="cta"><button class="btn sm" data-review="${t.id}" style="border-color:rgba(106,164,255,.35);color:var(--blue)">Review changes</button></div>`;
-  if (t.col === 'done' && (t.commit || t.tokens)) cta = `<div class="f mono">${t.commit ? `<span>⎇ ${esc(t.commit)}</span>` : ''}${t.tokens ? `<span class="tok" style="margin-left:auto">${fmtTok(t.tokens)} tok</span>` : ''}</div>`;
+  const mst = t.merged ? `<span class="mst ok" title="Merged into ${esc(t.merged.into || 'the base branch')} · ${esc(t.merged.commit)}">✓ Merged</span>`
+    : t.pr ? `<a class="mst ok" href="${esc(t.pr)}" target="_blank" rel="noopener" title="Pull request">PR open</a>`
+    : t.merge_error?.files?.length ? `<span class="mst warn" title="Merge conflicts: ${esc(t.merge_error.files.join(', '))}">Conflict</span>` : t.commit ? '<span class="mst" title="Approved and committed on its branch, not merged yet">Not merged</span>' : '';
+  if (t.col === 'done' && (t.commit || t.tokens)) cta = `<div class="f mono">${t.commit ? `<span>⎇ ${esc(t.commit)}</span>` : ''}${mst}${t.tokens ? `<span class="tok" style="margin-left:auto">${fmtTok(t.tokens)} tok</span>` : ''}</div>`;
   const owner = t.col === 'doing' && t.who ? S.agents.find(a => a.name === t.who) : null;
   const liveSubs = owner ? Object.keys(owner.subs || {}).length : 0;
   const subs = liveSubs ? `<span class="subtag live" title="${liveSubs} subagent${liveSubs > 1 ? 's' : ''} running">${SUBI}${liveSubs}</span>`
@@ -1147,35 +1183,81 @@ function msgBody(m) {
 }
 const toolIcon = n => ({Read:'◫',Edit:'✎',Write:'✎',MultiEdit:'✎',Bash:'›_',Grep:'⌕',Glob:'⌕',WebFetch:'↗',WebSearch:'↗',TodoWrite:'☰',Task:SUBI,Agent:SUBI}[n] || '◆');
 
+function diffFiles(p) {
+  const files = []; let f = null, hunk = false;
+  for (const l of (p || '').split('\n')) {
+    if (l.startsWith('diff --git')) { f = {path: l.replace(/^diff --git a\/(.+?) b\/.*/, '$1'), add: 0, del: 0, html: ''}; files.push(f); hunk = false; continue; }
+    if (!f || l === '') continue;
+    if (l.startsWith('@@')) { hunk = true; f.html += `<div class="hk">${esc(l)}</div>`; continue; }
+    if (!hunk) { if (/^Binary files/.test(l)) f.html += `<div class="cx">${esc(l)}</div>`; continue; }  // drops the index/---/+++ header lines
+    if (l.startsWith('+')) { f.add++; f.html += `<div class="ad">${esc(l)}</div>`; }
+    else if (l.startsWith('-')) { f.del++; f.html += `<div class="rm">${esc(l)}</div>`; }
+    else f.html += `<div class="cx">${esc(l)}</div>`;
+  }
+  return files;
+}
+function renderDiff(files) {  // one collapsible block per file; open by default when the change is small
+  return files.map(f => `<details ${files.length <= 3 ? 'open' : ''}><summary class="fh"><span class="fp">${esc(f.path)}</span><span class="fc"><b class="ad">+${f.add}</b><b class="rm">−${f.del}</b></span></summary>${f.html}</details>`).join('');
+}
+function testsNote(t) {  // simple heuristic over the summary and the agent's last messages
+  const txt = [t.summary, ...(agent(t.who)?.log || []).slice(-12).filter(m => m.kind === 'text').map(m => m.text)].join('\n');
+  if (/\b[1-9]\d*\s+(failed|failing)\b|\btests?\s+(are\s+)?(failing|failed)\b/i.test(txt)) return ['bad', '✕ tests failed'];
+  if (/\b\d+\s+passed\b|\ball\s+(\w+\s+)?tests?\s+pass|\btests?\s+pass/i.test(txt)) return ['ok', '✓ tests passed'];
+  return null;
+}
+async function approveTask(id) {
+  if (task(id)?.col !== 'review') return;
+  const r = await act('approve', {task: id});
+  if (r.error) return;
+  view.drawer = {review: id}; render();
+  toast(`Approved #${id}`, 'var(--green)', r.undo ? {label: 'Undo', ms: 6000, fn: () => undoApprove(id)} : null);
+}
+async function undoApprove(id) {
+  const r = await act('unapprove', {task: id});
+  if (r.ok) { view.drawer = {review: id}; render(); toast(`Approval of #${id} undone: back in Review`, 'var(--amber)'); }
+}
+async function mergeTask(id) {
+  const r = await act('merge', {task: id});
+  if (r.ok) toast(`Merged #${id} into ${r.merged.into}`, 'var(--green)');
+  render();
+}
+async function openPr(id) {
+  toast('Pushing the branch and opening a PR…', 'var(--blue)');
+  const r = await act('open_pr', {task: id});
+  if (r.ok) toast('PR opened: ' + r.pr, 'var(--green)');
+  render();
+}
+function reviewBarHtml(t) {
+  const w = t.who, a = agent(w);
+  if (t.col === 'review') return `<div class="inputwrap"><textarea id="fb" rows="1" placeholder="Feedback for ${esc(w)} if you send it back…"></textarea></div>
+      <div class="acts"><button class="btn green" data-approve="${t.id}">✓ Approve &amp; commit <kbd>A</kbd></button><button class="btn" data-reject="${t.id}">↺ Send back</button><button class="btn ghost" data-fwd="${t.id}" title="Hand off to another agent" aria-label="Hand off to another agent">⋮</button></div>`;
+  const me = t.merge_error, st = t.merged ? `<span>✓ <b>Merged</b> into ${esc(t.merged.into || 'the base branch')} · ${esc(t.merged.commit)}</span>`
+    : t.pr ? `<span>PR open: <a href="${esc(t.pr)}" target="_blank" rel="noopener">${esc(t.pr)}</a></span>` : t.commit ? '<span><b>Not merged</b> yet</span>' : '<span>Nothing to commit: no file changes</span>';
+  const conflict = me?.files?.length ? `<div class="cflict">Merging into <b>${esc(me.base)}</b> hit conflicts, so nothing was changed. Conflicting files:<br>${me.files.map(f => `<code>${esc(f)}</code>`).join(' ')}
+      ${me.sent ? `<div class="faint" style="margin-top:6px">Sent back to ${esc(w)} as #${me.sent}.</div>` : `<div style="margin-top:8px"><button class="btn sm" data-rebase="${t.id}">↺ Send back to ${esc(w)} to rebase</button></div>`}</div>` : '';
+  const can = t.commit && !t.merged;
+  return `<div class="rstate"><span>✓ <b>Approved</b>${t.commit ? ` · commit ${esc(t.commit)}${a?.branch ? ' on ' + esc(a.branch) : ''}` : ''}</span>${st}</div>${conflict}
+      <div class="acts">${can ? `<button class="btn green" data-merge="${t.id}">Merge into current branch</button><button class="btn" data-openpr="${t.id}" ${t.pr ? 'disabled' : ''}>Open PR</button>` : ''}${t.commit_full && !t.merged && !t.pr ? `<button class="btn ghost" data-undo="${t.id}" style="margin-left:auto">↶ Undo approval</button>` : ''}</div>`;
+}
 function renderReviewDrawer(d, t) {
-  if (!t || t.col !== 'review') { view.drawer = null; return renderDrawer(); }
-  if (d.querySelector('[data-shell="review"]')?.dataset.id == t.id) return; // keep typed feedback
-  const diff = t.diff || {};
-  d.innerHTML = `<div data-shell="review" data-id="${t.id}" style="display:contents">
+  if (!t || (t.col !== 'review' && t.col !== 'done')) { view.drawer = null; return renderDrawer(); }
+  const key = [t.id, t.col, t.commit, t.merged?.commit, t.pr, t.merge_error?.at, t.merge_error?.sent].join(':');
+  if (d.querySelector('[data-shell="review"]')?.dataset.key === key) return; // keep typed feedback
+  const diff = t.diff || {}, files = diffFiles(diff.patch);
+  const add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0), tn = testsNote(t);
+  const verdict = files.length ? `<b>${files.length} file${files.length > 1 ? 's' : ''}</b><span class="sep">·</span><span class="ad">+${add}</span><span class="rm">−${del}</span>${tn ? `<span class="sep">·</span><span class="${tn[0]}">${tn[1]}</span>` : ''}` : `<span class="faint">no file changes</span>${tn ? `<span class="sep">·</span><span class="${tn[0]}">${tn[1]}</span>` : ''}`;
+  d.innerHTML = `<div data-shell="review" data-key="${key}" style="display:contents">
     <div class="dh"><div class="row"><span class="tag ${t.tag}">${t.tag}</span><h3 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">#${t.id} ${esc(t.title)}</h3><button class="iconbtn" data-close-drawer style="margin-left:auto">✕</button></div>
-      <div class="kv"><span>by ${esc(t.who)}</span>${t.tokens ? `<span class="tok">${fmtTok(t.tokens)} tokens</span>` : ''}${t.finished && t.started ? `<span>took ${dur(t.finished - t.started)}</span>` : ''}${agent(t.who)?.branch ? `<span>⎇ ${esc(agent(t.who).branch)}</span>` : ''}<span>${(diff.stat || '').trim().split('\n').pop() || 'no file changes'}</span></div></div>
+      <div class="verdict">${verdict}</div>
+      <div class="kv"><span>by ${esc(t.who)}</span>${t.tokens ? `<span class="tok">${fmtTok(t.tokens)} tokens</span>` : ''}${t.finished && t.started ? `<span>took ${dur(t.finished - t.started)}</span>` : ''}${agent(t.who)?.branch ? `<span>⎇ ${esc(agent(t.who).branch)}</span>` : ''}</div></div>
     <div class="stream">
       <div class="label">Agent summary</div>
       <div class="summary">${esc(t.summary || '(no summary)')}</div>
       <div class="label" style="display:flex;align-items:center">Changes <button class="btn sm ghost" data-refresh-diff="${t.id}" style="margin-left:auto">↻ refresh</button></div>
-      ${diff.note ? `<div class="empty">${esc(diff.note)}</div>` : diff.patch ? `<div class="diff">${renderDiff(diff.patch)}</div>` : '<div class="empty">No file changes in the worktree.</div>'}
+      ${diff.note ? `<div class="empty">${esc(diff.note)}</div>` : files.length ? `<div class="diff">${renderDiff(files)}</div>` : '<div class="empty">No file changes in the worktree.</div>'}
     </div>
-    <div class="reviewbar">
-      <div class="inputwrap"><textarea id="fb" rows="1" placeholder="Feedback for ${esc(t.who)} if you send it back…"></textarea></div>
-      <div style="display:flex;gap:8px"><button class="btn green" data-approve="${t.id}">✓ Approve &amp; commit</button><button class="btn" data-reject="${t.id}">↺ Send back</button><button class="btn ghost" data-fwd="${t.id}" style="margin-left:auto"><span class="fwdi">${FWD}</span> Hand off ▾</button></div>
-    </div></div>`;
-  $('#fb').addEventListener('input', autosize);
-}
-
-function renderDiff(p) {
-  return p.split('\n').map(l => {
-    if (l.startsWith('diff --git')) return `<div class="fh">${esc(l.replace(/^diff --git a\/(\S+) b\/.*/, '$1'))}</div>`;
-    if (/^(index |--- |\+\+\+ |new file|deleted file|similarity|rename )/.test(l)) return '';
-    if (l.startsWith('@@')) return `<div class="hk">${esc(l)}</div>`;
-    if (l.startsWith('+')) return `<div class="ad">${esc(l)}</div>`;
-    if (l.startsWith('-')) return `<div class="rm">${esc(l)}</div>`;
-    return `<div class="cx">${esc(l)}</div>`;
-  }).join('');
+    <div class="reviewbar">${reviewBarHtml(t)}</div></div>`;
+  $('#fb')?.addEventListener('input', autosize);
 }
 
 const FEED_COLOR = {handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)'};
@@ -1199,7 +1281,7 @@ async function sendMsg() {
 /* ── interactions ──────────────────────────────────── */
 document.addEventListener('click', async e => {
   if (!e.target.closest('.menu')) closeMenu();
-  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-kill],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-filter],[data-agent],[data-close]');
+  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-kill],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-filter],[data-agent],[data-close]');
   if (!el) return;
   const ds = el.dataset;
   if (ds.menu) { e.stopPropagation(); return openTaskMenu(+ds.menu, el); }
@@ -1215,7 +1297,12 @@ document.addEventListener('click', async e => {
   if (ds.respawn) { e.stopPropagation(); return act('respawn', {agent: ds.respawn}); }
   if (ds.respawnFresh) return act('respawn', {agent: ds.respawnFresh, fresh: true});
   if (ds.review) { view.drawer = {review: +ds.review}; return render(); }
-  if (ds.approve) { await act('approve', {task: +ds.approve}); view.drawer = null; return render(); }
+  if (ds.approve) return approveTask(+ds.approve);
+  if (ds.merge) return mergeTask(+ds.merge);
+  if (ds.openpr) return openPr(+ds.openpr);
+  if (ds.rebase) { await act('merge_rebase', {task: +ds.rebase}); return render(); }
+  if (ds.undo) return undoApprove(+ds.undo);
+  if ('try' in ds) return openTask('', FIRST_TASK);
   if (ds.reject) { await act('reject', {task: +ds.reject, text: $('#fb')?.value}); view.drawer = {agent: task(+ds.reject)?.who}; return render(); }
   if (ds.backlog) { await act('move', {task: +ds.backlog, col: 'backlog'}); view.drawer = null; return render(); }
   if (ds.refreshDiff) { await act('diff', {task: +ds.refreshDiff}); const d = $('#drawer'); d.innerHTML = ''; return render(); }
@@ -1306,6 +1393,13 @@ function openTaskMenu(id, anchor) {
   if (t.hold) h += item('▶ Resume: let it run again', () => act('resume', {task: id}));
   if (t.who || t.history?.length || t.handoff) h += item('Open its agent', () => { view.drawer = {agent: t.who || t.history?.at(-1)?.who || t.handoff?.from}; render(); });
   h += '<div class="sep"></div>';
+  if (t.col === 'done' && t.commit) {
+    h += item('Open review sheet', () => { view.drawer = {review: id}; render(); });
+    h += item(t.merged ? '✓ Merged' : 'Merge into the current branch', () => mergeTask(id), {disabled: !!t.merged});
+    h += item('Open PR…', () => openPr(id), {disabled: !!t.merged || !!t.pr, sub: t.pr ? 'already open' : 'needs gh and an origin remote'});
+    if (t.merge_error?.files?.length && !t.merged) h += item(`Send back to ${esc(t.who)} to rebase`, async () => { await act('merge_rebase', {task: id}); render(); }, {disabled: !!t.merge_error.sent});
+    h += '<div class="sep"></div>';
+  }
   h += item('Backlog · anyone with a matching role', () => moveTo(id, 'backlog'), {disabled: t.col === 'backlog' && !t.who});
   h += item('Mark done', () => moveTo(id, 'done'), {disabled: t.col === 'done'});
   h += item('Delete', () => askConfirm('Delete task', `Delete <b>#${t.id} ${esc(t.title)}</b>?${t.col === 'doing' ? ' Its agent will be stopped first.' : ''}`, 'Delete',
@@ -1392,11 +1486,11 @@ function askConfirm(title, body, ok, run, danger = false) {
 $('#cfOk').onclick = () => { const r = confirmRun; confirmRun = null; closeModals(); r && r(); };
 
 // new task modal
-function openTask(who = '') {
-  view.newWho = who; view.tagTouched = false; view.newTag = 'feature';
+function openTask(who = '', pre = null) {
+  view.newWho = who; view.tagTouched = !!pre; view.newTag = pre?.tag || 'feature';
   $('#tTag').innerHTML = S.tags.map(t => `<button data-tag="${t}" class="${view.newTag === t ? 'on' : ''}">${t}</button>`).join('');
   $('#tWho').innerHTML = [['', 'anyone'], ...S.agents.map(a => [a.name, a.name])].map(([v, l]) => `<button data-who="${v}" class="${view.newWho === v ? 'on' : ''}">${l}</button>`).join('');
-  $('#taskModal').classList.add('on'); $('#tTitle').value = ''; $('#tDetails').value = ''; setTimeout(() => $('#tTitle').focus(), 0);
+  $('#taskModal').classList.add('on'); $('#tTitle').value = pre?.title || ''; $('#tDetails').value = pre?.details || ''; setTimeout(() => $('#tTitle').focus(), 0);
 }
 $('#tTag').onclick = e => { const b = e.target.closest('[data-tag]'); if (!b) return; view.newTag = b.dataset.tag; view.tagTouched = true; $('#tTag').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
 $('#tWho').onclick = e => { const b = e.target.closest('[data-who]'); if (!b) return; view.newWho = b.dataset.who; $('#tWho').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
@@ -2244,6 +2338,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.querySelector('.menu')) return closeMenu();
   if (e.key === 'Escape') { if (document.querySelector('.scrim.on')) return closeModals(); if (view.drawer) { view.drawer = null; render(); } return; }
   if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || document.querySelector('.scrim.on')) return;
+  if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.isContentEditable && view.drawer?.review && task(view.drawer.review)?.col === 'review') { e.preventDefault(); return approveTask(view.drawer.review); }
   if (e.key.toLowerCase() === 'n') { e.preventDefault(); openTask(); }
   if (/^[1-9]$/.test(e.key) && S.agents[+e.key - 1]) { view.drawer = {agent: S.agents[+e.key - 1].name}; render(); }
 });

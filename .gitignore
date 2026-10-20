@@ -8,3 +8,5 @@ build/
 .venv/
 venv/
 .ruff_cache/
+*.bak
+*.corrupt-*

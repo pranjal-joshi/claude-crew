@@ -6,6 +6,7 @@ import json
 import shutil
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tests.helpers import TempCrewCase, server
 
@@ -134,6 +135,110 @@ class RenameRemove(GitCrewCase):
         self.assertEqual(run(self.project, "rev-parse", "crew/builder"), sha)
         saved = json.loads(self.cfg_path.read_text(encoding="utf-8"))
         self.assertNotIn("builder", [a["name"] for a in saved["agents"]])
+
+
+class Merge(GitCrewCase):
+    def setUp(self):
+        super().setUp()
+        self.crew._ensure_worktree(self.agent)
+        self.base = run(self.project, "rev-parse", "--abbrev-ref", "HEAD")
+
+    def approved(self, name="work.txt", text="x\n"):
+        (self.wt / name).write_text(text, encoding="utf-8")
+        t = {"id": 1, "title": "Task", "details": "", "tag": "feature", "col": "review", "who": "builder", "summary": "done"}
+        self.crew.tasks.append(t)
+        self.crew.next_id = 2
+        with self.crew.lock:
+            self.crew._approve(t)
+        return t
+
+    def test_clean_merge(self):
+        t = self.approved()
+        self.assertEqual(self.crew.act("merge", {"task": 1}), {"ok": True, "merged": t["merged"]})
+        self.assertTrue((self.project / "work.txt").exists())
+        self.assertEqual(run(self.project, "log", "-1", "--format=%s"), "Merge crew/builder: #1 Task")
+        self.assertEqual(len(run(self.project, "log", "-1", "--format=%p").split()), 2)  # --no-ff
+        self.assertEqual(t["merged"]["into"], self.base)
+        self.assertEqual(self.crew.act("merge", {"task": 1}), {"error": "already merged"})
+
+    def test_refused_when_main_is_dirty(self):
+        t = self.approved()
+        (self.project / "README.md").write_text("edited\n", encoding="utf-8")
+        r = self.crew.act("merge", {"task": 1})
+        self.assertIn("uncommitted", r["error"])
+        self.assertNotIn("merged", t)
+        self.assertFalse((self.project / "work.txt").exists())
+        run(self.project, "checkout", "README.md")
+        (self.project / "untracked.txt").write_text("u\n", encoding="utf-8")  # untracked files alone don't block
+        self.assertTrue(self.crew.act("merge", {"task": 1}).get("ok"))
+
+    def test_conflict_is_aborted_and_listed(self):
+        t = self.approved("README.md", "from agent\n")
+        (self.project / "README.md").write_text("from main\n", encoding="utf-8")
+        run(self.project, "add", "-A")
+        run(self.project, *G, "commit", "-qm", "main edit")
+        r = self.crew.act("merge", {"task": 1})
+        self.assertEqual(r["conflicts"], ["README.md"])
+        self.assertIn("README.md", r["error"])
+        self.assertEqual(t["merge_error"]["files"], ["README.md"])
+        self.assertNotIn("merged", t)
+        self.assertEqual(run(self.project, "status", "--porcelain"), "")  # aborted: nothing half-merged
+        self.assertFalse((self.project / ".git" / "MERGE_HEAD").exists())
+        self.assertEqual((self.project / "README.md").read_text(encoding="utf-8"), "from main\n")
+        sent = self.crew.act("merge_rebase", {"task": 1})
+        nt = self.crew._task(sent["task"])
+        self.assertEqual((nt["who"], nt["col"]), ("builder", "backlog"))
+        self.assertIn("README.md", nt["details"])
+        self.assertIn(f"git merge {self.base}", nt["details"])
+
+    def test_not_available_to_agents(self):
+        for a in ("merge", "open_pr", "unapprove", "merge_rebase"):
+            self.assertNotIn(a, server.MCP_ACTIONS)
+
+    def test_open_pr_errors_without_gh_or_remote(self):
+        self.approved()
+        with mock.patch.object(server.shutil, "which", return_value=None):
+            self.assertIn("gh", self.crew.act("open_pr", {"task": 1})["error"])
+        with mock.patch.object(server.shutil, "which", return_value="gh"):
+            self.assertIn("origin", self.crew.act("open_pr", {"task": 1})["error"])
+
+
+class UndoApprove(GitCrewCase):
+    def setUp(self):
+        super().setUp()
+        self.crew._ensure_worktree(self.agent)
+        (self.wt / "work.txt").write_text("x\n", encoding="utf-8")
+        self.t = {"id": 1, "title": "Task", "details": "", "tag": "feature", "col": "review", "who": "builder", "summary": "done"}
+        self.crew.tasks.append(self.t)
+        self.agent.update(status="review", task=1)
+        self.before = run(self.wt, "rev-parse", "HEAD")
+        self.crew.act("approve", {"task": 1})
+
+    def test_resets_only_the_approval_commit(self):
+        self.assertEqual(self.t["col"], "done")
+        self.assertNotEqual(run(self.wt, "rev-parse", "HEAD"), self.before)
+        self.assertEqual(self.crew.act("unapprove", {"task": 1}), {"ok": True})
+        self.assertEqual(run(self.wt, "rev-parse", "HEAD"), self.before)
+        self.assertEqual(self.t["col"], "review")
+        self.assertNotIn("commit", self.t)
+        self.assertEqual((self.agent["status"], self.agent["task"]), ("review", 1))
+        self.assertIn("work.txt", run(self.wt, "diff", "--cached", "--name-only"))  # changes kept, staged
+
+    def test_refused_when_head_moved(self):
+        (self.wt / "more.txt").write_text("y\n", encoding="utf-8")
+        run(self.wt, "add", "-A")
+        run(self.wt, *G, "commit", "-qm", "later")
+        head = run(self.wt, "rev-parse", "HEAD")
+        self.assertIn("new commits", self.crew.act("unapprove", {"task": 1})["error"])
+        self.assertEqual(run(self.wt, "rev-parse", "HEAD"), head)
+        self.assertEqual(self.t["col"], "done")
+
+    def test_refused_when_merged_or_agent_busy(self):
+        self.agent.update(status="running", task=2)
+        self.assertIn("moved on", self.crew.act("unapprove", {"task": 1})["error"])
+        self.agent.update(status="idle", task=None)
+        self.crew.act("merge", {"task": 1})
+        self.assertIn("merged", self.crew.act("unapprove", {"task": 1})["error"])
 
 
 class Persistence(TempCrewCase):
