@@ -12,7 +12,7 @@
 
 <p align="center">
   <b>Run a crew of Claude Code agents, one for each stage of your SDLC.</b><br>
-  They pick tasks off a board or start on schedules and events, work in their own git worktrees, and hand you diffs to approve.<br>
+  They pick tasks off a board, run in workflows you chain together, start on schedules and events, and hand you diffs to approve.<br>
   One Python file, one HTML file, no dependencies.
 </p>
 
@@ -70,6 +70,26 @@ Nine agents, one per stage of the delivery loop. Each owns a few tags, so an una
 | Ship & observe | **ops** | `ops` `deploy` `incident` `chore` | Sonnet · high | CI/CD, deployments, telemetry, cost, incidents and repo hygiene. Diagnoses before it changes anything. |
 | Report | **scribe** | `docs` `report` | Sonnet · low | Standups, PR descriptions, release notes and docs. Short and linked. |
 
+## Workflows
+
+The **Workflows** tab (<kbd>W</kbd>) chains agents in a fixed order. Run one with a goal, and step 1's task is created. When a step is done, the next step's task is created with the earlier steps' summaries and an instruction to merge the previous agent's branch, so each agent builds on real work.
+
+Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on its own when the agent finishes.
+
+| Workflow | Steps |
+| --- | --- |
+| Feature delivery | planner ✋ → builder ✋ → tester ⚡ → reviewer ✋ → scribe |
+| Bug fix | tester (failing test) ⚡ → builder ✋ → reviewer |
+| Spike to plan | researcher ✋ → planner |
+| Model change | evaluator (baseline) ⚡ → builder ✋ → evaluator (re-eval) |
+| Incident | ops (diagnose) ✋ → builder ✋ → tester ⚡ → scribe (post-mortem) |
+
+Edit or add workflows in the UI: pick an agent per step, write its instruction (`{input}`, `{prev_summary}`, `{prev_branch}` and more), set its gate, reorder. Runs show live progress per step, and click through to each step's task.
+
+## Context per task
+
+Each agent starts a **fresh Claude session for every new task** by default. Old tasks aren't re-read on every turn, so tokens stay low and context doesn't fill up. What should carry over already travels with the task: the hand-off summary, the previous step's branch, the workflow brief. Send back still resumes the same session, so the agent revises its own work. Switch any agent to **Keep across tasks** in ⚙ Model & role.
+
 ## Triggers
 
 Assigning a task is the manual trigger. Press <kbd>T</kbd> for the automatic ones. Each firing adds a task from a template, and the dispatcher hands it out like any other.
@@ -95,7 +115,9 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 | | |
 | --- | --- |
 | 🧑‍🤝‍🧑 **An SDLC crew** | Planner, researcher, designer, builder, tester, reviewer, evaluator, ops and scribe by default. Add, remove and re-role agents from the UI. |
+| ⛓ **Workflows** | Chain agents in order (plan → build → test → review → write-up), with an approval or auto gate per step. |
 | ⚡ **Triggers** | Schedules, task events, file watches, command polls and webhooks start work on their own. Presets included. |
+| 🧹 **Fresh context per task** | A new session per task keeps tokens down; send-back still resumes. Per-agent switch. |
 | 🧠 **Model and effort per agent** | Opus for the builder, Sonnet for the tester, Fable for research: each agent gets its own model and effort level (low to max). |
 | 🪢 **Subagents, visible** | When an agent fans out to subagents, you see each one live on the agent card, a count on the task, and a labelled thread in the transcript. |
 | 🌳 **Worktree isolation** | One worktree and branch per agent. Merge what you approve with `git merge crew/<name>`. |
@@ -107,7 +129,7 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 | 🔢 **Tokens and cost** | Live token counts per agent, per task and in total. Hide the dollar amounts with one click. |
 | 🧩 **Your skills and MCP servers** | Agents are ordinary Claude Code sessions, so they load your skills, plugins and MCP servers. |
 | 📁 **Projects** | Switch repos from the header. Each project keeps its own board, sessions and worktrees. |
-| ⌨️ **Keyboard first** | `N` new task, `T` triggers, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
+| ⌨️ **Keyboard first** | `N` new task, `T` triggers, `W` / `B` workflows / board, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
 
 ## Screenshots
 
@@ -115,6 +137,10 @@ Nine presets cover the common loops: daily standup, test what ships, review what
   <tr>
     <td width="50%"><img src="assets/agent.png" alt="Agent transcript with parallel subagents"><br><sub><b>Agent view.</b> Live transcript; subagents get their own labelled thread.</sub></td>
     <td width="50%"><img src="assets/review.png" alt="Review drawer with summary and diff"><br><sub><b>Review.</b> The agent's summary and its diff. Approve commits to its branch.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/flows.png" alt="Workflows tab with five workflows and two live runs"><br><sub><b>Workflows.</b> Agents in a fixed order; runs show each step live.</sub></td>
+    <td width="50%"><img src="assets/wf-edit.png" alt="Workflow editor"><br><sub><b>Workflow editor.</b> Agent, instruction and gate per step.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="assets/triggers.png" alt="Triggers list with schedules, events and watches"><br><sub><b>Triggers.</b> Schedules, events, watches, polls and webhooks, each with its next run and history.</sub></td>
@@ -200,7 +226,8 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 - [x] Live subagent indicators
 - [ ] Background-job and monitor indicators, and holding a task until its jobs finish
 - [x] Event triggers chain work ("tests after feature")
-- [ ] Full task dependencies (wait for several tasks)
+- [x] Workflows: agents in a fixed order with approval gates
+- [ ] Parallel steps in workflows (fan out, then join)
 - [ ] One-click merge of approved branches
 
 Ideas and PRs welcome. Open an issue first for anything big.

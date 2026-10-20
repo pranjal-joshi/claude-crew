@@ -36,6 +36,7 @@ IS_WIN = os.name == "nt"
 # -> evaluate -> ship/observe -> report. Tags route unassigned tasks; each tag belongs to one agent.
 DEFAULT_CONFIG = {
     "permission_mode": "acceptEdits",
+    "context": "fresh",
     "allowed_tools": ["Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(git merge:*)",
                       "Bash(ls:*)", "Bash(npm test:*)", "Bash(pytest:*)", "Bash(python -m pytest:*)", "WebSearch", "WebFetch"],
     "agents": [
@@ -70,10 +71,36 @@ DEFAULT_CONFIG = {
     ],
 }
 
+DEFAULT_WORKFLOWS = [
+    {"id": "w1", "name": "Feature delivery", "description": "Plan it, build it, test it, review it, write it up.",
+     "steps": [{"agent": "planner", "title": "Plan: {input}", "details": "", "gate": "approve"},
+               {"agent": "builder", "title": "Build: {input}", "details": "Implement the plan from step 1.", "gate": "approve"},
+               {"agent": "tester", "title": "Test: {input}", "details": "Cover the new behaviour and its edge cases.", "gate": "auto"},
+               {"agent": "reviewer", "title": "Review: {input}", "details": "Review the builder's and tester's commits.", "gate": "approve"},
+               {"agent": "scribe", "title": "Write up: {input}", "details": "PR description and release note.", "gate": "auto"}]},
+    {"id": "w2", "name": "Bug fix", "description": "Reproduce with a failing test, fix, review.",
+     "steps": [{"agent": "tester", "title": "Reproduce: {input}", "details": "Write a failing test that shows the bug. Do not fix it.", "gate": "auto"},
+               {"agent": "builder", "title": "Fix: {input}", "details": "Make the failing test from step 1 pass.", "gate": "approve"},
+               {"agent": "reviewer", "title": "Review fix: {input}", "details": "", "gate": "approve"}]},
+    {"id": "w3", "name": "Spike to plan", "description": "Research the options, then turn the pick into a plan.",
+     "steps": [{"agent": "researcher", "title": "Research: {input}", "details": "", "gate": "approve"},
+               {"agent": "planner", "title": "Plan: {input}", "details": "Plan around the recommendation from step 1.", "gate": "approve"}]},
+    {"id": "w4", "name": "Model change", "description": "Baseline eval, change, re-eval against the baseline.",
+     "steps": [{"agent": "evaluator", "title": "Baseline: {input}", "details": "Measure the current behaviour first.", "gate": "auto"},
+               {"agent": "builder", "title": "Change: {input}", "details": "", "gate": "approve"},
+               {"agent": "evaluator", "title": "Re-evaluate: {input}", "details": "Same dataset and settings as the baseline; report the delta.", "gate": "approve"}]},
+    {"id": "w5", "name": "Incident", "description": "Diagnose, fix, verify, post-mortem.",
+     "steps": [{"agent": "ops", "title": "Diagnose: {input}", "details": "Find the root cause. Change nothing yet.", "gate": "approve"},
+               {"agent": "builder", "title": "Fix: {input}", "details": "", "gate": "approve"},
+               {"agent": "tester", "title": "Verify fix: {input}", "details": "", "gate": "auto"},
+               {"agent": "scribe", "title": "Post-mortem: {input}", "details": "What broke, why, the fix, and how we'd catch it sooner.", "gate": "auto"}]},
+]
+
 TAGS = ["plan", "research", "ui", "feature", "bug", "api", "test", "review", "eval", "ops", "incident", "docs", "report", "chore"]
 # acceptEdits: edits auto-approved, other tools only via allowed_tools.
 # auto: Claude Code's classifier approves safe actions. bypassPermissions: nothing is checked.
 MODES = ["acceptEdits", "auto", "bypassPermissions"]
+CONTEXTS = ["fresh", "keep"]
 MODELS = ["fable", "opus", "sonnet", "haiku"]          # aliases the CLI resolves to the latest of each family
 EFFORTS = ["low", "medium", "high", "xhigh", "max"]
 NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,23}")
@@ -188,6 +215,8 @@ class Crew:
         self.mcp_allow: set[str] = set()   # MCP server prefixes seen in agents' tool lists
         self.triggers: list[dict] = []
         self.next_trig = 1
+        self.runs: list[dict] = []
+        self.next_run = 1
         self.agents: dict[str, dict] = {}
         for spec in config["agents"]:
             self.agents[spec["name"]] = self._new_agent(spec)
@@ -204,6 +233,9 @@ class Crew:
             "cwd": str(self.project), "branch": None, "error": None, "launched": None,
             "tokens": {"in": 0, "out": 0, "cache": 0}, "last_msg": None, "mcp": [], "skills": 0,
             "subs": {},  # live subagents: tool_use id -> {label, type, since}
+            # fresh: a new Claude session per task (send-back keeps it). keep: one session across tasks.
+            "context": spec.get("context") if spec.get("context") in CONTEXTS else self.config.get("context", "fresh"),
+            "last_task": None,
         }
 
     def _attach_worktree(self, a: dict) -> None:
@@ -213,13 +245,14 @@ class Crew:
 
     def _save_config(self) -> None:
         """Write the agent roster and mode back to crew.json, keeping any other keys."""
-        self.config["agents"] = [{"name": a["name"], "role": a["role"], "tags": a["tags"],
-                                  "model": a["model"], "effort": a["effort"]} for a in self.agents.values()]
+        self.config["agents"] = [{"name": a["name"], "role": a["role"], "tags": a["tags"], "model": a["model"],
+                                  "effort": a["effort"], "context": a["context"]} for a in self.agents.values()]
         if not self.config_path:
             return
         saved = json.loads(self.config_path.read_text(encoding="utf-8")) if self.config_path.exists() else {}
         saved["agents"] = self.config["agents"]
         saved["permission_mode"] = self.config["permission_mode"]
+        saved["workflows"] = self.config.get("workflows", [])
         self.config_path.write_text(json.dumps(saved, indent=2), encoding="utf-8")
 
     def _launch_key(self, a: dict) -> tuple:
@@ -238,6 +271,8 @@ class Crew:
             return
         self.mcp_allow = set(data.get("mcp_allow", []))
         self.triggers = data.get("triggers", [])
+        self.runs = data.get("runs", [])[-50:]
+        self.next_run = data.get("next_run", len(self.runs) + 1)
         self.next_trig = data.get("next_trig", len(self.triggers) + 1)
         for tr in self.triggers:
             tr["next"] = cron_next(tr["spec"]["cron"], now()) if tr["kind"] == "schedule" else None
@@ -257,6 +292,7 @@ class Crew:
     def _save(self) -> None:
         data = {"project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
                 "mcp_allow": sorted(self.mcp_allow), "triggers": self._public_triggers(), "next_trig": self.next_trig,
+                "runs": self.runs[-50:], "next_run": self.next_run,
                 "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:]} for n, a in self.agents.items()}}
         tmp = self.state_file.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
@@ -294,7 +330,8 @@ class Crew:
                     "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
                     "project_name": self.project.name, "mcp_allow": sorted(self.mcp_allow),
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(),
-                    "trigger_kinds": TRIGGER_KINDS}
+                    "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []),
+                    "runs": self.runs[-30:], "contexts": CONTEXTS}
 
     # ---- worktrees -----------------------------------------------------------
     def _ensure_worktree(self, a: dict) -> None:
@@ -512,8 +549,13 @@ class Crew:
         return next((t for t in self.tasks if t["id"] == tid), None)
 
     def _begin(self, a: dict, t: dict) -> None:
+        if a["context"] == "fresh" and a.get("last_task") not in (None, t["id"]) and (a["session"] or self._alive(a["name"])):
+            self._kill_proc(a["name"])  # new task, new session: no paying to re-read old work
+            a["session"] = None
+            self.log(a, "sys", f"fresh context for #{t['id']}")
         if not self._start(a):
             return
+        a["last_task"] = t["id"]
         tk = a["tokens"]
         t.update(col="doing", who=a["name"], started=now(), tok0=tk["in"] + tk["cache"] + tk["out"] - t.get("tokens", 0))
         a.update(status="running", task=t["id"], since=now(), activity="starting…")
@@ -585,8 +627,24 @@ class Crew:
         self.event("trigger", f"⚡ {tr['name']} → #{t['id']} {title}" + (f" → {who}" if who else ""), who)
         return t
 
+    def _approve(self, t: dict, by: str = "you") -> None:
+        """Commit the owner's worktree and move the task to Done. Caller holds the lock."""
+        w = self.agents.get(t["who"])
+        if w and self.git:
+            git(Path(w["cwd"]), "add", "-A")
+            r = git(Path(w["cwd"]), "-c", "user.name=crew", "-c", "user.email=crew@localhost",
+                    "commit", "-m", f"#{t['id']} {t['title']}\n\n{(t.get('summary') or '')[:2000]}")
+            t["commit"] = git(Path(w["cwd"]), "rev-parse", "--short", "HEAD").stdout.strip() if r.returncode == 0 else None
+            t["merge_hint"] = f"git merge {w['branch']}"
+        t["col"] = "done"
+        if w:
+            w.update(status="idle", task=None)
+        self.event("approve", f"{'auto-' if by != 'you' else ''}approved #{t['id']}" + (f" · commit {t.get('commit')} on {w['branch']}" if t.get("commit") else ""))
+        self._task_event(t, "done")
+
     def _task_event(self, t: dict, col: str, summary: str | None = None) -> None:
-        """Event triggers: a task reached review or done, or its agent hit an error."""
+        """Event triggers and workflow runs: a task reached review or done, or its agent hit an error."""
+        self._wf_event(t, col, summary)
         w = self.agents.get(t.get("who") or "")
         for tr in self.triggers:
             sp = tr["spec"]
@@ -735,6 +793,83 @@ class Crew:
                       "task": {"title": str(task["title"]).strip()[:200], "details": str(task.get("details") or "")[:4000],
                                "tag": task.get("tag") or "", "agent": task.get("agent") or ""}}
 
+    # ---- workflows --------------------------------------------------------------------
+    # A workflow is an ordered list of steps, each run by one agent. Running it creates step 1's task;
+    # when a step is done (approved by you, or automatically if its gate is "auto") the next step's task
+    # is created with the previous step's summary and branch, so agents build on each other's work.
+    def _workflow(self, wid) -> dict | None:
+        return next((w for w in self.config.get("workflows", []) if w["id"] == wid), None)
+
+    def _run(self, rid) -> dict | None:
+        return next((r for r in self.runs if r["id"] == rid), None)
+
+    def _wf_step(self, run: dict, i: int) -> None:
+        step, n = run["steps"][i], len(run["steps"])
+        a = self.agents.get(step["agent"])
+        if not a:
+            run.update(status="failed", note=f"step {i + 1}: no agent called {step['agent']}", ended=now())
+            self.event("error", f"workflow {run['name']} stopped: {step['agent']} is not in the crew")
+            return
+        prev = run["results"][i - 1] if i else None
+        ctx = {"input": run["title"], "details": run["details"], "step": i + 1, "steps": n, "workflow": run["name"],
+               "prev_summary": (prev or {}).get("summary", ""), "prev_who": (prev or {}).get("who", ""),
+               "prev_branch": (prev or {}).get("branch", ""), "prev_commit": (prev or {}).get("commit", "")}
+        title = fill(step.get("title") or "{input}", ctx).strip()[:200] or run["title"]
+        body = fill(step.get("details") or "", ctx).strip()
+        brief = [f"Workflow '{run['name']}', step {i + 1} of {n}. Goal: {run['title']}"]
+        if run["details"]:
+            brief.append(run["details"])
+        for k, r in enumerate(run["results"][:i]):  # every earlier step, newest in full
+            if not r:
+                continue
+            where = f" on {r['branch']} (commit {r['commit']})" if r.get("commit") else ""
+            text = r["summary"] if k == i - 1 else r["summary"][:400]
+            brief.append(f"Step {k + 1} by {r['who']}{where}:\n{text}")
+        if prev and prev.get("commit") and prev.get("branch"):
+            brief.append(f"Run `git merge {prev['branch']}` in your worktree first so you build on that work.")
+        t = {"id": self.next_id, "title": title, "details": ((body + "\n\n---\n") if body else "") + "\n\n".join(brief),
+             "tag": (a["tags"] or ["feature"])[0], "col": "backlog", "who": a["name"], "pinned": a["name"], "created": now(),
+             "run": {"id": run["id"], "step": i, "name": run["name"], "n": n}}
+        self.next_id += 1
+        self.tasks.append(t)
+        run["step"], run["tasks"][i] = i, t["id"]
+        self.event("workflow", f"⛓ {run['name']} {i + 1}/{n} → {a['name']}: {title}", a["name"])
+
+    def _wf_event(self, t: dict, col: str, summary: str | None) -> None:
+        ref = t.get("run") or {}
+        run = self._run(ref.get("id"))
+        if not run or run["status"] != "running" or run["tasks"][ref["step"]] != t["id"]:
+            return
+        i, step = ref["step"], run["steps"][ref["step"]]
+        if col == "error":
+            run["note"] = f"step {i + 1} hit an error; it is back in the backlog and the run continues when it finishes"
+        elif col == "review" and step.get("gate") == "auto":
+            self._approve(t, by="workflow")  # fires "done", which advances below
+        elif col == "done":
+            w = self.agents.get(t.get("who") or "")
+            run["results"][i] = {"who": t.get("who") or "", "summary": (t.get("summary") or "")[:3000],
+                                 "branch": w["branch"] if w and w.get("branch") else "", "commit": t.get("commit") or ""}
+            run["note"] = ""
+            if i + 1 < len(run["steps"]):
+                self._wf_step(run, i + 1)
+            else:
+                run.update(status="done", ended=now())
+                self.event("workflow", f"⛓ {run['name']} finished: {run['title']}")
+
+    def _clean_workflow(self, p: dict) -> tuple[str | None, dict]:
+        name = str(p.get("name") or "").strip()[:60]
+        if not name:
+            return "name the workflow", {}
+        steps = []
+        for k, st in enumerate(p.get("steps") or []):
+            if st.get("agent") not in self.agents:
+                return f"step {k + 1}: pick an agent", {}
+            steps.append({"agent": st["agent"], "title": str(st.get("title") or "").strip()[:200],
+                          "details": str(st.get("details") or "")[:3000], "gate": "auto" if st.get("gate") == "auto" else "approve"})
+        if not steps:
+            return "add at least one step", {}
+        return None, {"name": name, "description": str(p.get("description") or "").strip()[:300], "steps": steps[:12]}
+
     # ---- actions from the UI ---------------------------------------------------
     def act(self, action: str, p: dict) -> dict:
         with self.lock:
@@ -803,6 +938,8 @@ class Crew:
                     a["role"] = str(p["role"]).strip()[:500]
                 if "tags" in p:
                     a["tags"] = clean_tags(p["tags"])
+                if p.get("context") in CONTEXTS:
+                    a["context"] = p["context"]
                 self._save_config()
                 if a["status"] != "running" and self._alive(a["name"]) and tuple(a.get("launched") or ()) != self._launch_key(a):
                     self._kill_proc(a["name"])  # restarts with the new settings on its next task (session kept)
@@ -838,6 +975,8 @@ class Crew:
                 if t["col"] == "doing":
                     return {"error": "task is running"}
                 self.tasks.remove(t)
+                if (run := self._run((t.get("run") or {}).get("id"))) and run["status"] == "running":
+                    run.update(status="stopped", ended=now(), note=f"step {t['run']['step'] + 1}'s task was deleted")
             elif action == "tell" and a:
                 text = (p.get("text") or "").strip()
                 if not text:
@@ -866,18 +1005,7 @@ class Crew:
                 self.log(a, "sys", "respawned" + (" with a fresh session" if p.get("fresh") else ", session kept"))
                 self.event("respawn", f"{a['name']} respawned", a["name"])
             elif action == "approve" and t and t["col"] == "review":
-                w = self.agents.get(t["who"])
-                if w and self.git:
-                    git(Path(w["cwd"]), "add", "-A")
-                    r = git(Path(w["cwd"]), "-c", "user.name=crew", "-c", "user.email=crew@localhost",
-                            "commit", "-m", f"#{t['id']} {t['title']}\n\n{(t.get('summary') or '')[:2000]}")
-                    t["commit"] = git(Path(w["cwd"]), "rev-parse", "--short", "HEAD").stdout.strip() if r.returncode == 0 else None
-                    t["merge_hint"] = f"git merge {w['branch']}"
-                t["col"] = "done"
-                if w:
-                    w.update(status="idle", task=None)
-                self.event("approve", f"approved #{t['id']}" + (f" · commit {t.get('commit')} on {w['branch']}" if t.get("commit") else ""))
-                self._task_event(t, "done")
+                self._approve(t)
             elif action == "reject" and t and t["col"] == "review":
                 w = self.agents.get(t["who"])
                 fb = (p.get("text") or "Please revise.").strip()
@@ -916,6 +1044,36 @@ class Crew:
             elif action == "trigger_run" and (tr := self._trigger(p.get("id"))):
                 self._fire(tr, {"payload": "(run by hand)", "output": "(run by hand)", "files": "(run by hand)", "exit": 0},
                            "run by you")
+            elif action == "wf_save":
+                err, clean = self._clean_workflow(p)
+                if err:
+                    return {"error": err}
+                flows = self.config.setdefault("workflows", [])
+                if w := self._workflow(p.get("id")):
+                    w.update(clean)
+                else:
+                    ids = [int(x["id"][1:]) for x in flows if x["id"][1:].isdigit()]
+                    flows.append(clean | {"id": f"w{max(ids, default=0) + 1}"})
+                self._save_config()
+            elif action == "wf_delete" and self._workflow(p.get("id")):
+                self.config["workflows"] = [w for w in self.config["workflows"] if w["id"] != p["id"]]
+                self._save_config()
+            elif action == "wf_run" and (w := self._workflow(p.get("id"))):
+                title = (p.get("title") or "").strip()
+                if not title:
+                    return {"error": "what should this run work on?"}
+                n = len(w["steps"])
+                run = {"id": f"r{self.next_run}", "wf": w["id"], "name": w["name"], "title": title[:200],
+                       "details": (p.get("details") or "").strip()[:4000], "steps": json.loads(json.dumps(w["steps"])),
+                       "status": "running", "step": 0, "tasks": [None] * n, "results": [None] * n, "started": now(), "note": ""}
+                self.next_run += 1
+                self.runs.append(run)
+                self._wf_step(run, 0)
+            elif action == "run_stop" and (run := self._run(p.get("id"))) and run["status"] == "running":
+                run.update(status="stopped", ended=now())
+                self.event("workflow", f"⛓ {run['name']} stopped")
+            elif action == "run_delete" and (run := self._run(p.get("id"))) and run["status"] != "running":
+                self.runs.remove(run)
             elif action == "diff" and t and t.get("who") in self.agents:
                 t["diff"] = self.diff(self.agents[t["who"]])
             else:
@@ -1138,7 +1296,8 @@ def main() -> None:
         cfg = json.loads(json.dumps(DEFAULT_CONFIG))
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-    config = DEFAULT_CONFIG | json.loads(cfg_path.read_text(encoding="utf-8"))
+    config = DEFAULT_CONFIG | {"workflows": DEFAULT_WORKFLOWS} | json.loads(cfg_path.read_text(encoding="utf-8"))
+    config.setdefault("workflows", DEFAULT_WORKFLOWS)
 
     if not project.exists() and project.parent == WORK_ROOT.resolve():
         init_repo(project, {

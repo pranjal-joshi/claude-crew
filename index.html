@@ -6,12 +6,13 @@
 <title>Crew</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%20width%3D%2264%22%20height%3D%2264%22%3E%20%3Cdefs%3E%20%3CradialGradient%20id%3D%22bg%22%20cx%3D%2230%25%22%20cy%3D%2225%25%22%20r%3D%2290%25%22%3E%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f3a984%22/%3E%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23c24e26%22/%3E%20%3C/radialGradient%3E%20%3C/defs%3E%20%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2216%22%20fill%3D%22url%28%23bg%29%22/%3E%20%3Cg%20stroke%3D%22%231a0d07%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22%20opacity%3D%22.55%22%3E%20%3Cpath%20d%3D%22M32%2032L32%2014.5M32%2032L48.6%2026.6M32%2032L42.3%2046.2M32%2032L21.7%2046.2M32%2032L15.4%2026.6%22/%3E%20%3C/g%3E%20%3Cg%20fill%3D%22%231a0d07%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2214.5%22%20r%3D%225%22/%3E%20%3Ccircle%20cx%3D%2248.6%22%20cy%3D%2226.6%22%20r%3D%225%22/%3E%20%3Ccircle%20cx%3D%2242.3%22%20cy%3D%2246.2%22%20r%3D%225%22/%3E%20%3Ccircle%20cx%3D%2221.7%22%20cy%3D%2246.2%22%20r%3D%225%22/%3E%20%3Ccircle%20cx%3D%2215.4%22%20cy%3D%2226.6%22%20r%3D%225%22/%3E%20%3C/g%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%226.5%22%20fill%3D%22%23fff4ee%22%20stroke%3D%22%231a0d07%22%20stroke-width%3D%222.6%22/%3E%20%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<!-- non-blocking: a slow font CDN must never hold back the app script -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <style>
 :root{
-  --bg:#08080a; --bg2:#0d0d10; --surface:#121216; --raised:#18181d; --hover:#1f1f25;
-  --line:#22222a; --line2:#2d2d36;
-  --text:#ececf1; --muted:#9a9aa6; --faint:#62626d;
+  --bg:#15161b; --bg2:#1a1b21; --surface:#1f2027; --raised:#26272f; --hover:#2e2f38;
+  --line:#2c2d36; --line2:#383944;
+  --text:#ececf1; --muted:#a4a5b2; --faint:#717280;
   --accent:#e07a52; --accent-soft:rgba(224,122,82,.14); --accent-line:rgba(224,122,82,.45);
   --green:#3fd48f; --green-soft:rgba(63,212,143,.12);
   --blue:#6aa4ff; --blue-soft:rgba(106,164,255,.12);
@@ -22,7 +23,7 @@
   --r:10px; --r-sm:7px;
   --sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"JetBrains Mono","Cascadia Code",ui-monospace,Consolas,monospace;
-  --shadow:0 10px 40px rgba(0,0,0,.55),0 0 0 1px var(--line);
+  --shadow:0 12px 40px rgba(0,0,0,.45),0 0 0 1px var(--line);
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -36,7 +37,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 
 /* ── app shell ─────────────────────────────────────────── */
 .app{display:grid;grid-template-rows:56px 1fr;height:100vh}
-.top{display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0e0e12,#0a0a0d)}
+.top{display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#1c1d24,#18191f)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-.01em;font-size:14px}
 .mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:radial-gradient(circle at 30% 25%,#f0a07f,#c9532a);color:#1a0d07;font-size:16px;box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 6px 18px rgba(224,122,82,.25)}
 .chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:var(--bg2);color:var(--muted);font-size:12px;white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis}
@@ -111,6 +112,45 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:#1c
 .main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .toolbar{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line)}
 .toolbar h2{margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em}
+.tabs{display:flex;gap:2px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:2px;flex:none}
+.tabs button{height:28px;padding:0 12px;border-radius:7px;border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.tabs button.on{background:var(--raised);color:var(--text);box-shadow:0 0 0 1px var(--line2)}
+.tabs .n{font:500 10.5px var(--mono);color:var(--teal)}
+.flows{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:22px;min-height:0}
+.flows h3{margin:0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px}
+.flows h3 .faint{font-weight:400}
+.wfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px}
+.wf{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.wf .wh{display:flex;align-items:center;gap:8px}
+.wf .wh b{font-size:14px;font-weight:600}
+.wf .wd{font-size:12.5px;color:var(--muted);line-height:1.45}
+.chain{display:flex;align-items:center;flex-wrap:wrap;gap:4px;row-gap:8px}
+.node{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 4px;border-radius:999px;border:1px solid var(--line2);background:var(--bg2);font-size:12px;white-space:nowrap}
+.node .mini{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--raised);font:600 10px var(--sans);color:var(--muted)}
+.node.done{border-color:rgba(63,212,143,.4);background:var(--green-soft)}.node.done .mini{background:var(--green);color:#05170e}
+.node.doing{border-color:rgba(63,212,143,.5);box-shadow:0 0 0 3px rgba(63,212,143,.08)}.node.doing .mini{background:var(--green-soft);color:var(--green)}
+.node.review{border-color:rgba(106,164,255,.5)}.node.review .mini{background:var(--blue-soft);color:var(--blue)}
+.node.waiting{border-style:dashed}
+.node.off{opacity:.45}
+.link{display:inline-flex;align-items:center;gap:3px;color:var(--faint);font:10.5px var(--mono);padding:0 2px}
+.link .g{font-size:11px}.link.auto{color:var(--teal)}.link.gate{color:var(--amber)}
+.runs{display:flex;flex-direction:column;gap:8px}
+.run{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:11px 13px}
+.run .rt{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
+.run .rt b{font-weight:600;white-space:nowrap}
+.run .rt .ttl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run .rmeta{font:11px var(--mono);color:var(--faint);margin-top:6px}
+.rpill{font:500 10.5px var(--mono);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.rpill.running{background:var(--green-soft);color:var(--green)}.rpill.done{background:var(--violet-soft);color:var(--violet)}
+.rpill.stopped,.rpill.failed{background:var(--red-soft);color:#ff8b90}
+.steprow{display:grid;grid-template-columns:26px 150px 1fr auto;gap:10px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)}
+.steprow .num{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--raised);font:600 11px var(--mono);color:var(--muted);margin-top:3px}
+.steprow .sb{display:flex;flex-direction:column;gap:6px;min-width:0}
+.steprow select.field{padding:7px 9px;font-size:12.5px}
+.steprow .sact{display:flex;flex-direction:column;gap:4px}
+.gatebtn{height:26px;padding:0 9px;border-radius:7px;border:1px solid var(--line2);background:var(--raised);cursor:pointer;font:500 11px var(--mono);white-space:nowrap}
+.gatebtn.approve{color:var(--amber);border-color:rgba(242,180,65,.35)}.gatebtn.auto{color:var(--teal);border-color:rgba(79,209,197,.35)}
+.srcl.wfl{color:var(--teal)}
 .filters{display:flex;gap:4px;margin-left:8px;overflow-x:auto;scrollbar-width:none}
 .boardhint{margin-left:auto;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;color:var(--faint)}
 @media (max-width:1400px){.body.drawer-open .boardhint{display:none}}
@@ -118,7 +158,7 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:#1c
 .fbtn.on{background:var(--raised);color:var(--text);border-color:var(--line2)}
 .board{flex:1;display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:14px;padding:16px 18px;overflow:auto;min-height:0}
 .col{display:flex;flex-direction:column;min-height:0;border-radius:12px;background:var(--bg2);border:1px solid var(--line);transition:border-color .15s,background .15s}
-.col.drop{border-color:var(--accent-line);background:#110e0d}
+.col.drop{border-color:var(--accent-line);background:#241b18}
 .colh{display:flex;align-items:center;gap:8px;padding:12px 13px 10px;font-weight:600;font-size:12.5px}
 .colh .n{color:var(--faint);font-weight:500;font-variant-numeric:tabular-nums}
 .cards{padding:2px 9px 10px;overflow:auto;flex:1}
@@ -137,7 +177,7 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:#1c
 .tag.test{background:var(--green-soft);color:var(--green)}
 .tag.review{background:var(--blue-soft);color:var(--blue)}
 .tag.research{background:var(--amber-soft);color:var(--amber)}
-.tag.docs,.tag.report{background:#1e1e25;color:#c4c4cf}
+.tag.docs,.tag.report{background:#2a2b34;color:#c4c4cf}
 .tag.plan,.tag.triage{background:rgba(106,164,255,.08);color:#9cc2ff}
 .tag.design{background:var(--violet-soft);color:var(--violet)}
 .tag.security{background:var(--red-soft);color:#ff8b90}
@@ -180,9 +220,9 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 
 /* review */
 .summary{white-space:pre-wrap;font-size:13px;line-height:1.55;color:#d6d6de;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:11px 12px}
-.diff{font:12px/1.55 var(--mono);border:1px solid var(--line);border-radius:var(--r);overflow:auto;background:#0a0a0c}
+.diff{font:12px/1.55 var(--mono);border:1px solid var(--line);border-radius:var(--r);overflow:auto;background:#17181d}
 .diff div{padding:0 12px;white-space:pre}
-.diff .fh{background:#14141a;color:var(--text);font-weight:500;padding:6px 12px;border-top:1px solid var(--line);position:sticky;left:0}
+.diff .fh{background:#202129;color:var(--text);font-weight:500;padding:6px 12px;border-top:1px solid var(--line);position:sticky;left:0}
 .diff .fh:first-child{border-top:0}
 .diff .hk{color:var(--blue);background:rgba(106,164,255,.06)}
 .diff .ad{color:#8fe9bb;background:rgba(63,212,143,.08)}
@@ -284,7 +324,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .effort i.on{background:var(--accent)}
 .sec .add{height:22px;padding:0 8px;border-radius:6px;border:1px dashed var(--line2);background:transparent;color:var(--muted);cursor:pointer;font:500 11px var(--sans);letter-spacing:0;text-transform:none}
 .sec .add:hover{border-color:var(--accent-line);color:var(--text);background:var(--accent-soft)}
-.dset{border-bottom:1px solid var(--line);padding:12px 16px 14px;display:flex;flex-direction:column;gap:12px;background:#0b0b0e}
+.dset{border-bottom:1px solid var(--line);padding:12px 16px 14px;display:flex;flex-direction:column;gap:12px;background:#1a1b21}
 .dset .row2{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:10px}
 .dset .k{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
 .seg.tight button{height:26px;padding:0 9px}
@@ -365,11 +405,12 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
     <section class="main">
       <div class="banner" id="banner"></div>
       <div class="toolbar">
-        <h2>Board</h2>
+        <div class="tabs" id="tabs"><button data-tab="board" class="on">Board</button><button data-tab="flows">Workflows <span class="n" id="runN"></span></button></div>
         <div class="filters" id="filters"></div>
         <span class="muted boardhint">Drag a card onto an agent to assign · unassigned cards go to matching roles</span>
       </div>
       <div class="board" id="board"></div>
+      <div class="flows" id="flows" hidden></div>
     </section>
     <aside class="drawer" id="drawer" hidden></aside>
   </div>
@@ -415,6 +456,26 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
     <div class="mh"><span id="tmTitle">Triggers</span><span class="faint" style="font-weight:400;font-size:12px;margin-left:auto;margin-right:12px">Each firing adds a task; agents pick it up like any other</span><button class="iconbtn" data-close>✕</button></div>
     <div class="mb" id="tmBody"></div>
     <div class="mf" id="tmFoot"></div>
+  </div>
+</div>
+
+<div class="scrim" id="wfModal">
+  <div class="modal tm" role="dialog" aria-label="Workflow">
+    <div class="mh"><span id="wfTitle">New workflow</span><span class="faint" style="font-weight:400;font-size:12px;margin-left:auto;margin-right:12px">Steps run in order; each one builds on the last</span><button class="iconbtn" data-close>✕</button></div>
+    <div class="mb" id="wfBody"></div>
+    <div class="mf" id="wfFoot"></div>
+  </div>
+</div>
+
+<div class="scrim" id="runModal">
+  <div class="modal" role="dialog" aria-label="Run workflow">
+    <div class="mh"><span id="runTitle">Run</span><button class="iconbtn" data-close>✕</button></div>
+    <div class="mb">
+      <div class="chain" id="runChain"></div>
+      <input class="field" id="rTitle" placeholder="What should it work on?" autocomplete="off">
+      <textarea class="field" id="rDetails" rows="4" placeholder="Context, links, acceptance criteria (optional)"></textarea>
+    </div>
+    <div class="mf"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="rStart">Start run</button></div>
   </div>
 </div>
 
@@ -549,6 +610,12 @@ function subChips(a) {
 }
 
 function renderBoard() {
+  const flows = view.tab === 'flows';
+  $('#board').hidden = flows; $('#filters').hidden = flows; $('#flows').hidden = !flows;
+  document.querySelector('.boardhint').hidden = flows;
+  const running = (S.runs || []).filter(r => r.status === 'running').length;
+  $('#runN').textContent = running ? `${running} running` : '';
+  if (flows) return renderFlows();
   if (document.querySelector('.menu')) return; // keep an open menu anchored
   const tags = ['all', ...S.tags];
   $('#filters').innerHTML = tags.map(t => `<button class="fbtn ${view.filter === t ? 'on' : ''}" data-filter="${t}">${t}</button>`).join('');
@@ -574,6 +641,7 @@ function card(t) {
   const hand = t.history?.length ? `<span class="handoff" title="Handed off ${t.history.length}x">↪ ${esc(t.history[t.history.length - 1].who || '')}</span>` : '';
   return `<div class="card ${t.col}" draggable="true" data-card="${t.id}">
     ${t.source ? `<div class="srcl" title="Created by trigger: ${esc(t.source.name)}">${BOLT}${esc(t.source.name)}</div>` : ''}
+    ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><button class="kebab" data-menu="${t.id}" title="Hand off or move">⋯</button></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
     <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${hand}${subs}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
@@ -629,16 +697,17 @@ function renderSettings(a) {
   const box = $('#dset'); if (!box) return;
   box.hidden = !view.showSettings;
   if (!view.showSettings) return;
-  const sig = JSON.stringify([a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags]);
+  const sig = JSON.stringify([a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags, a.context]);
   if (sig === view.setSig || box.contains(document.activeElement)) return;
   view.setSig = sig;
   const busy = a.status === 'running';
   box.innerHTML = `
     <div class="row2"><span class="k">Model</span><div class="seg tight" data-cfg="model">${['', ...S.models].map(m => `<button data-v="${m}" class="${(a.model || '') === m ? 'on' : ''}" title="${MODEL_INFO[m]?.[1] || ''}">${MODEL_INFO[m]?.[0] || m}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Effort</span><div class="seg tight" data-cfg="effort">${['', ...S.efforts].map(e => `<button data-v="${e}" class="${(a.effort || '') === e ? 'on' : ''}">${e || 'Default'}</button>`).join('')}</div></div>
+    <div class="row2"><span class="k">Context</span><div class="seg tight" data-cfg="context">${[['fresh', 'Fresh per task'], ['keep', 'Keep across tasks']].map(([v, l]) => `<button data-v="${v}" class="${a.context === v ? 'on' : ''}" title="${v === 'fresh' ? 'New Claude session for each task: cheaper, no stale context. Send back still resumes the same session.' : 'One session across tasks: remembers earlier work, but every turn re-reads it.'}">${l}</button>`).join('')}</div></div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Role</span><textarea class="field" id="cfgRole" rows="2">${esc(a.role)}</textarea></div>
     <div class="row2"><span class="k">Tags</span><input class="field" id="cfgTags" value="${esc(a.tags.join(', '))}" placeholder="comma separated"></div>
-    <div class="foot"><span class="muted">${busy ? 'Applies after the current turn. ' : ''}Sessions are kept across changes.</span>
+    <div class="foot"><span class="muted">${busy ? 'Applies after the current turn. ' : ''}${a.context === 'fresh' ? 'Each task starts a new session.' : 'One session across tasks.'}</span>
       <button class="btn sm danger" data-remove-agent="${a.name}" style="margin-left:auto">Remove agent</button></div>`;
   const save = (k, v) => act('configure', {agent: a.name, [k]: v});
   box.querySelectorAll('[data-cfg] button').forEach(b => b.onclick = () => { const k = b.parentElement.dataset.cfg; b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); save(k, b.dataset.v); });
@@ -760,7 +829,7 @@ function renderDiff(p) {
   }).join('');
 }
 
-const FEED_COLOR = {trigger:'var(--amber)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)'};
+const FEED_COLOR = {trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)'};
 function renderFeed() {
   const f = S.feed;
   const last = f.length ? f[f.length - 1].t : 0;
@@ -1090,6 +1159,132 @@ $('#trigModal').addEventListener('input', e => {
   }
 });
 
+
+// ---- workflows ------------------------------------------------------------------
+// Ordered agent steps. Each step's task gets the earlier steps' summaries and branch; a step's gate
+// either waits for your approval or continues on its own when the agent finishes.
+const STEP_STATE = (run, i) => {
+  if (run.results[i]) return 'done';
+  const t = run.tasks[i] != null ? task(run.tasks[i]) : null;
+  if (!t) return run.status === 'running' && i === run.step ? 'waiting' : '';
+  return t.col === 'doing' ? 'doing' : t.col === 'review' ? 'review' : t.col === 'done' ? 'done' : 'waiting';
+};
+function chainHtml(steps, run = null) {
+  return steps.map((st, i) => {
+    const state = run ? STEP_STATE(run, i) : '';
+    const a = S.agents.find(x => x.name === st.agent);
+    const node = `<span class="node ${state} ${a ? '' : 'off'}" ${run && run.tasks[i] != null ? `data-open-task="${run.tasks[i]}"` : ''} title="${esc(st.title || '{input}')}${run && run.tasks[i] != null ? ' · click to open' : ''}" style="${run && run.tasks[i] != null ? 'cursor:pointer' : ''}"><span class="mini">${state === 'done' ? '✓' : esc(st.agent[0] || '?')}</span>${esc(st.agent)}</span>`;
+    const link = i < steps.length - 1 ? `<span class="link ${st.gate === 'auto' ? 'auto' : 'gate'}" title="${st.gate === 'auto' ? 'Continues automatically when this step finishes' : 'Waits for you to approve this step'}"><span class="g">${st.gate === 'auto' ? '⚡' : '✋'}</span>→</span>` : '';
+    return node + link;
+  }).join('');
+}
+function blockedNote(r) {  // why the current step hasn't started
+  if (r.status !== 'running') return '';
+  const t = r.tasks[r.step] != null ? task(r.tasks[r.step]) : null;
+  if (!t || t.col !== 'backlog') return '';
+  const a = S.agents.find(x => x.name === t.who);
+  if (!a) return '';
+  if (a.status === 'review' && a.task) return ` · <span style="color:var(--amber)">waiting: review ${esc(a.name)}'s #${a.task} first</span>`;
+  if (a.status === 'running') return ` · <span style="color:var(--faint)">queued: ${esc(a.name)} is busy</span>`;
+  if (a.status === 'killed' || a.status === 'error') return ` · <span style="color:var(--red)">${esc(a.name)} is ${a.status}: respawn it</span>`;
+  return '';
+}
+function renderFlows() {
+  const flows = S.workflows || [], runs = [...(S.runs || [])].reverse();
+  $('#flows').innerHTML = `
+    <div><h3>Workflows <span class="faint">Run agents in a fixed order. ✋ waits for your approval, ⚡ continues on its own.</span>
+      <button class="btn sm primary" data-wf-new style="margin-left:auto">＋ New workflow</button></h3></div>
+    <div class="wfgrid">${flows.map(w => `
+      <div class="wf">
+        <div class="wh"><b>${esc(w.name)}</b><span class="faint" style="font:11px var(--mono)">${w.steps.length} steps</span>
+          <span style="margin-left:auto;display:flex;gap:6px"><button class="btn sm primary" data-wf-run="${w.id}">▶ Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="iconbtn danger" data-wf-del="${w.id}" title="Delete workflow">✕</button></span></div>
+        ${w.description ? `<div class="wd">${esc(w.description)}</div>` : ''}
+        <div class="chain">${chainHtml(w.steps)}</div>
+      </div>`).join('') || '<div class="empty">No workflows yet.</div>'}</div>
+    <div class="runs"><h3>Runs <span class="faint">${runs.length ? '' : 'Start one with ▶ Run.'}</span></h3>
+      ${runs.map(r => `
+        <div class="run">
+          <div style="min-width:0">
+            <div class="rt"><span class="rpill ${r.status}">${r.status}</span><b>${esc(r.name)}</b><span class="faint">·</span><span class="ttl" title="${esc(r.title)}">${esc(r.title)}</span></div>
+            <div class="chain" style="margin-top:9px">${chainHtml(r.steps, r)}</div>
+            <div class="rmeta">started ${ago(r.started)} ago${r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}${r.status === 'running' ? ` · step ${r.step + 1} of ${r.steps.length}` : ''}${blockedNote(r)}${r.note ? ' · ' + esc(r.note) : ''}</div>
+          </div>
+          <div>${r.status === 'running' ? `<button class="btn sm danger" data-run-stop="${r.id}">Stop</button>` : `<button class="iconbtn" data-run-del="${r.id}" title="Remove from list">✕</button>`}</div>
+        </div>`).join('')}
+    </div>`;
+}
+$('#tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (!b) return; view.tab = b.dataset.tab; $('#tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+$('#flows').addEventListener('click', async e => {
+  const el = e.target.closest('[data-wf-new],[data-wf-run],[data-wf-edit],[data-wf-del],[data-run-stop],[data-run-del],[data-open-task]'); if (!el) return;
+  const d = el.dataset, wf = id => S.workflows.find(w => w.id === id);
+  if ('wfNew' in d) return openWfEditor(null);
+  if (d.wfRun) return openRun(wf(d.wfRun));
+  if (d.wfEdit) return openWfEditor(wf(d.wfEdit));
+  if (d.wfDel) return askConfirm('Delete workflow?', `<b>${esc(wf(d.wfDel).name)}</b> is removed. Runs already started keep going.`, 'Delete', () => act('wf_delete', {id: d.wfDel}), true);
+  if (d.runStop) return askConfirm('Stop this run?', 'No more steps are created. The current step\'s task stays on the board.', 'Stop run', () => act('run_stop', {id: d.runStop}), true);
+  if (d.runDel) return act('run_delete', {id: d.runDel});
+  if (d.openTask) { const t = task(+d.openTask); if (!t) return; view.tab = 'board'; $('#tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.tab === 'board')); view.drawer = t.col === 'review' ? {review: t.id} : t.who ? {agent: t.who} : null; render(); }
+});
+// run modal
+let runWf = null;
+function openRun(w) {
+  runWf = w; $('#runTitle').textContent = `Run: ${w.name}`; $('#runChain').innerHTML = chainHtml(w.steps);
+  $('#rTitle').value = ''; $('#rDetails').value = ''; $('#runModal').classList.add('on'); setTimeout(() => $('#rTitle').focus(), 0);
+}
+$('#rStart').onclick = async () => {
+  const title = $('#rTitle').value.trim(); if (!title) return $('#rTitle').focus();
+  const r = await act('wf_run', {id: runWf.id, title, details: $('#rDetails').value});
+  if (r.ok) { closeModals(); toast(`${runWf.name} started: ${runWf.steps[0].agent} is up first`, 'var(--teal)'); }
+};
+$('#rTitle').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#rStart').click(); } };
+// editor
+let wfe = null;
+function openWfEditor(w) {
+  wfe = w ? JSON.parse(JSON.stringify(w)) : {id: null, name: '', description: '', steps: [{agent: S.agents[0]?.name || '', title: '{input}', details: '', gate: 'approve'}]};
+  drawWfEditor(); $('#wfModal').classList.add('on');
+}
+function drawWfEditor() {
+  $('#wfTitle').textContent = wfe.id ? 'Edit workflow' : 'New workflow';
+  const opts = cur => S.agents.map(a => `<option value="${a.name}" ${a.name === cur ? 'selected' : ''}>${a.name}</option>`).join('') + (cur && !S.agents.some(a => a.name === cur) ? `<option value="${esc(cur)}" selected>${esc(cur)} (missing)</option>` : '');
+  $('#wfBody').innerHTML = `
+    <input class="field" data-w="name" placeholder="Name, e.g. Feature delivery" value="${esc(wfe.name)}" maxlength="60" autocomplete="off">
+    <input class="field" data-w="description" placeholder="What it's for (optional)" value="${esc(wfe.description || '')}" maxlength="300" autocomplete="off">
+    <div class="chain">${chainHtml(wfe.steps)}</div>
+    ${wfe.steps.map((st, i) => `
+      <div class="steprow">
+        <div class="num">${i + 1}</div>
+        <select class="field" data-st="${i}" data-k="agent">${opts(st.agent)}</select>
+        <div class="sb">
+          <input class="field" data-st="${i}" data-k="title" value="${esc(st.title)}" placeholder="Task title, e.g. Build: {input}" autocomplete="off">
+          <textarea class="field" data-st="${i}" data-k="details" rows="2" placeholder="Instructions for this step (optional). Earlier steps' summaries are added automatically.">${esc(st.details)}</textarea>
+          <div><button class="gatebtn ${st.gate === 'auto' ? 'auto' : 'approve'}" data-gate="${i}">${st.gate === 'auto' ? '⚡ Continue automatically when done' : '✋ Wait for my approval'}</button></div>
+        </div>
+        <div class="sact">
+          <button class="iconbtn" data-mv="${i}" data-dir="-1" title="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button class="iconbtn" data-mv="${i}" data-dir="1" title="Move down" ${i === wfe.steps.length - 1 ? 'disabled' : ''}>↓</button>
+          <button class="iconbtn danger" data-rm="${i}" title="Remove step" ${wfe.steps.length === 1 ? 'disabled' : ''}>✕</button>
+        </div>
+      </div>`).join('')}
+    <div><button class="btn sm" data-add-step>＋ Add step</button></div>
+    <div class="thint">Placeholders: <code>{input}</code> <code>{details}</code> the run's goal · <code>{prev_summary}</code> <code>{prev_who}</code> <code>{prev_branch}</code> <code>{prev_commit}</code> · <code>{step}</code> <code>{steps}</code></div>`;
+  $('#wfFoot').innerHTML = `<button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-wf-save>${wfe.id ? 'Save' : 'Create workflow'}</button>`;
+}
+$('#wfModal').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b || b.hasAttribute('data-close')) return;
+  const d = b.dataset;
+  if (d.gate) { const st = wfe.steps[+d.gate]; st.gate = st.gate === 'auto' ? 'approve' : 'auto'; return drawWfEditor(); }
+  if (d.mv) { const i = +d.mv, j = i + +d.dir; [wfe.steps[i], wfe.steps[j]] = [wfe.steps[j], wfe.steps[i]]; return drawWfEditor(); }
+  if (d.rm) { wfe.steps.splice(+d.rm, 1); return drawWfEditor(); }
+  if ('addStep' in d) { wfe.steps.push({agent: S.agents[0]?.name || '', title: '{input}', details: '', gate: 'approve'}); return drawWfEditor(); }
+  if ('wfSave' in d) { const r = await act('wf_save', wfe); if (r.ok) { closeModals(); toast(wfe.id ? 'Workflow saved' : 'Workflow created', 'var(--teal)'); } }
+});
+$('#wfModal').addEventListener('input', e => {
+  const el = e.target, d = el.dataset;
+  if (d.w) wfe[d.w] = el.value;
+  if (d.st != null && d.k) { wfe.steps[+d.st][d.k] = el.value; if (d.k === 'agent') drawWfEditor(); }
+});
+$('#wfModal').addEventListener('change', e => { const el = e.target, d = el.dataset; if (d.st != null && d.k === 'agent') { wfe.steps[+d.st].agent = el.value; drawWfEditor(); } });
+
 // command palette
 let palItems = [], palIdx = 0;
 function openPalette() { $('#palette').classList.add('on'); $('#palIn').value = ''; buildPalette(); setTimeout(() => $('#palIn').focus(), 0); }
@@ -1100,6 +1295,9 @@ function buildPalette() {
     {ic: '＋', label: 'Add agent', run: () => openAgentModal()},
     {ic: '⌂', label: 'Switch project…', run: () => openProjectModal()},
     {ic: '⚡', label: 'Triggers…', k: 'T', run: () => openTriggers()},
+    {ic: '⛓', label: 'Workflows', k: 'W', run: () => document.querySelector('[data-tab="flows"]').click()},
+    {ic: '⛓', label: 'New workflow', run: () => openWfEditor(null)},
+    ...(S.workflows || []).map(w => ({ic: '▶', label: `Run workflow: ${w.name}`, run: () => openRun(w)})),
     {ic: '⚡', label: 'New trigger', run: () => { openTriggers(); editTrig(null); }},
     ...(S.triggers || []).map(tr => ({ic: '⚡', label: `Run trigger: ${tr.name}`, run: () => act('trigger_run', {id: tr.id})})),
     {ic: '$', label: showCost ? 'Hide prices' : 'Show prices', run: () => document.querySelector('[data-toggle-cost]')?.click()},
@@ -1129,6 +1327,7 @@ $('#mode').onclick = e => { e.stopPropagation(); openModeMenu($('#mode')); };
 // global keys
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette(); }
+  if ((e.key === 'w' || e.key === 'b') && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return document.querySelector(`[data-tab="${e.key === 'w' ? 'flows' : 'board'}"]`).click(); }
   if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return openTriggers(); }
   if (e.key === 'Escape' && document.querySelector('.menu')) return closeMenu();
   if (e.key === 'Escape') { if (document.querySelector('.scrim.on')) return closeModals(); if (view.drawer) { view.drawer = null; render(); } return; }
@@ -1149,12 +1348,15 @@ function applyDeepLink() {
   if (h.get('review')) { const t = h.get('review') === 'any' ? S.tasks.find(t => t.col === 'review') : task(+h.get('review')); if (t) view.drawer = {review: t.id}; }
   if (h.get('modal') === 'project') setTimeout(openProjectModal, 0);
   if (h.get('modal') === 'task') setTimeout(() => openTask(), 0);
+  if (h.get('tab') === 'flows') { view.tab = 'flows'; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === 'flows')); }
+  if (h.get('wf')) setTimeout(() => { const w = S.workflows.find(x => x.id === h.get('wf')); if (w) openWfEditor(w); }, 0);
   if (h.get('modal') === 'triggers') setTimeout(() => { openTriggers(); if (h.get('preset')) { tv = presetForm(+h.get('preset')); drawTriggers(); } }, 0);
   if (h.has('palette')) setTimeout(openPalette, 0);
 }
 window.addEventListener('hashchange', () => { if (location.hash.length > 1 && S) { deepLink = new URLSearchParams(location.hash.slice(1)); applyDeepLink(); render(); } });
 // state stream
 function connect() {
+  fetch('/api/state').then(r => r.json()).then(d => { if (!S) { S = d; if (deepLink) applyDeepLink(); render(); } }).catch(() => {});  // paint before the stream's first event
   const es = new EventSource('/api/stream');
   es.onopen = () => $('#conn').classList.add('ok');
   es.onmessage = ev => { S = JSON.parse(ev.data); if (deepLink) applyDeepLink(); render(); };
