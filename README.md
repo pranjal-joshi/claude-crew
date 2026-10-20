@@ -39,7 +39,7 @@ You need [Claude Code](https://docs.claude.com/en/docs/claude-code) installed an
 python server.py --project /path/to/your/repo
 ```
 
-To use it from your phone or another computer on the same Wi-Fi, add `--lan`, then click **Phone** in the header and scan the QR code:
+To use it from your phone or another computer on the same Wi-Fi, add `--lan`, then click **Phone** in the header and scan the QR code. On a phone it lays out like an app:
 
 ```bash
 python server.py --project /path/to/your/repo --lan
@@ -59,6 +59,16 @@ Crew gives that queue a home:
 - **No stepping on each other.** Every agent works in its own git worktree on its own `crew/<name>` branch.
 - **You stay the reviewer.** Finished work lands in Review with the agent's summary and a real diff. Approve commits it; Send back resumes the same session with your feedback.
 - **Work that starts itself.** Schedules, events, file watches, command polls and webhooks turn into tasks, so the standup gets written at 11:00 and every approved feature gets tests.
+
+## The boss
+
+A chat bar at the bottom (<kbd>/</kbd>) talks to the **boss**: a Claude session that runs the crew instead of writing code. Ask it to "plan and build CSV export, then have it tested and reviewed" and it creates tasks, assigns agents, starts workflows, messages or stops agents, and adds triggers, through a small set of crew tools (`crew_mcp.py`). Switch the chat to any agent to talk to it directly.
+
+The boss runs with only the crew tools and a few read-only ones, so a turn costs about 10k tokens of context instead of your full setup.
+
+**Auto Workflow Builder** (Workflows tab): describe a process in plain words, and the boss maps it onto agents, workflows and triggers. It reuses agents that fit, adds the missing ones, and creates triggers for any schedule or event you mention.
+
+**Auto hand-off**: every agent has a `handoff` tool. When its finished work clearly needs another specialist, it hands a follow-up to a teammate by name, or `auto` by tag. Chains stop after five hops. The manual hand-off menu is unchanged, and it now also offers **Auto**: the boss picks the agent.
 
 ## The crew
 
@@ -92,9 +102,15 @@ Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on it
 
 Edit or add workflows in the UI: pick an agent per step, write its instruction (`{input}`, `{prev_summary}`, `{prev_branch}` and more), set its gate, reorder. Runs show live progress per step, and click through to each step's task.
 
+## Stop, kill, clear
+
+- **■ Stop** (agent card, drawer, or **Stop all** in the header) ends the current run at once. The session is kept, the task goes back to the backlog **on hold**, and the agent pauses until you press **▶ Resume** or give it work.
+- **Kill** disables an agent until you respawn it. Use it for an agent that misbehaves.
+- **Clear ▾** removes Done tasks, or the whole board (running agents are stopped first). Branches and commits are kept.
+
 ## Context per task
 
-Each agent starts a **fresh Claude session for every new task** by default. Old tasks aren't re-read on every turn, so tokens stay low and context doesn't fill up. What should carry over already travels with the task: the hand-off summary, the previous step's branch, the workflow brief. Send back still resumes the same session, so the agent revises its own work. Switch any agent to **Keep across tasks** in ⚙ Model & role.
+Each agent starts a **fresh Claude session for every new task** by default. Old tasks aren't re-read on every turn, so tokens stay low and context doesn't fill up. What should carry over already travels with the task: the hand-off summary, the previous step's branch, the workflow brief. Send back still resumes the same session, so the agent revises its own work. Switch any agent to **Keep across tasks** in ⚙ Model & role. Each agent's drawer shows how full its context is, with **Compact** (Claude Code's `/compact`) and **New session**.
 
 ## Triggers
 
@@ -129,8 +145,10 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 | 🌳 **Worktree isolation** | One worktree and branch per agent. Merge what you approve with `git merge crew/<name>`. |
 | 🔍 **Review gate** | Agent summary and colored diff side by side. Approve and commit, send back, or hand off to another agent. |
 | ↪️ **Hand-offs** | Drag any card, in any column, onto another agent. The earlier summary, branch and commit go along as context. |
+| ✦ **Boss chat** | A chat bar that runs the crew: tasks, workflows, agents and triggers, from plain requests. |
 | 💬 **Talk mid-run** | Message any agent while it works. The message lands in the running session. |
-| ☠️ **Kill and respawn** | Kill ends the whole process tree immediately. Respawn resumes the same Claude session or starts fresh. |
+| 📱 **Phone app feel** | `--lan` plus a QR code. On a phone: bottom navigation, swipeable columns, bottom sheets, Android back closes sheets. |
+| ■ **Stop, kill, clear** | Stop a run (session kept, task on hold), stop everything at once, or clear the board. |
 | 🔐 **Permission modes** | Accept edits (default), Auto (Claude Code's safety classifier) or Bypass, for all agents from one switch. |
 | 🔢 **Tokens and cost** | Live token counts per agent, per task and in total. Hide the dollar amounts with one click. |
 | 🧩 **Your skills and MCP servers** | Agents are ordinary Claude Code sessions, so they load your skills, plugins and MCP servers. |

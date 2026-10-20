@@ -104,7 +104,8 @@ MODES = ["acceptEdits", "auto", "bypassPermissions"]
 CONTEXTS = ["fresh", "keep"]
 MODELS = ["fable", "opus", "sonnet", "haiku"]          # aliases the CLI resolves to the latest of each family
 EFFORTS = ["low", "medium", "high", "xhigh", "max"]
-NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,23}")
+NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,23}")
+RESERVED = {"boss", "you", "anyone", "auto"}
 
 
 def clean_tags(tags) -> list[str]:
@@ -277,6 +278,10 @@ class Crew:
         self.agents: dict[str, dict] = {}
         for spec in config["agents"]:
             self.agents[spec["name"]] = self._new_agent(spec)
+        self.boss = self._new_agent({"name": "boss", "role": "Runs the crew", "tags": [],
+                                     "model": (config.get("boss") or {}).get("model") or "opus",
+                                     "effort": (config.get("boss") or {}).get("effort"), "context": "keep"})
+        self.boss["kind"] = "boss"
         self._load()
         for a in self.agents.values():  # re-attach worktrees made in earlier runs
             self._attach_worktree(a)
@@ -293,6 +298,8 @@ class Crew:
             # fresh: a new Claude session per task (send-back keeps it). keep: one session across tasks.
             "context": spec.get("context") if spec.get("context") in CONTEXTS else self.config.get("context", "fresh"),
             "last_task": None,
+            "ctx": 0,            # tokens in the context window at the last model call
+            "compacting": None,  # status to return to after /compact
         }
 
     def _attach_worktree(self, a: dict) -> None:
@@ -310,11 +317,13 @@ class Crew:
         saved["agents"] = self.config["agents"]
         saved["permission_mode"] = self.config["permission_mode"]
         saved["workflows"] = self.config.get("workflows", [])
+        if self.config.get("boss"):
+            saved["boss"] = self.config["boss"]
         self.config_path.write_text(json.dumps(saved, indent=2), encoding="utf-8")
 
     def _launch_key(self, a: dict) -> tuple:
-        mcp = tuple(sorted(self.mcp_allow)) if self.config.get("allow_mcp", True) else ()
-        return (self.config["permission_mode"], a["model"], a["effort"], mcp)
+        # MCP servers found later are allowed from the agent's next start; no restart (that would drop the live context)
+        return (self.config["permission_mode"], a["model"], a["effort"])
 
     # ---- persistence & change notification ---------------------------------
     def _load(self) -> None:
@@ -340,6 +349,8 @@ class Crew:
                 t["col"] = "backlog"
             if t["col"] == "backlog" and t.get("who") and t["who"] not in self.agents:
                 t["who"] = t["pinned"] = None  # its agent left the roster; let the tags route it
+        if b := data.get("boss"):
+            self.boss.update({k: b[k] for k in ("session", "cost", "log", "tokens", "ctx") if k in b})
         for name, saved in data.get("agents", {}).items():
             if name in self.agents:
                 self.agents[name].update({k: saved[k] for k in ("session", "cost", "log", "tokens", "mcp", "skills", "skill_names", "plugins") if k in saved})
@@ -352,7 +363,8 @@ class Crew:
                 "runs": self.runs[-50:], "next_run": self.next_run,
                 "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
                            "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", [])}
-                       for n, a in self.agents.items()}}
+                       for n, a in self.agents.items()},
+                "boss": {k: self.boss[k] for k in ("session", "cost", "tokens", "ctx")} | {"log": self.boss["log"][-200:]}}
         tmp = self.state_file.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
         tmp.replace(self.state_file)
@@ -383,7 +395,8 @@ class Crew:
             agents = []
             for a in self.agents.values():
                 agents.append({k: v for k, v in a.items() if k != "log"} | {"log": a["log"][-120:], "alive": self._alive(a["name"])})
-            return {"version": self.version, "project": str(self.project), "git": self.git,
+            boss = {k: v for k, v in self.boss.items() if k != "log"} | {"log": self.boss["log"][-160:], "alive": self._alive("boss")}
+            return {"version": self.version, "project": str(self.project), "git": self.git, "boss": boss,
                     "agents": agents, "tasks": self.tasks, "feed": self.feed[-30:],
                     "permission_mode": self.config["permission_mode"], "modes": MODES,
                     "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
@@ -425,20 +438,36 @@ class Crew:
     def _start(self, a: dict) -> bool:
         if self._alive(a["name"]):
             return True
-        self._ensure_worktree(a)
-        role = (f"You are '{a['name']}', one of {len(self.agents)} Claude Code agents working in parallel on this project. "
-                f"Your role: {a['role']} "
-                f"Your working folder is {a['cwd']}" + (f", a git worktree of the project {self.project}" if a['branch'] else "") + ". "
-                "Stay inside it: do not read, create or change files outside this folder unless the task explicitly names a path outside it. "
-                "Never touch other agents' worktrees. "
-                "When you finish a task, end with a short summary: what you changed, files touched, and anything left open.")
-        mode = self.config["permission_mode"]
+        boss = a.get("kind") == "boss"
+        if not boss:
+            self._ensure_worktree(a)
+        team = ", ".join(f"{x['name']} ({', '.join(x['tags']) or 'no tags'})" for x in self.agents.values())
+        if boss:
+            role = (f"You are the boss of Crew, a team of Claude Code agents working on the project {self.project}. "
+                    f"The crew: {team}. You do not write code yourself: you plan, delegate and coordinate through the crew "
+                    "tools (crew_status, create_task, assign_task, message_agent, stop_agent, run_workflow, add_agent, "
+                    "update_agent, save_workflow, add_trigger). Call crew_status before acting. Prefer existing agents and "
+                    "workflows; add or change them only when the request needs it. Keep replies short: what you did, "
+                    "task numbers, and what the user should approve next. Read files only to understand the project.")
+        else:
+            role = (f"You are '{a['name']}', one of {len(self.agents)} Claude Code agents working in parallel on this project. "
+                    f"Your role: {a['role']} Teammates: {team}. "
+                    f"Your working folder is {a['cwd']}" + (f", a git worktree of the project {self.project}" if a['branch'] else "") + ". "
+                    "Stay inside it: do not read, create or change files outside this folder unless the task explicitly names a path outside it. "
+                    "Never touch other agents' worktrees. "
+                    + ("When your finished work clearly needs another specialist next, call the crew handoff tool once "
+                       "(to a teammate's name, or 'auto' with a tag); say what you did and where. " if self.config.get("auto_handoff", True) else "")
+                    + "When you finish a task, end with a short summary: what you changed, files touched, and anything left open.")
+        mode = "acceptEdits" if boss else self.config["permission_mode"]
         cmd = [*self.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                "--permission-mode", mode, "--append-system-prompt", role]
-        if mode == "bypassPermissions":
+        if boss:  # coordinates, never edits: crew tools and read-only tools only
+            cmd += ["--allowedTools", "mcp__crew", "Read", "Grep", "Glob", "WebSearch", "WebFetch", "Bash(git log:*)", "Bash(git status:*)",
+                    "--disallowedTools", "Edit", "Write", "MultiEdit", "NotebookEdit"]
+        elif mode == "bypassPermissions":
             cmd += ["--dangerously-skip-permissions"]
         else:
-            allowed = list(self.config.get("allowed_tools") or [])
+            allowed = list(self.config.get("allowed_tools") or []) + ["mcp__crew"]
             if self.config.get("allow_mcp", True):
                 allowed += sorted(self.mcp_allow)  # e.g. mcp__azure-devops: every tool on that server
             if allowed:
@@ -455,11 +484,15 @@ class Crew:
         if a["branch"]:
             if copied := sync_claude_files(self.project, Path(a["cwd"])):
                 self.log(a, "sys", f"synced {len(copied)} local Claude file{'s' if len(copied) != 1 else ''} into the worktree")
-        if servers := local_mcp_servers(self.project):
-            f = WORK_ROOT / "mcp" / f"{self.key}.json"
-            f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text(json.dumps({"mcpServers": servers}, indent=1), encoding="utf-8")
-            cmd += [f"--mcp-config={f}"]  # "=" form: the flag is variadic and would swallow what follows
+        servers = {} if boss else local_mcp_servers(self.project)
+        servers["crew"] = {"type": "stdio", "command": sys.executable, "args": [str(APP_DIR / "crew_mcp.py")],
+                           "env": {"CREW_URL": f"http://127.0.0.1:{PORT}", "CREW_AGENT": a["name"], "CREW_ROLE": "boss" if boss else "agent"}}
+        f = WORK_ROOT / "mcp" / f"{self.key}-{a['name']}.json"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps({"mcpServers": servers}, indent=1), encoding="utf-8")
+        cmd += [f"--mcp-config={f}"]  # "=" form: the flag is variadic and would swallow what follows
+        if boss:  # the boss only needs the crew tools and a few readers: a small context keeps every turn cheap
+            cmd += ["--strict-mcp-config", "--disable-slash-commands", "--tools=Read,Grep,Glob,WebSearch,WebFetch,Bash"]
         flags = subprocess.CREATE_NEW_PROCESS_GROUP if IS_WIN else 0
         try:
             p = subprocess.Popen(cmd, cwd=a["cwd"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -481,9 +514,12 @@ class Crew:
         p.stdin.write(json.dumps(msg) + "\n")
         p.stdin.flush()
 
+    def _agent(self, name) -> dict | None:
+        return self.boss if name == "boss" else self.agents.get(name or "")
+
     def _kill_proc(self, name: str) -> None:
-        if name in self.agents:
-            self.agents[name]["subs"] = {}  # the tree kill ends its subagents too
+        if a := self._agent(name):
+            a["subs"] = {}  # the tree kill ends its subagents too
         p = self.procs.pop(name, None)
         if not p or p.poll() is not None:
             return
@@ -525,6 +561,10 @@ class Crew:
         t, st = d.get("type"), d.get("subtype")
         if d.get("session_id"):
             a["session"] = d["session_id"]
+        if t == "system" and st == "compact_boundary":
+            meta = d.get("compact_metadata") or {}
+            self.log(a, "sys", f"context compacted ({meta.get('trigger', 'manual')}, was {int(meta.get('pre_tokens') or a['ctx']) // 1000}k tokens)")
+            a["ctx"] = 0
         if t == "system" and st == "init":
             a["mcp"] = [{"name": m.get("name"), "status": m.get("status")} for m in d.get("mcp_servers") or []]
             a["skills"] = len(d.get("skills") or [])
@@ -545,6 +585,8 @@ class Crew:
                 tk["in"] += int(u.get("input_tokens") or 0) + int(u.get("cache_creation_input_tokens") or 0)
                 tk["cache"] += int(u.get("cache_read_input_tokens") or 0)
                 tk["out"] += int(u.get("output_tokens") or 0)
+                if not d.get("parent_tool_use_id"):  # the main thread's window, not a subagent's
+                    a["ctx"] = sum(int(u.get(k) or 0) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
             for b in m.get("content", []):
                 if b.get("type") == "text" and b.get("text", "").strip():
                     self.log(a, "text", b["text"], sub=sub)
@@ -577,6 +619,10 @@ class Crew:
             total = float(d.get("total_cost_usd") or 0)
             a["cost"] += max(0.0, total - a["proc_cost"])
             a["proc_cost"] = total
+            if a.get("compacting"):  # a /compact turn: no task changes
+                a.update(status=a["compacting"], compacting=None, activity="")
+                self.log(a, "done", "compaction finished")
+                return
             task = self._task(a["task"]) if a["task"] else None
             if d.get("is_error") or st != "success":
                 msg = d.get("result") or st or "error"
@@ -643,7 +689,7 @@ class Crew:
             for a in self.agents.values():
                 if a["status"] != "idle":
                     continue
-                t = next((t for t in self.tasks if t["col"] == "backlog" and
+                t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and
                           (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"]))), None)
                 if t:
                     self._begin(a, t)
@@ -686,6 +732,12 @@ class Crew:
                "weekday": time.strftime("%A", lt), "trigger": tr["name"]} | ctx
         spec = tr["task"]
         title = fill(spec.get("title") or tr["name"], ctx).strip()[:200] or tr["name"]
+        if (w := self._workflow(spec.get("workflow"))) is not None:
+            run = self._start_run(w, title, fill(spec.get("details") or "", ctx), source={"trigger": tr["id"], "name": tr["name"]})
+            tr["fired"] = tr.get("fired", 0) + 1
+            tr["last"], tr["note"] = now(), note[:200]
+            self.event("trigger", f"⚡ {tr['name']} → ⛓ {w['name']}: {title}")
+            return self._task(run["tasks"][0]) or {}
         who = spec.get("agent") if spec.get("agent") in self.agents else None
         t = {"id": self.next_id, "title": title, "details": fill(spec.get("details") or "", ctx).strip()[:8000],
              "tag": spec.get("tag") if spec.get("tag") in self._all_tags() else "feature", "col": "backlog",
@@ -834,6 +886,8 @@ class Crew:
             return "the task needs a title", {}
         if task.get("agent") and task["agent"] not in self.agents:
             return f"no agent called {task['agent']}", {}
+        if task.get("workflow") and not self._workflow(task["workflow"]):
+            return f"no workflow {task['workflow']}", {}
         try:
             if kind == "schedule":
                 cron = " ".join(str(sp.get("cron") or "").split())
@@ -862,7 +916,7 @@ class Crew:
             return "numbers only for intervals", {}
         return None, {"name": name, "kind": kind, "enabled": bool(p.get("enabled", True)), "spec": spec,
                       "task": {"title": str(task["title"]).strip()[:200], "details": str(task.get("details") or "")[:4000],
-                               "tag": task.get("tag") or "", "agent": task.get("agent") or ""}}
+                               "tag": task.get("tag") or "", "agent": task.get("agent") or "", "workflow": task.get("workflow") or ""}}
 
     # ---- workflows --------------------------------------------------------------------
     # A workflow is an ordered list of steps, each run by one agent. Running it creates step 1's task;
@@ -873,6 +927,26 @@ class Crew:
 
     def _run(self, rid) -> dict | None:
         return next((r for r in self.runs if r["id"] == rid), None)
+
+    def _start_run(self, w: dict, title: str, details: str = "", source: dict | None = None) -> dict:
+        n = len(w["steps"])
+        run = {"id": f"r{self.next_run}", "wf": w["id"], "name": w["name"], "title": title[:200],
+               "details": (details or "").strip()[:4000], "steps": json.loads(json.dumps(w["steps"])),
+               "status": "running", "step": 0, "tasks": [None] * n, "results": [None] * n, "started": now(), "note": "",
+               "source": source}
+        self.next_run += 1
+        self.runs.append(run)
+        self._wf_step(run, 0)
+        return run
+
+    def _stop_agent(self, a: dict, why: str = "stopped by you") -> None:
+        """End the current run now. The session is kept; the task waits in the backlog until you move it."""
+        self._kill_proc(a["name"])
+        if t := self._task(a["task"]):
+            if t["col"] == "doing":
+                t.update(col="backlog", who=t.get("pinned") or a["name"], hold=True)
+        a.update(status="paused" if a.get("kind") != "boss" else "idle", task=None, activity="", since=None, compacting=None)
+        self.log(a, "sys", why + (" · paused until you resume it or give it work" if a.get("kind") != "boss" else ""))
 
     def _wf_step(self, run: dict, i: int) -> None:
         step, n = run["steps"][i], len(run["steps"])
@@ -946,6 +1020,8 @@ class Crew:
         with self.lock:
             a = self.agents.get(p.get("agent", ""))
             t = self._task(p.get("task"))
+            if action in ("tell", "stop", "compact", "respawn", "resume") and p.get("agent") == "boss":
+                a = self.boss
             if action == "add":
                 title = (p.get("title") or "").strip()
                 if not title:
@@ -961,6 +1037,8 @@ class Crew:
                 # Any column: the task becomes a to-do for `agent` (or anyone when agent is empty).
                 if a and a["status"] in ("killed", "error"):
                     return {"error": f"{a['name']} is {a['status']}; respawn it first"}
+                if a and a["status"] == "paused":
+                    a["status"] = "idle"
                 if t["col"] == "doing" and a and t.get("who") == a["name"]:
                     return {"error": f"{a['name']} is already on it"}
                 was = t["col"]
@@ -969,6 +1047,7 @@ class Crew:
                 t["col"] = "backlog"
                 t["who"] = t["pinned"] = a["name"] if a else None
                 t.pop("commit", None)
+                t.pop("hold", None)
                 if a and a["status"] == "idle":
                     self._begin(a, t)
                 else:
@@ -987,6 +1066,7 @@ class Crew:
                                 self._kill_proc(owner["name"])
                             owner.update(status="idle", task=None, activity="", since=None)
                     t["col"] = p["col"]
+                    t.pop("hold", None)
                     if p["col"] == "done":
                         self._task_event(t, "done")
             elif action == "mode" and p.get("mode") in MODES:
@@ -1016,10 +1096,12 @@ class Crew:
                     self._kill_proc(a["name"])  # restarts with the new settings on its next task (session kept)
                 self.event("config", f"{a['name']} · {a['model'] or 'default'} · {a['effort'] or 'default'} effort", a["name"])
             elif action == "add_agent":
-                name = (p.get("name") or "").strip().lower()
+                name = (p.get("name") or "").strip()
                 if not NAME_RE.fullmatch(name):
-                    return {"error": "name: 1-24 lowercase letters, digits or dashes"}
-                if name in self.agents:
+                    return {"error": "name: 1-24 letters, digits or dashes"}
+                if name.lower() in RESERVED:
+                    return {"error": f"{name} is reserved"}
+                if name.lower() in {n.lower() for n in self.agents}:  # worktree folders are case-insensitive on Windows
                     return {"error": f"{name} already exists"}
                 if p.get("model") and p["model"] not in MODELS or p.get("effort") and p["effort"] not in EFFORTS:
                     return {"error": "unknown model or effort"}
@@ -1056,11 +1138,78 @@ class Crew:
                     return {"error": "agent is killed"}
                 if not self._start(a):
                     return {"error": a["error"]}
-                self.log(a, "you", text)
+                self.log(a, "you", text, **({"by": p["from"]} if p.get("from") else {}))
                 self._send(a, text)
-                if a["status"] in ("idle", "error"):
+                if a["status"] in ("idle", "error", "paused"):
                     a.update(status="running", since=now(), activity="thinking…", error=None)
                 self.event("tell", f"→ {a['name']}: {text[:80]}", a["name"])
+            elif action == "stop" and a:
+                if a["status"] != "running" and not self._alive(a["name"]):
+                    return {"error": f"{a['name']} is not running"}
+                self._stop_agent(a)
+                self.event("kill", f"■ {a['name']} stopped", a["name"])
+            elif action == "stop_all":
+                n = 0
+                for ag in [*self.agents.values(), self.boss]:
+                    if ag["status"] == "running":
+                        self._stop_agent(ag, "stopped (stop all)")
+                        n += 1
+                runs = [r for r in self.runs if r["status"] == "running"]
+                for r in runs:
+                    r.update(status="stopped", ended=now(), note="stop all")
+                self.event("kill", f"■ stopped {n} agent{'s' if n != 1 else ''}" + (f" and {len(runs)} workflow run{'s' if len(runs) != 1 else ''}" if runs else ""))
+            elif action == "clear":
+                scope = p.get("scope") if p.get("scope") in ("done", "all") else "done"
+                if scope == "all":
+                    for ag in self.agents.values():
+                        if ag["status"] == "running":
+                            self._stop_agent(ag, "stopped: board cleared")
+                        ag.update(task=None, status="idle" if ag["status"] in ("review", "running") else ag["status"])
+                    for r in self.runs:
+                        if r["status"] == "running":
+                            r.update(status="stopped", ended=now(), note="board cleared")
+                    gone = len(self.tasks)
+                    self.tasks = []
+                else:
+                    gone = sum(1 for x in self.tasks if x["col"] == "done")
+                    self.tasks = [x for x in self.tasks if x["col"] != "done"]
+                self.event("clear", f"cleared {gone} task{'s' if gone != 1 else ''}" + (" (whole board)" if scope == "all" else " from Done"))
+            elif action == "compact" and a:
+                if a["status"] == "running":
+                    return {"error": f"{a['name']} is busy; compact after this turn"}
+                if not self._alive(a["name"]):
+                    return {"error": "no live session to compact; its next task starts with a fresh context anyway"}
+                a.update(compacting=a["status"], status="running", since=now(), activity="compacting context…")
+                self.log(a, "you", "/compact")
+                self._send(a, "/compact")
+                self.event("tell", f"{a['name']}: compacting context", a["name"])
+            elif action == "handoff":
+                src = self.agents.get(p.get("from") or "")
+                to = (p.get("to") or "").strip()
+                title = (p.get("title") or "").strip()
+                if not title:
+                    return {"error": "handoff needs a title"}
+                if to.lower() != "auto" and to not in self.agents:
+                    return {"error": f"no agent called {to}; use one of {', '.join(self.agents)} or 'auto'"}
+                if to == (src or {}).get("name"):
+                    return {"error": "hand off to someone else"}
+                parent = self._task(src["task"]) if src and src.get("task") else None
+                depth = (parent or {}).get("depth", 0) + 1
+                if depth > MAX_CHAIN:
+                    return {"error": f"hand-off chain is already {MAX_CHAIN} deep; finish and summarise instead"}
+                who = None if to.lower() == "auto" else to
+                tag = p.get("tag") if p.get("tag") in self._all_tags() else (self.agents[who]["tags"] or ["feature"])[0] if who else "feature"
+                details = (p.get("details") or "").strip()
+                if src and src.get("branch"):
+                    details += f"\n\n---\nHanded off by {src['name']} from #{(parent or {}).get('id', '?')} ({src['branch']}). Merge that branch first if you need its changes: `git merge {src['branch']}`."
+                nt = {"id": self.next_id, "title": title[:200], "details": details[:8000], "tag": tag, "col": "backlog",
+                      "who": who, "pinned": who, "created": now(), "depth": depth,
+                      "handoff": {"from": (src or {}).get("name", p.get("from") or "boss"), "task": (parent or {}).get("id")}}
+                self.next_id += 1
+                self.tasks.append(nt)
+                self.event("handoff", f"↪ {nt['handoff']['from']} → {who or 'auto (' + tag + ')'}: #{nt['id']} {nt['title']}", who)
+                self.touch()
+                return {"ok": True, "task": nt["id"]}
             elif action == "kill" and a:
                 self._kill_proc(a["name"])
                 if t := self._task(a["task"]):
@@ -1133,18 +1282,29 @@ class Crew:
                 title = (p.get("title") or "").strip()
                 if not title:
                     return {"error": "what should this run work on?"}
-                n = len(w["steps"])
-                run = {"id": f"r{self.next_run}", "wf": w["id"], "name": w["name"], "title": title[:200],
-                       "details": (p.get("details") or "").strip()[:4000], "steps": json.loads(json.dumps(w["steps"])),
-                       "status": "running", "step": 0, "tasks": [None] * n, "results": [None] * n, "started": now(), "note": ""}
-                self.next_run += 1
-                self.runs.append(run)
-                self._wf_step(run, 0)
+                self._start_run(w, title, p.get("details") or "")
             elif action == "run_stop" and (run := self._run(p.get("id"))) and run["status"] == "running":
                 run.update(status="stopped", ended=now())
                 self.event("workflow", f"⛓ {run['name']} stopped")
             elif action == "run_delete" and (run := self._run(p.get("id"))) and run["status"] != "running":
                 self.runs.remove(run)
+            elif action == "resume" and t and t.get("hold"):
+                t.pop("hold")
+            elif action == "resume" and a and a["status"] == "paused":
+                a["status"] = "idle"
+                self.log(a, "sys", "resumed")
+            elif action == "resume_all":
+                for ag in self.agents.values():
+                    if ag["status"] == "paused":
+                        ag["status"] = "idle"
+            elif action == "boss_model":
+                if p.get("model") and p["model"] not in MODELS:
+                    return {"error": "unknown model"}
+                self.boss["model"] = p.get("model") or None
+                self.config["boss"] = {"model": self.boss["model"], "effort": self.boss["effort"]}
+                self._save_config()
+                if self.boss["status"] != "running":
+                    self._kill_proc("boss")
             elif action == "diff" and t and t.get("who") in self.agents:
                 t["diff"] = self.diff(self.agents[t["who"]])
             else:
@@ -1153,7 +1313,7 @@ class Crew:
         return {"ok": True}
 
     def shutdown(self) -> None:
-        for n in list(self.procs):
+        for n in list(self.procs):  # includes the boss
             self._kill_proc(n)
 
 
@@ -1220,6 +1380,7 @@ def switch_project(path: str) -> dict:
     return {"ok": True}
 
 
+PORT = 8770
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 
@@ -1276,16 +1437,39 @@ class Handler(BaseHTTPRequestHandler):
         return hmac.compare_digest(cookie, LAN_KEY)
 
     def _login(self) -> bool:
-        """/?key=<key> from the LAN: set the cookie and redirect to a clean URL."""
+        """/?key=<key> from the LAN: set the cookie and serve the app in the same response.
+        No redirect: a link opened from a camera or QR app is a cross-site navigation, and browsers
+        drop cookies on the redirect that follows it. Lax (not Strict) for the same reason."""
         u = urlsplit(self.path)
         key = (parse_qs(u.query).get("key") or [""])[0]
         if not (LAN_KEY and key and hmac.compare_digest(key, LAN_KEY)):
             return False
-        self.send_response(303)
-        self.send_header("Set-Cookie", f"crew_key={LAN_KEY}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict")
-        self.send_header("Location", "/")
-        self.end_headers()
+        self._page(cookie=f"crew_key={LAN_KEY}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax")
         return True
+
+    def _page(self, cookie: str | None = None):
+        body = (APP_DIR / "index.html").read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")  # never leak ?key= to other sites
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _denied(self):
+        body = ("<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'><title>Crew</title>"
+                "<body style='background:#15161b;color:#ececf1;font:16px system-ui;padding:32px;line-height:1.5'>"
+                "<h2 style='margin:0 0 12px'>Crew needs a key</h2><p style='color:#a4a5b2'>On your computer, click <b>Phone</b> "
+                "in Crew's header and scan the QR code, or open the full link with <code>?key=</code>. "
+                "It signs this browser in for a year.</p></body>").encode()
+        self.send_response(403)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _json(self, obj, code=200):
         body = json.dumps(obj).encode()
@@ -1300,20 +1484,14 @@ class Handler(BaseHTTPRequestHandler):
         if urlsplit(self.path).path == "/" and "key=" in self.path and self._login():
             return
         if not self._host_ok():
-            return self.send_error(HTTPStatus.FORBIDDEN, "Open the link with ?key= from the Crew window on your computer")
+            return self._denied() if urlsplit(self.path).path in ("/", "/index.html") else self.send_error(HTTPStatus.FORBIDDEN)
         if self.path == "/api/lan":  # only the computer itself may read the key
             if not self._local():
                 return self.send_error(HTTPStatus.FORBIDDEN)
             port = self.server.server_address[1]
             return self._json({"enabled": bool(LAN_KEY), "urls": [f"http://{ip}:{port}/?key={LAN_KEY}" for ip in lan_ips()] if LAN_KEY else []})
-        if self.path in ("/", "/index.html"):
-            body = (APP_DIR / "index.html").read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+        if urlsplit(self.path).path in ("/", "/index.html"):
+            self._page()
         elif self.path == "/api/state":
             self._json(CREW.snapshot())
         elif self.path == "/api/stream":
@@ -1464,7 +1642,8 @@ def main() -> None:
             time.sleep(1)
 
     threading.Thread(target=loop, daemon=True).start()
-    global LAN_KEY
+    global LAN_KEY, PORT
+    PORT = args.port
     if args.lan:
         LAN_KEY = lan_key()
     srv = ThreadingHTTPServer(("0.0.0.0" if args.lan else "127.0.0.1", args.port), Handler)
