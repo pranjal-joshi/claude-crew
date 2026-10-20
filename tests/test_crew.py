@@ -88,6 +88,26 @@ class Actions(TempCrewCase):
         self.crew.agents[a]["status"] = "running"
         self.assertIn("error", self.crew.act("rename_agent", {"agent": a, "name": "Fine"}))
 
+    def test_agent_icon_and_color_saved(self):
+        a = next(iter(self.crew.agents))
+        self.assertNotIn("error", self.crew.act("configure", {"agent": a, "icon": "code", "color": "#3e63dd"}))
+        saved = json.loads(self.cfg_path.read_text(encoding="utf-8"))["agents"][0]
+        self.assertEqual((saved["icon"], saved["color"]), ("code", "#3e63dd"))
+        self.assertIn("error", self.crew.act("configure", {"agent": a, "color": "blue"}))
+        self.assertIn("error", self.crew.act("configure", {"agent": a, "icon": "<svg>"}))
+        self.crew.act("configure", {"agent": a, "icon": "", "color": ""})
+        self.assertNotIn("icon", json.loads(self.cfg_path.read_text(encoding="utf-8"))["agents"][0])
+
+    def test_busy_tracks_running_work(self):
+        self.assertFalse(self.crew.busy())
+        next(iter(self.crew.agents.values()))["status"] = "running"
+        self.assertTrue(self.crew.busy())
+
+    def test_keep_awake_off_never_holds(self):
+        k = server.KeepAwake("off")
+        k.set(True)
+        self.assertFalse(k.on)
+
     def test_state_is_written_under_work_root_only(self):
         self.assertTrue(str(self.crew.state_file).startswith(str(server.WORK_ROOT)))
 

@@ -111,6 +111,8 @@ MODELS = ["fable", "opus", "sonnet", "haiku"]          # aliases the CLI resolve
 EFFORTS = ["low", "medium", "high", "xhigh", "max"]
 NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,23}")
 RESERVED = {"boss", "you", "anyone", "auto"}
+ICON_RE = re.compile(r"[a-z][a-z0-9-]{0,23}")  # a key from the UI's icon set
+COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 
 
 def clean_tags(tags) -> list[str]:
@@ -329,6 +331,8 @@ class Crew:
         return {
             "name": spec["name"], "role": spec.get("role", ""), "tags": list(spec.get("tags", [])),
             "model": spec.get("model") or None, "effort": spec.get("effort") or None,
+            "icon": spec.get("icon") if ICON_RE.fullmatch(str(spec.get("icon") or "")) else None,
+            "color": spec.get("color") if COLOR_RE.fullmatch(str(spec.get("color") or "")) else None,
             "status": "idle", "task": None, "session": None,
             "cost": 0.0, "proc_cost": 0.0, "log": [], "activity": "", "since": None,
             "cwd": str(self.project), "branch": None, "error": None, "launched": None,
@@ -349,7 +353,8 @@ class Crew:
     def _save_config(self) -> None:
         """Write the agent roster and mode back to crew.json, keeping any other keys."""
         self.config["agents"] = [{"name": a["name"], "role": a["role"], "tags": a["tags"], "model": a["model"],
-                                  "effort": a["effort"], "context": a["context"]} for a in self.agents.values()]
+                                  "effort": a["effort"], "context": a["context"],
+                                  **{k: a[k] for k in ("icon", "color") if a.get(k)}} for a in self.agents.values()]
         if not self.config_path:
             return
         saved = json.loads(self.config_path.read_text(encoding="utf-8")) if self.config_path.exists() else {}
@@ -429,6 +434,11 @@ class Crew:
             tags += [t for t in a["tags"] if t not in tags]
         return tags
 
+    def busy(self) -> bool:
+        """Work in flight: an agent or the boss mid-turn, or a workflow run going."""
+        return (any(a["status"] == "running" for a in self.agents.values()) or self.boss["status"] == "running"
+                or any(r["status"] == "running" for r in self.runs))
+
     def snapshot(self) -> dict:
         with self.lock:
             agents = []
@@ -442,7 +452,8 @@ class Crew:
                     "project_name": self.project.name, "app_version": __version__, "mcp_allow": sorted(self.mcp_allow),
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(),
                     "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []),
-                    "runs": self.runs[-30:], "contexts": CONTEXTS}
+                    "runs": self.runs[-30:], "contexts": CONTEXTS,
+                    "awake": getattr(self, "awake", False)}
 
     # ---- worktrees -----------------------------------------------------------
     def _ensure_worktree(self, a: dict) -> None:
@@ -1197,6 +1208,14 @@ class Crew:
                     a["tags"] = clean_tags(p["tags"])
                 if p.get("context") in CONTEXTS:
                     a["context"] = p["context"]
+                if "icon" in p:
+                    if p["icon"] and not ICON_RE.fullmatch(str(p["icon"])):
+                        return {"error": "unknown icon"}
+                    a["icon"] = p["icon"] or None
+                if "color" in p:
+                    if p["color"] and not COLOR_RE.fullmatch(str(p["color"])):
+                        return {"error": "color must be #rrggbb"}
+                    a["color"] = p["color"] or None
                 self._save_config()
                 if a["status"] != "running" and self._alive(a["name"]) and tuple(a.get("launched") or ()) != self._launch_key(a):
                     self._kill_proc(a["name"])  # restarts with the new settings on its next task (session kept)
@@ -1213,7 +1232,8 @@ class Crew:
                     return {"error": "unknown model or effort"}
                 self.agents[name] = self._new_agent({"name": name, "role": (p.get("role") or "").strip()[:500],
                                                      "tags": clean_tags(p.get("tags") or []),
-                                                     "model": p.get("model"), "effort": p.get("effort")})
+                                                     "model": p.get("model"), "effort": p.get("effort"),
+                                                     "icon": p.get("icon"), "color": p.get("color")})
                 self._attach_worktree(self.agents[name])
                 self._save_config()
                 self.event("agent", f"+ {name} joined the crew", name)
@@ -1232,17 +1252,20 @@ class Crew:
                 self._kill_proc(old)
                 if self.git and a.get("branch"):  # keep the worktree and branch in step with the name
                     path, branch = WORK_ROOT / "wt" / self.key / new, f"crew/{new}"
-                    if new.lower() != old.lower() and Path(a["cwd"]).exists():
-                        r = git(self.project, "worktree", "move", a["cwd"], str(path))
-                        if r.returncode != 0:
-                            return {"error": "could not move the worktree: " + r.stderr.strip()[:200]}
-                        a["cwd"] = str(path)
+                    case_only = new.lower() == old.lower()  # Windows paths and git refs ignore case: go via a temp name
+                    if Path(a["cwd"]).exists() and Path(a["cwd"]).name != new:
+                        for hop in ([path.with_name(new + "-renaming")] if case_only else []) + [path]:
+                            r = git(self.project, "worktree", "move", a["cwd"], str(hop))
+                            if r.returncode != 0:
+                                return {"error": "could not move the worktree: " + r.stderr.strip()[:200]}
+                            a["cwd"] = str(hop)
                     if branch != a["branch"]:
-                        r = git(self.project, "branch", "-m", a["branch"], branch)
-                        if r.returncode == 0:
-                            a["branch"] = branch
-                        else:
-                            self.log(a, "sys", f"kept branch {a['branch']}: {r.stderr.strip()[:120]}")
+                        for hop in ([f"crew/{new}-renaming"] if case_only else []) + [branch]:
+                            r = git(self.project, "branch", "-m", a["branch"], hop)
+                            if r.returncode != 0:
+                                self.log(a, "sys", f"kept branch {a['branch']}: {r.stderr.strip()[:120]}")
+                                break
+                            a["branch"] = hop
                 a["name"] = new
                 a["session"] = None  # sessions are filed by folder; the next message starts fresh
                 renamed = [(new if n == old else n, ag) for n, ag in self.agents.items()]
@@ -1768,6 +1791,36 @@ def init_repo(project: Path, files: dict[str, str]) -> None:
     git(project, "-c", "user.name=crew", "-c", "user.email=crew@localhost", "commit", "-qm", "init")
 
 
+class KeepAwake:
+    """Keep the computer from idle-sleeping while the crew has work in flight, like the Claude desktop app.
+    A locked screen never pauses Crew; sleep does. The display may still turn off, and a closed lid still sleeps.
+    Windows: SetThreadExecutionState (always called from the dispatcher thread). macOS: caffeinate. Linux: systemd-inhibit."""
+
+    def __init__(self, mode: str):
+        self.mode, self.on, self.proc = mode, False, None
+
+    def set(self, want: bool) -> None:
+        want = want and self.mode != "off"
+        if want == self.on:
+            return
+        self.on = want
+        try:
+            if IS_WIN:
+                import ctypes
+                es_continuous, es_system_required = 0x80000000, 0x00000001
+                ctypes.windll.kernel32.SetThreadExecutionState(es_continuous | (es_system_required if want else 0))
+            elif want:
+                cmd = (["caffeinate", "-i", "-w", str(os.getpid())] if sys.platform == "darwin" else
+                       ["systemd-inhibit", "--what=idle:sleep", "--who=crew", "--why=agents are working", "sleep", "infinity"])
+                if shutil.which(cmd[0]):
+                    self.proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif self.proc:
+                self.proc.terminate()
+                self.proc = None
+        except Exception as e:  # never let power management take the dispatcher down
+            print("keep-awake:", e, file=sys.stderr)
+
+
 def main() -> None:
     global CREW
     ap = argparse.ArgumentParser(description="Local web console for a crew of Claude Code agents")
@@ -1776,6 +1829,8 @@ def main() -> None:
     ap.add_argument("--config", help="crew config (default: crew.json next to server.py, or in the current folder when installed)")
     ap.add_argument("--demo", action="store_true", help="simulated agents with sample tasks: no Claude CLI, no tokens")
     ap.add_argument("--lan", action="store_true", help="also serve other devices on your network (phone, tablet), behind a key")
+    ap.add_argument("--awake", choices=("busy", "always", "off"), default="busy",
+                    help="keep the computer from sleeping: while agents work (default), always (so schedules fire), or off")
     ap.add_argument("--version", action="version", version=f"crew {__version__}")
     args = ap.parse_args()
 
@@ -1817,11 +1872,18 @@ def main() -> None:
         for tr in DEMO_TRIGGERS:
             CREW.act("trigger_add", tr)
 
+    awake = KeepAwake(args.awake)
+
     def loop():
         while True:
             try:
                 CREW.tick_triggers()
                 CREW.dispatch()
+                busy = args.awake == "always" or CREW.busy()
+                if busy != awake.on:
+                    awake.set(busy)
+                    CREW.awake = awake.on
+                    CREW.touch()
             except Exception as e:  # keep the dispatcher alive
                 print("dispatch error:", e, file=sys.stderr)
             time.sleep(1)
@@ -1840,6 +1902,7 @@ def main() -> None:
         srv.serve_forever()
     finally:
         CREW.shutdown()
+        awake.set(False)
 
 
 if __name__ == "__main__":

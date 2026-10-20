@@ -132,7 +132,7 @@ The **Output** block decides what a finished run delivers:
 - **Clear ▾** removes Done tasks, or the whole board (running agents are stopped first). Branches and commits are kept.
 - **Clear** (red button, top right of an open boss or agent chat) wipes that conversation and empties its context: the next message starts a fresh session.
 
-Every agent and every card has a **⋮** menu at its top right: rename, settings, stop, kill or delete an agent; move, mark done or delete a card. The forward button next to a card's ⋮ hands it to an agent (or lets the boss pick), and hand-offs show the same arrow with who it went to. Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
+Give each agent an icon (two dozen dev line icons) and a colour in its settings; the glyph switches between black and white to stay readable. Every agent and every card has a **⋮** menu at its top right: rename, settings, stop, kill or delete an agent; move, mark done or delete a card. The forward button next to a card's ⋮ hands it to an agent (or lets the boss pick), and hand-offs show the same arrow with who it went to. Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
 
 ## Context per task
 
@@ -248,6 +248,7 @@ flowchart LR
 | `--config PATH` | `crew.json` | Next to `server.py` from a clone, in the current folder when installed. |
 | `--version` | | Print the version and exit. |
 | `--demo` | off | Simulated agents and sample tasks. |
+| `--awake` | `busy` | Keep the computer from sleeping while agents work (`busy`), `always` (so schedules fire overnight), or `off`. Locking the screen never pauses Crew; sleep does. A ☕ in the header shows when it's holding the machine awake. A closed laptop lid still sleeps. |
 
 `CREW_CLAUDE` overrides the command used to start agents.
 

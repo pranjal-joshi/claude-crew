@@ -5,6 +5,9 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- Agent icons (24 dev line icons) and background colours; the glyph turns black or white for contrast.
+- Keep-awake while agents work (`--awake busy|always|off`, default `busy`), like the Claude desktop app: a locked screen never paused Crew, but idle sleep did. ☕ in the header while it holds.
+- Case-only agent renames (designer → Designer) carry the worktree and branch along.
 - ⋮ menu on every agent: rename (moves its worktree and branch, updates tasks, triggers and workflows), settings, stop, kill, delete.
 
 ### Changed
