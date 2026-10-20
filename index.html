@@ -1048,8 +1048,10 @@ function renderSettings(a) {
       <button class="btn sm danger" data-remove-agent="${a.name}" style="margin-left:auto">Remove agent</button></div>`;
   const save = (k, v) => act('configure', {agent: a.name, [k]: v});
   box.querySelectorAll('[data-cfg] button').forEach(b => b.onclick = () => { const k = b.parentElement.dataset.cfg; b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); save(k, b.dataset.v); });
-  box.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => { a.icon = b.dataset.icon || null; view.setSig = ''; render(); save('icon', b.dataset.icon); });
-  box.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { a.color = b.dataset.color || null; view.setSig = ''; render(); save('color', b.dataset.color); });
+  // a clicked button keeps focus, and the panel doesn't redraw while it holds focus: drop it, then redraw
+  const pick = (k, v) => { a[k] = v || null; document.activeElement?.blur(); view.setSig = ''; render(); save(k, v); };
+  box.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => pick('icon', b.dataset.icon));
+  box.querySelectorAll('[data-color]').forEach(b => b.onclick = () => pick('color', b.dataset.color));
   const role = $('#cfgRole'), tags = $('#cfgTags');
   role.onblur = () => { if (role.value.trim() !== a.role) save('role', role.value); };
   role.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); role.blur(); } };
