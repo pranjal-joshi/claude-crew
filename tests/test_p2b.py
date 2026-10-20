@@ -528,7 +528,11 @@ class OwnProcesses(unittest.TestCase):
 
     def test_proc_cmdlines_reads_a_live_process_and_skips_dead_pids(self):
         p = self.spawn()
-        got = server.proc_cmdlines([p.pid, 999999])
+        for _ in range(40):  # the child may still be starting (exec) on a slow runner
+            got = server.proc_cmdlines([p.pid, 999999])
+            if "crew-test-sleeper" in got.get(p.pid, ""):
+                break
+            time.sleep(0.1)
         self.assertIn("crew-test-sleeper", got.get(p.pid, ""))
         self.assertNotIn(999999, got)
 

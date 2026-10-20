@@ -424,7 +424,8 @@ def proc_cmdlines(pids) -> dict[int, str]:
             r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, text=True,
                                encoding="utf-8", errors="replace", timeout=25)
         else:
-            r = subprocess.run(["ps", "-o", "pid=,command=", "-p", ",".join(map(str, pids))], capture_output=True, text=True,
+            # every process, full width, filtered here: macOS ps rejects a -p list holding a dead pid and truncates commands
+            r = subprocess.run(["ps", "-A", "-ww", "-o", "pid=,command="], capture_output=True, text=True,
                                encoding="utf-8", errors="replace", timeout=10)
     except (OSError, subprocess.SubprocessError):
         return {}

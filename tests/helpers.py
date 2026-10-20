@@ -18,7 +18,7 @@ class TempCrewCase(unittest.TestCase):
     The claude binary is a placeholder that is never launched."""
 
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # a background save may land late
         self.addCleanup(self._tmp.cleanup)
         tmp = Path(self._tmp.name)
         self._old_root = server.WORK_ROOT
