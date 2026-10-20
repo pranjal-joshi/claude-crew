@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+crew.json
+.DS_Store
