@@ -103,7 +103,8 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:#1c
 .m.subagent b{color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .m.subdone{font:11px var(--mono);color:var(--teal);opacity:.8;margin-left:12px}
 .agent .meta{display:flex;gap:10px;margin-top:8px;font:11px var(--mono);color:var(--faint)}
-.agent .tools{position:absolute;top:9px;right:9px;display:none;gap:4px}
+.agent .tools{position:absolute;top:9px;right:40px;display:none;gap:4px}
+.agent .row1 .kebab{margin:0 -4px 0 -2px}
 .agent:hover .tools{display:flex}.agent:hover .pill{visibility:hidden}
 .iconbtn{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;border:1px solid var(--line2);background:var(--raised);cursor:pointer;color:var(--muted);font-size:12px}
 .iconbtn:hover{color:var(--text);background:var(--hover)}.iconbtn.danger:hover{color:var(--red);border-color:rgba(255,93,100,.4)}
@@ -319,9 +320,11 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .slashpop .si .k{font-size:10.5px;color:var(--faint);border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap}
 .slashpop .si .k.crew{color:var(--accent);border-color:var(--accent-line)}
 .slashpop .empty{padding:10px;color:var(--faint);font-size:12.5px}
-.kebab{flex:none;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;border:0;background:transparent;color:var(--faint);cursor:pointer;opacity:0;transition:opacity .12s,background .12s;font-size:14px;line-height:1}
-.card:hover .kebab,.kebab:focus-visible{opacity:1}.kebab:hover{background:var(--hover);color:var(--text)}
-.card .th{display:flex;align-items:flex-start;gap:4px}.card .th .t{flex:1;min-width:0}
+.kebab{flex:none;width:26px;height:26px;margin:-4px -5px 0 0;border-radius:7px;display:grid;place-items:center;border:0;background:transparent;color:var(--muted);cursor:pointer;opacity:.7;transition:opacity .12s,background .12s,color .12s;font-size:16px;font-weight:700;line-height:1}
+.card:hover .kebab,.agent:hover .kebab,.kebab:focus-visible{opacity:1}.kebab:hover{background:var(--hover);color:var(--text)}
+.card .th{display:flex;align-items:flex-start;gap:10px}.card .th .t{flex:1;min-width:0}
+.fwd{flex:none;vertical-align:-2px}.fwdi{display:inline-flex;vertical-align:-1px}
+.handoff,.hofrom{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .handoff{display:inline-flex;align-items:center;gap:4px;font:10.5px var(--mono);color:var(--amber)}
 .confirm .mb p{margin:0;color:var(--muted);line-height:1.6}
 .confirm .mb b{color:var(--text)}
@@ -865,6 +868,7 @@ function renderRail() {
               : a.status === 'running' ? `<button class="iconbtn danger" data-stop="${a.name}" title="Stop now (session kept, task on hold)">■</button>`
               : a.status === 'paused' ? `<button class="iconbtn" data-resume="${a.name}" title="Resume: let it pick up work again" style="color:var(--amber)">▶</button>` : ''}
           </div>
+          <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, delete…">⋮</button>
         </div>
         <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : 'waiting for work'}</span>`}</div>
         ${a.activity ? `<div class="act ${live ? 'live' : ''}">› ${esc(a.activity)}</div>` : ''}
@@ -904,6 +908,7 @@ function renderBoard() {
   }).join('');
 }
 
+const FWD = '<svg class="fwd" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 4.5v4.2C7.6 9.6 4.3 14.1 3 19.5c2.6-3.6 6.2-5.3 11-5.3v4.3l7.5-7z"/></svg>';
 function card(t) {
   const who = t.who ? `<span class="who"><span class="mini">${esc(t.who[0])}</span>${esc(t.who)}</span>` : `<span class="who faint">anyone</span>`;
   let cta = '';
@@ -913,13 +918,13 @@ function card(t) {
   const liveSubs = owner ? Object.keys(owner.subs || {}).length : 0;
   const subs = liveSubs ? `<span class="subtag live" title="${liveSubs} subagent${liveSubs > 1 ? 's' : ''} running">${SUBI}${liveSubs}</span>`
     : t.subagents ? `<span class="subtag" title="used ${t.subagents} subagent${t.subagents > 1 ? 's' : ''}">${SUBI}${t.subagents}</span>` : '';
-  const hand = t.history?.length ? `<span class="handoff" title="Handed off ${t.history.length}x">↪ ${esc(t.history[t.history.length - 1].who || '')}</span>` : '';
+  const hand = t.history?.length ? `<span class="handoff" title="Handed off ${t.history.length}x">${FWD}${esc(t.history[t.history.length - 1].who || '')}</span>` : '';
   return `<div class="card ${t.col}" draggable="true" data-card="${t.id}">
     ${t.source ? `<div class="srcl" title="Created by trigger: ${esc(t.source.name)}">${BOLT}${esc(t.source.name)}</div>` : ''}
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
-    <div class="th"><div class="t">${esc(t.title)}</div><button class="kebab" data-menu="${t.id}" title="Hand off or move">⋯</button></div>
+    <div class="th"><div class="t">${esc(t.title)}</div><button class="kebab" data-menu="${t.id}" title="Hand off, move or delete">⋮</button></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
-    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${hand}${subs}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">↪ from ${esc(t.handoff.from)}</span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
+    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${hand}${subs}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}from ${esc(t.handoff.from)}</span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
   </div>`;
 }
@@ -1092,7 +1097,7 @@ function renderReviewDrawer(d, t) {
     </div>
     <div class="reviewbar">
       <div class="inputwrap"><textarea id="fb" rows="1" placeholder="Feedback for ${esc(t.who)} if you send it back…"></textarea></div>
-      <div style="display:flex;gap:8px"><button class="btn green" data-approve="${t.id}">✓ Approve &amp; commit</button><button class="btn" data-reject="${t.id}">↺ Send back</button><button class="btn ghost" data-menu="${t.id}" style="margin-left:auto">Hand off ▾</button></div>
+      <div style="display:flex;gap:8px"><button class="btn green" data-approve="${t.id}">✓ Approve &amp; commit</button><button class="btn" data-reject="${t.id}">↺ Send back</button><button class="btn ghost" data-menu="${t.id}" style="margin-left:auto"><span class="fwdi">${FWD}</span> Hand off ▾</button></div>
     </div></div>`;
   $('#fb').addEventListener('input', autosize);
 }
@@ -1138,9 +1143,7 @@ document.addEventListener('click', async e => {
   if (ds.browse !== undefined) return browseTo(ds.browse);
   if (ds.openProject) return openProject(ds.openProject);
   if ('toggleSettings' in ds) { view.showSettings = !view.showSettings; view.setSig = ''; return render(); }
-  if (ds.removeAgent) { const n = ds.removeAgent, ag = agent(n); return askConfirm(`Remove ${n}?`,
-      `<b>${esc(n)}</b> will be stopped and removed from the crew.${ag?.task ? ' Its current task goes back to the backlog.' : ''}${ag?.branch ? ` Its work stays on branch <b>${esc(ag.branch)}</b> and its worktree is left on disk.` : ''}`,
-      'Remove agent', async () => { const r = await act('remove_agent', {agent: n}); if (r.ok) { view.drawer = null; render(); } }, true); }
+  if (ds.removeAgent) return removeAgent(ds.removeAgent);
   if (ds.mi) { const f = MENU_ACTIONS[+ds.mi]; closeMenu(); return f && f(); }
   if (ds.kill) { e.stopPropagation(); return act('kill', {agent: ds.kill}); }
   if (ds.respawn) { e.stopPropagation(); return act('respawn', {agent: ds.respawn}); }
@@ -1221,7 +1224,7 @@ function openTaskMenu(id, anchor) {
   MENU_ACTIONS = [];
   let h = '';
   if (t.hold) h += item('▶ Resume: let it run again', () => act('resume', {task: id}));
-  h += `<div class="mh">Hand #${t.id} to · as a to-do</div>`;
+  h += `<div class="mh"><span class="fwdi">${FWD}</span> Forward #${t.id} to · as a to-do</div>`;
   h += item(`<span class="mini" style="display:inline-grid;margin-right:8px;vertical-align:-4px;background:linear-gradient(135deg,#f0a07f,#c9532a);color:#1a0d07">✦</span>Auto<span class="faint"> · the boss picks the best agent</span>`,
     () => bossSays(`Pick the best agent for task #${t.id} "${t.title}" and assign it with assign_task. One line on why.`));
   for (const a of S.agents) {
@@ -1237,6 +1240,43 @@ function openTaskMenu(id, anchor) {
     async () => { if (task(id)?.col === 'doing') await act('move', {task: id, col: 'backlog'}); act('delete', {task: id}); }, true), {cls: 'danger'});
   showMenu(anchor, h);
 }
+function openAgentMenu(n, anchor) {
+  const a = agent(n); if (!a) return;
+  MENU_ACTIONS = [];
+  const open = (settings = false) => { view.drawer = {agent: n}; view.showSettings = settings; render(); };
+  let h = `<div class="mh">${esc(n)} · ${a.status}</div>`;
+  h += item('Open', () => open());
+  h += item('Rename…', () => renameAgent(n), {disabled: a.status === 'running', sub: a.status === 'running' ? 'stop it first' : ''});
+  h += item('Role, model and effort…', () => open(true));
+  h += item('Message…', () => { view.chatTo = n; view.chatOpen = true; render(); $('#chatIn').focus(); });
+  h += '<div class="sep"></div>';
+  if (a.status === 'running') h += item('■ Stop', () => act('stop', {agent: n}));
+  if (a.status === 'paused') h += item('▶ Resume', () => act('resume', {agent: n}));
+  if (a.status === 'killed' || a.status === 'error') h += item('↻ Respawn', () => act('respawn', {agent: n}));
+  else h += item('Kill', () => act('kill', {agent: n}), {sub: 'disable until respawned'});
+  h += item('Delete agent', () => removeAgent(n), {cls: 'danger'});
+  showMenu(anchor, h);
+}
+function removeAgent(n) {
+  const ag = agent(n);
+  askConfirm(`Remove ${n}?`,
+    `<b>${esc(n)}</b> will be stopped and removed from the crew.${ag?.task ? ' Its current task goes back to the backlog.' : ''}${ag?.branch ? ` Its work stays on branch <b>${esc(ag.branch)}</b> and its worktree is left on disk.` : ''}`,
+    'Remove agent', async () => { const r = await act('remove_agent', {agent: n}); if (r.ok) { view.drawer = null; render(); } }, true);
+}
+function renameAgent(n) {
+  askConfirm(`Rename ${n}`, `<input class="field" id="renIn" value="${esc(n)}" maxlength="24" spellcheck="false" autocomplete="off" style="width:100%">
+    <span class="faint" style="display:block;margin-top:8px;font-size:12px">Letters, digits or dashes. Its worktree and branch follow the new name; tasks, triggers and workflows are updated. The next message starts a fresh session.</span>`,
+    'Rename', async () => {
+      const name = ($('#renIn')?.value || '').trim();
+      const r = await act('rename_agent', {agent: n, name});
+      if (r.ok) { if (view.drawer?.agent === n) view.drawer = {agent: name}; if (view.chatTo === n) view.chatTo = name; render(); }
+    });
+  setTimeout(() => { const i = $('#renIn'); if (i) { i.focus(); i.select(); i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#cfOk').click(); } }; } }, 0);
+}
+document.addEventListener('click', e => {
+  const k = e.target.closest('[data-agent-menu]');
+  if (k) { e.stopPropagation(); e.preventDefault(); openAgentMenu(k.dataset.agentMenu, k); }
+}, true);
 function openModeMenu(anchor) {
   MENU_ACTIONS = [];
   let h = '<div class="mh">Permission mode · all agents</div>';

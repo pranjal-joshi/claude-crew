@@ -65,6 +65,29 @@ class Actions(TempCrewCase):
         a["status"] = "running"
         self.assertIn("error", self.crew.act("clear_chat", {"agent": a["name"]}))
 
+    def test_rename_agent_updates_references(self):
+        names = list(self.crew.agents)
+        old = names[0]
+        self.crew.act("add", {"title": "x", "agent": old})
+        self.crew.config["workflows"].append({"id": "w", "name": "w", "steps": [{"agent": old, "title": "s"}]})
+        r = self.crew.act("rename_agent", {"agent": old, "name": "Renamed"})
+        self.assertNotIn("error", r)
+        self.assertEqual(list(self.crew.agents)[0], "Renamed")  # keeps its place in the rail
+        self.assertNotIn(old, self.crew.agents)
+        self.assertEqual(self.crew.agents["Renamed"]["name"], "Renamed")
+        self.assertEqual(self.crew.tasks[-1]["who"], "Renamed")
+        self.assertEqual(self.crew.config["workflows"][-1]["steps"][0]["agent"], "Renamed")
+        saved = json.loads(self.cfg_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved["agents"][0]["name"], "Renamed")
+
+    def test_rename_agent_rejects_bad_names(self):
+        a, b = list(self.crew.agents)[:2]
+        self.assertIn("error", self.crew.act("rename_agent", {"agent": a, "name": b.upper()}))
+        self.assertIn("error", self.crew.act("rename_agent", {"agent": a, "name": "boss"}))
+        self.assertIn("error", self.crew.act("rename_agent", {"agent": a, "name": "no spaces"}))
+        self.crew.agents[a]["status"] = "running"
+        self.assertIn("error", self.crew.act("rename_agent", {"agent": a, "name": "Fine"}))
+
     def test_state_is_written_under_work_root_only(self):
         self.assertTrue(str(self.crew.state_file).startswith(str(server.WORK_ROOT)))
 

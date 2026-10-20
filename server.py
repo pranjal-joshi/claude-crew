@@ -1217,6 +1217,57 @@ class Crew:
                 self._attach_worktree(self.agents[name])
                 self._save_config()
                 self.event("agent", f"+ {name} joined the crew", name)
+            elif action == "rename_agent" and a:
+                old, new = a["name"], (p.get("name") or "").strip()
+                if new == old:
+                    return {"ok": True}
+                if not NAME_RE.fullmatch(new):
+                    return {"error": "name: 1-24 letters, digits or dashes"}
+                if new.lower() in RESERVED:
+                    return {"error": f"{new} is reserved"}
+                if new.lower() != old.lower() and new.lower() in {n.lower() for n in self.agents}:
+                    return {"error": f"{new} already exists"}
+                if a["status"] == "running":
+                    return {"error": f"{old} is working: stop it first"}
+                self._kill_proc(old)
+                if self.git and a.get("branch"):  # keep the worktree and branch in step with the name
+                    path, branch = WORK_ROOT / "wt" / self.key / new, f"crew/{new}"
+                    if new.lower() != old.lower() and Path(a["cwd"]).exists():
+                        r = git(self.project, "worktree", "move", a["cwd"], str(path))
+                        if r.returncode != 0:
+                            return {"error": "could not move the worktree: " + r.stderr.strip()[:200]}
+                        a["cwd"] = str(path)
+                    if branch != a["branch"]:
+                        r = git(self.project, "branch", "-m", a["branch"], branch)
+                        if r.returncode == 0:
+                            a["branch"] = branch
+                        else:
+                            self.log(a, "sys", f"kept branch {a['branch']}: {r.stderr.strip()[:120]}")
+                a["name"] = new
+                a["session"] = None  # sessions are filed by folder; the next message starts fresh
+                renamed = [(new if n == old else n, ag) for n, ag in self.agents.items()]
+                self.agents.clear()
+                self.agents.update(renamed)
+                for tk in self.tasks:
+                    for k in ("who", "pinned"):
+                        if tk.get(k) == old:
+                            tk[k] = new
+                    for h in tk.get("history") or []:
+                        if h.get("who") == old:
+                            h["who"] = new
+                    if (tk.get("handoff") or {}).get("from") == old:
+                        tk["handoff"]["from"] = new
+                for tr in self.triggers:
+                    for part in (tr.get("task") or {}, tr.get("spec") or {}):
+                        if part.get("agent") == old:
+                            part["agent"] = new
+                for w in self.config.get("workflows", []):
+                    for st in w.get("steps", []):
+                        if st.get("agent") == old:
+                            st["agent"] = new
+                self._save_config()
+                self.log(a, "sys", f"renamed from {old}")
+                self.event("agent", f"{old} is now {new}", new)
             elif action == "remove_agent" and a:
                 if len(self.agents) <= 1:
                     return {"error": "keep at least one agent"}

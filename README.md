@@ -132,7 +132,7 @@ The **Output** block decides what a finished run delivers:
 - **Clear ▾** removes Done tasks, or the whole board (running agents are stopped first). Branches and commits are kept.
 - **Clear** (red button, top right of an open boss or agent chat) wipes that conversation and empties its context: the next message starts a fresh session.
 
-Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
+Every agent and every card has a **⋮** menu at its top right: rename, settings, stop, kill or delete an agent; forward (hand off), move or delete a card. Hand-offs show a forward arrow with who it went to. Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
 
 ## Context per task
 

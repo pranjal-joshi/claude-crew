@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- ⋮ menu on every agent: rename (moves its worktree and branch, updates tasks, triggers and workflows), settings, stop, kill, delete.
+
+### Changed
+- Card ⋮ is always visible at the top right; hand-offs show a forward arrow.
+
 ## [0.1.0] - 2026-10-20
 
 First packaged release. `pipx install claude-crew` gives a `crew` command; `python server.py` from a clone still works.
