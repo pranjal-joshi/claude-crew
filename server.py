@@ -15,6 +15,7 @@ import hmac
 import json
 import re
 import os
+import queue
 import secrets
 import shlex
 import socket
@@ -345,6 +346,206 @@ def is_git(path: Path) -> bool:
     return git(path, "rev-parse", "--is-inside-work-tree").stdout.strip() == "true"
 
 
+# ---- permission denials ------------------------------------------------------------
+# A stream-json `result` event lists the tool calls the permission mode refused:
+#   "permission_denials": [{"tool_name": "Bash", "tool_use_id": "toolu_..", "tool_input": {"command": "npm test"}}]
+_SEGMENT = re.compile(r"\s*(?:&&|\|\||[;|&\n])\s*")
+_RULE_RE = re.compile(r"[A-Za-z][\w.\-]*(\([^\r\n]*\))?")
+
+
+def bash_prefix(command: str) -> str:
+    """The leading words of a shell command that make a good allow rule: `npm test --silent` -> `npm test`."""
+    segs = [s for s in _SEGMENT.split(str(command or "").strip()) if s.strip()]
+    seg = next((s for s in segs if not re.match(r"\s*cd(\s|$)", s)), segs[0] if segs else "")
+    words = seg.split()
+    while words and re.fullmatch(r"[A-Za-z_]\w*=\S*", words[0]):
+        words.pop(0)  # FOO=1 cmd
+    if not words:
+        return ""
+    n = 1
+    if words[0] in ("python", "python3", "py") and len(words) > 2 and words[1] == "-m":
+        n = 3  # python -m pytest
+    elif words[0] in ("npm", "pnpm", "yarn") and len(words) > 2 and words[1] == "run" and re.fullmatch(r"[\w:-]+", words[2]):
+        n = 3  # npm run build
+    elif len(words) > 1 and re.fullmatch(r"[A-Za-z][\w-]*", words[1]):
+        n = 2  # git status, npm test, cargo build
+    return " ".join(words[:n])
+
+
+def allow_rule(tool: str, inp: dict | None) -> str:
+    """A permission rule for a refused tool call, e.g. `Bash(npm test:*)`, `WebFetch(domain:example.com)`, `Edit`."""
+    inp = inp if isinstance(inp, dict) else {}
+    if tool == "Bash":
+        prefix = bash_prefix(inp.get("command") or "")
+        return f"Bash({prefix}:*)" if prefix else "Bash"
+    if tool == "WebFetch" and (m := re.match(r"https?://([^/:?#\s]+)", str(inp.get("url") or ""))):
+        return f"WebFetch(domain:{m.group(1)})"
+    return tool
+
+
+def clean_rule(rule) -> tuple[str | None, str]:
+    """Validate a rule typed by the user: `Tool` or `Tool(specifier)`, one line."""
+    rule = str(rule or "").strip()
+    if not rule or len(rule) > 300 or not _RULE_RE.fullmatch(rule):
+        return "a rule looks like Bash(npm test:*), WebFetch(domain:example.com) or a tool name", rule
+    return None, rule
+
+
+def parse_denials(raw) -> list[dict]:
+    """Normalise a result event's permission_denials into {tool, cmd, rule, use_id}, dropping anything malformed."""
+    out = []
+    for d in raw if isinstance(raw, list) else []:
+        if not isinstance(d, dict) or not isinstance(d.get("tool_name"), str) or not d["tool_name"]:
+            continue
+        tool, inp = d["tool_name"], d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
+        cmd = inp.get("command") or inp.get("file_path") or inp.get("url") or inp.get("pattern") or inp.get("path") or (json.dumps(inp)[:200] if inp else "")
+        out.append({"tool": tool[:100], "cmd": str(cmd)[:300], "rule": allow_rule(tool, inp), "use_id": str(d.get("tool_use_id") or "")[:80]})
+    return out
+
+
+def today() -> str:
+    return time.strftime("%Y-%m-%d")
+
+
+# ---- processes: pidfile, orphans, termination ----------------------------------------------
+STDIN_LIMIT = 15.0  # a write to an agent's stdin that blocks longer than this means the process is hung
+
+
+def proc_cmdlines(pids) -> dict[int, str]:
+    """Command lines of the live processes among pids ({} when they can't be read). Windows: Get-CimInstance
+    (wmic is gone from current Windows); elsewhere: ps."""
+    pids = sorted({int(p) for p in pids if int(p) > 0})
+    if not pids:
+        return {}
+    try:
+        if IS_WIN:
+            flt = " -or ".join(f"$_.ProcessId -eq {p}" for p in pids)
+            ps = "Get-CimInstance Win32_Process | Where-Object { " + flt + ' } | ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }'
+            r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=25)
+        else:
+            r = subprocess.run(["ps", "-o", "pid=,command=", "-p", ",".join(map(str, pids))], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    out = {}
+    for line in r.stdout.splitlines():
+        m = re.match(r"\s*(\d+)[\t ]+(.*)$", line)
+        if m and int(m.group(1)) in pids:
+            out[int(m.group(1))] = m.group(2).strip()
+    return out
+
+
+def is_agent_cmdline(cmd: str, key: str = "") -> bool:
+    """Does this command line look like an agent process Crew started: a claude / node claude-code / demo fake_claude
+    speaking stream-json, whose --mcp-config file carries this project's key? Guards against a reused pid."""
+    c = (cmd or "").lower()
+    return "stream-json" in c and "claude" in c and (not key or key.lower() in c)
+
+
+CREW_SERVER_RE = re.compile(r"server\.py|claude_crew|[\\/ ]crew(\.exe)?(\s|$)")
+
+
+def orphans_to_kill(entries: list[dict], cmdlines: dict[int, str], key: str = "") -> list[int]:
+    """Recorded pids that are still alive (present in cmdlines) and still look like our agent processes."""
+    out = []
+    for e in entries:
+        pid = e.get("pid") if isinstance(e, dict) else None
+        if isinstance(pid, int) and pid > 0 and pid != os.getpid() and is_agent_cmdline(cmdlines.get(pid, ""), key):
+            out.append(pid)
+    return out
+
+
+def pid_alive(pid: int, proc: subprocess.Popen | None = None) -> bool:
+    if proc is not None:
+        return proc.poll() is None
+    if IS_WIN:
+        try:
+            r = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"], capture_output=True, text=True, timeout=15)
+            return f'"{pid}"' in r.stdout
+        except (OSError, subprocess.SubprocessError):
+            return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def signal_tree(pid: int, sig: int) -> None:
+    try:
+        os.killpg(pid, sig)  # agents start their own session, so the pid is the group id
+    except ProcessLookupError:
+        pass
+    except OSError:
+        try:
+            os.kill(pid, sig)
+        except OSError:
+            pass
+
+
+def terminate_tree(pid: int, proc: subprocess.Popen | None = None, grace: float = 3.0) -> str | None:
+    """Stop a process and its children. POSIX: SIGTERM to the group, wait up to `grace` s, then SIGKILL.
+    Windows: taskkill /T /F. Returns None on success, else why it failed."""
+    if IS_WIN:
+        try:
+            r = subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.SubprocessError) as e:
+            return f"taskkill could not run: {e}"
+        if r.returncode != 0 and pid_alive(pid, proc):
+            return f"taskkill exited {r.returncode}: {(r.stderr or r.stdout).strip()[:200]}"
+        return None
+    signal_tree(pid, signal.SIGTERM)
+    end = time.time() + grace
+    while time.time() < end:
+        if proc is not None:
+            try:
+                proc.wait(timeout=0.1)
+                return None
+            except subprocess.TimeoutExpired:
+                continue
+        if not pid_alive(pid):
+            return None
+        time.sleep(0.1)
+    signal_tree(pid, signal.SIGKILL)
+    if proc is not None:
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            return "still running after SIGKILL"
+    return None
+
+
+class StdinWriter:
+    """Feeds one process's stdin from its own thread so a hung pipe can never block the server or its lock."""
+
+    def __init__(self, p: subprocess.Popen):
+        self.p, self.q, self.since, self.error = p, queue.Queue(), None, None
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def put(self, line: str) -> None:
+        self.q.put(line)
+
+    def close(self) -> None:
+        self.q.put(None)
+
+    def stuck(self, limit: float | None = None) -> bool:
+        return self.since is not None and time.time() - self.since > (STDIN_LIMIT if limit is None else limit)
+
+    def _run(self) -> None:
+        while (line := self.q.get()) is not None:
+            self.since = time.time()
+            try:
+                self.p.stdin.write(line)
+                self.p.stdin.flush()
+            except (OSError, ValueError) as e:  # broken pipe, or the process was killed mid-write
+                self.error, self.since = str(e) or type(e).__name__, None
+                return
+            self.since = None
+
+
 class Crew:
     def __init__(self, project: Path, config: dict, claude: list[str]):
         self.project = project
@@ -363,6 +564,15 @@ class Crew:
         self.state_file = WORK_ROOT / "state" / f"{self.key}.json"
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.procs: dict[str, subprocess.Popen] = {}
+        self.writers: dict[str, StdinWriter] = {}
+        self.pids: dict[int, str] = {}   # live agent processes this run started: pid -> agent name (mirrored to the pidfile)
+        self.pid_lock = threading.Lock()
+        self.pid_file = WORK_ROOT / "pids" / f"{self.key}.json"
+        self._busy: dict[int, str] = {}  # task id -> the git action running outside the lock
+        self._jobs: list[tuple] = []     # git work queued by event handlers, run outside the lock (see _run_jobs)
+        self.git_mutex = threading.Lock()  # one merge / push at a time in the project folder
+        self.next_denial = 1
+        self.day, self.day_spend, self.day_hit = today(), 0.0, None  # today's spend across agents and the boss
         self.mcp_allow: set[str] = set()   # MCP server prefixes seen in agents' tool lists
         self.triggers: list[dict] = []
         self.next_trig = 1
@@ -393,7 +603,9 @@ class Crew:
             # fresh: a new Claude session per task (send-back keeps it). keep: one session across tasks.
             "context": spec.get("context") if spec.get("context") in CONTEXTS else self.config.get("context", "fresh"),
             "last_task": None,
-            "ctx": 0,            # tokens in the context window at the last model call
+            "denials": [],       # tool calls the permission mode refused, waiting in the inbox
+            "budget_paused": False,
+            "ctx": 0,           # tokens in the context window at the last model call
             "compacting": None,  # status to return to after /compact
         }
 
@@ -418,11 +630,22 @@ class Crew:
         saved["workflows"] = self.config.get("workflows", [])
         if self.config.get("boss"):
             saved["boss"] = self.config["boss"]
+        for k in ("budget_task_usd", "budget_day_usd"):
+            if k in self.config:
+                saved[k] = self.config[k]
+        if "allowed_tools" in saved or self.config.get("allowed_tools") != DEFAULT_CONFIG["allowed_tools"]:
+            saved["allowed_tools"] = self.config.get("allowed_tools") or []  # rules added from the permission inbox
         write_atomic(self.config_path, json.dumps(saved, indent=2))
 
     def _launch_key(self, a: dict) -> tuple:
-        # MCP servers found later are allowed from the agent's next start; no restart (that would drop the live context)
-        return (self.config["permission_mode"], a["model"], a["effort"])
+        # MCP servers found later are allowed from the agent's next start; no restart (that would drop the live context).
+        # Rules added from the permission inbox do restart it (the session is kept).
+        return (self.config["permission_mode"], a["model"], a["effort"], tuple(self.config.get("allowed_tools") or []), tuple(self._once_rules(a)))
+
+    def _once_rules(self, a: dict) -> list[str]:
+        """Allow-once rules: they live on the agent's current task and vanish when it ends."""
+        t = self._task(a["task"]) if a.get("task") else None
+        return list((t or {}).get("allow_once") or [])
 
     # ---- persistence & change notification ---------------------------------
     def _load(self) -> None:
@@ -448,9 +671,13 @@ class Crew:
         self.next_trig = data.get("next_trig", len(self.triggers) + 1)
         for tr in self.triggers:
             tr["next"] = cron_next(tr["spec"]["cron"], now()) if tr["kind"] == "schedule" else None
+        if data.get("day") == today():  # the day's spend survives a restart; a new day starts at zero
+            self.day, self.day_spend, self.day_hit = data["day"], float(data.get("day_spend") or 0), data.get("day_hit")
         self.tasks = data.get("tasks", [])
         self.next_id = data.get("next_id", len(self.tasks) + 1)
         for t in self.tasks:  # nothing is running after a restart
+            if (t.get("diff") or {}).get("pending"):
+                t.pop("diff")  # its collection never finished: the review sheet's refresh button collects it again
             if t["col"] == "doing":
                 t["col"] = "backlog"
             if t["col"] == "backlog" and t.get("who") and t["who"] not in self.agents:
@@ -467,6 +694,7 @@ class Crew:
         data = {"project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
                 "mcp_allow": sorted(self.mcp_allow), "triggers": self._public_triggers(), "next_trig": self.next_trig,
                 "runs": self.runs[-50:], "next_run": self.next_run,
+                "day": self.day, "day_spend": round(self.day_spend, 6), "day_hit": self.day_hit,
                 "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
                            "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", []), "commands": a.get("commands", [])}
                        for n, a in self.agents.items()},
@@ -476,7 +704,10 @@ class Crew:
     def touch(self) -> None:
         with self.lock:
             self.version += 1
-            self._save()
+            try:
+                self._save()
+            except OSError as e:  # a locked or full disk must not kill the thread that called us
+                print(f"crew: could not save state: {e}", file=sys.stderr)
             self.changed.notify_all()
 
     def event(self, kind: str, text: str, agent: str | None = None) -> None:
@@ -505,8 +736,12 @@ class Crew:
             for a in self.agents.values():
                 agents.append({k: v for k, v in a.items() if k != "log"} | {"log": a["log"][-120:], "alive": self._alive(a["name"])})
             boss = {k: v for k, v in self.boss.items() if k != "log"} | {"log": self.boss["log"][-160:], "alive": self._alive("boss")}
+            self._roll_day()
+            tasks = [t | {"busy": self._busy[t["id"]]} if t["id"] in self._busy else t for t in self.tasks]
             return {"version": self.version, "project": str(self.project), "git": self.git, "boss": boss,
-                    "agents": agents, "tasks": self.tasks, "feed": self.feed[-30:],
+                    "agents": agents, "tasks": tasks, "feed": self.feed[-30:],
+                    "budget": {"task_usd": self._budget("budget_task_usd"), "day_usd": self._budget("budget_day_usd"),
+                               "day_spent": round(self.day_spend, 4), "blocked": self._day_blocked()},
                     "permission_mode": self.config["permission_mode"], "modes": MODES,
                     "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
                     "project_name": self.project.name, "app_version": __version__, "mcp_allow": sorted(self.mcp_allow),
@@ -540,9 +775,12 @@ class Crew:
             git(cwd, "reset", "-q", "--", *paths)
 
     def diff(self, a: dict) -> dict:
+        """Stage and diff an agent's worktree. Runs git: never call it while holding self.lock."""
+        return self.diff_at(Path(a["cwd"]))
+
+    def diff_at(self, cwd: Path) -> dict:
         if not self.git:
             return {"stat": "", "patch": "", "note": "Project is not a git repo, so no diff is available."}
-        cwd = Path(a["cwd"])
         self._stage(cwd)
         stat = git(cwd, "diff", "--cached", "--stat").stdout
         patch = git(cwd, "diff", "--cached").stdout
@@ -587,7 +825,7 @@ class Crew:
         elif mode == "bypassPermissions":
             cmd += ["--dangerously-skip-permissions"]
         else:
-            allowed = list(self.config.get("allowed_tools") or []) + ["mcp__crew"]
+            allowed = list(self.config.get("allowed_tools") or []) + ["mcp__crew"] + self._once_rules(a)
             if self.config.get("allow_mcp", True):
                 allowed += sorted(self.mcp_allow)  # e.g. mcp__azure-devops: every tool on that server
             if allowed:
@@ -624,33 +862,141 @@ class Crew:
             self.log(a, "error", a["error"])
             return False
         self.procs[a["name"]] = p
+        self.writers[a["name"]] = StdinWriter(p)
+        self._pid_add(p.pid, a["name"])
         a["proc_cost"] = 0.0
         a["error"] = None
         threading.Thread(target=self._read, args=(a, p), daemon=True).start()
         return True
 
-    def _send(self, a: dict, text: str) -> None:
-        p = self.procs[a["name"]]
-        msg = {"type": "user", "message": {"role": "user", "content": text}}
-        p.stdin.write(json.dumps(msg) + "\n")
-        p.stdin.flush()
+    def _send(self, a: dict, text: str) -> bool:
+        """Queue a user message for the agent's process. The write happens on the process's own writer thread, so
+        this never blocks. False when the process is gone, its pipe broke, or it has not read for STDIN_LIMIT seconds."""
+        w = self.writers.get(a["name"])
+        if w and w.stuck():
+            w.error = w.error or f"claude has not read its input for {int(STDIN_LIMIT)} s"
+        if not w or w.error or not self._alive(a["name"]):
+            why = w.error if w and w.error else "the process is not running"
+            self._kill_proc(a["name"])
+            a["error"] = f"could not send to claude: {why}"
+            self.log(a, "error", a["error"])
+            return False
+        w.put(json.dumps({"type": "user", "message": {"role": "user", "content": text}}) + "\n")
+        return True
+
+    def _check_writers(self) -> bool:
+        """A process that stopped reading its stdin is hung: end it (session kept) instead of waiting forever."""
+        hung = False
+        for name, w in list(self.writers.items()):
+            if w.stuck() and (a := self._agent(name)):
+                self._fail(a, f"claude has not read its input for {int(STDIN_LIMIT)} s and was ended; its session is kept")
+                hung = True
+        return hung
+
+    def _fail(self, a: dict, msg: str) -> None:
+        """End an agent's process after a failure: error state, its task back in the backlog."""
+        self._kill_proc(a["name"])
+        a["status"], a["error"], a["activity"] = "error", msg[:400], ""
+        self.log(a, "error", a["error"])
+        if (t := self._task(a["task"]) if a["task"] else None) and t["col"] == "doing":
+            t["col"], t["who"] = "backlog", t.get("pinned")
+        a["task"] = None
+        self.event("error", f"{a['name']}: {msg[:120]}", a["name"])
+
+    # ---- pidfile: agent processes this run started, so a crash can't leave them behind ------------------
+    def _pid_flush(self) -> None:
+        """Mirror the live agent pids to ~/.crew/pids/<project key>.json (the file goes away when none are left).
+        Caller holds pid_lock."""
+        try:
+            if self.pids:
+                self.pid_file.parent.mkdir(parents=True, exist_ok=True)
+                write_atomic(self.pid_file, json.dumps({"owner": os.getpid(), "project": str(self.project), "t": now(),
+                                                        "procs": [{"pid": k, "agent": v} for k, v in self.pids.items()]}, indent=1))
+            else:
+                self.pid_file.unlink(missing_ok=True)
+        except OSError as e:
+            print(f"crew: could not update {self.pid_file}: {e}", file=sys.stderr)
+
+    def _pid_add(self, pid: int, name: str) -> None:
+        with self.pid_lock:
+            self.pids[pid] = name
+            self._pid_flush()
+
+    def _pid_drop(self, pid: int) -> None:
+        with self.pid_lock:
+            if self.pids.pop(pid, None) is not None:
+                self._pid_flush()
+
+    def reap_orphans(self) -> int:
+        """At startup: end agent processes an earlier run left running (crash, kill -9, closed console). Every
+        recorded pid is matched against its live command line first, so a reused pid is never touched."""
+        try:
+            data = json.loads(self.pid_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return 0
+        if not isinstance(data, dict):
+            return 0
+        owner = data.get("owner")
+        if isinstance(owner, int) and owner != os.getpid() and CREW_SERVER_RE.search(proc_cmdlines([owner]).get(owner, "")):
+            return 0  # another Crew is serving this project right now: those processes are not orphans
+        entries = [e for e in data.get("procs") or [] if isinstance(e, dict) and e.get("pid") not in self.pids]
+        todo = orphans_to_kill(entries, proc_cmdlines([e["pid"] for e in entries if isinstance(e.get("pid"), int)]), self.key)
+        failed = [(pid, err) for pid in todo if (err := terminate_tree(pid))]
+        with self.pid_lock:
+            self._pid_flush()  # rewrites the file for this run's own processes, or removes it
+        n = len(todo) - len(failed)
+        if n:
+            print(f"crew: reaped {n} orphaned agent process{'es' if n != 1 else ''}", file=sys.stderr)
+            self.event("kill", f"reaped {n} orphaned agent process{'es' if n != 1 else ''}")
+        for pid, err in failed:
+            self.event("error", f"could not stop orphaned agent process {pid}: {err}")
+        return n
 
     def _agent(self, name) -> dict | None:
         return self.boss if name == "boss" else self.agents.get(name or "")
 
-    def _kill_proc(self, name: str) -> None:
-        if a := self._agent(name):
+    def _kill_proc(self, name: str, wait: bool = False) -> None:
+        """End an agent's process tree. Windows: taskkill /T /F (failures are logged). POSIX: SIGTERM to the group,
+        then SIGKILL after 3 s, on a helper thread so the caller (usually holding self.lock) doesn't wait; wait=True joins it."""
+        a = self._agent(name)
+        if a:
             a["subs"] = {}  # the tree kill ends its subagents too
+        if w := self.writers.pop(name, None):
+            w.close()
         p = self.procs.pop(name, None)
         if not p or p.poll() is not None:
             return
-        try:
-            if IS_WIN:
-                subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
-            else:
-                os.killpg(p.pid, signal.SIGKILL)
-        except Exception:
-            p.kill()
+        if IS_WIN:
+            self._end_tree(p, name)
+        else:
+            th = threading.Thread(target=self._end_tree, args=(p, name), daemon=True)
+            th.start()
+            if wait:
+                th.join(timeout=12)
+
+    def _end_tree(self, p: subprocess.Popen, name: str) -> None:
+        err = terminate_tree(p.pid, p)
+        if err:
+            try:
+                p.kill()
+            except OSError:
+                pass
+            msg = f"could not stop {name}'s process tree (pid {p.pid}): {err}"
+            with self.lock:
+                if a := self._agent(name):
+                    self.log(a, "error", msg)
+                self.event("error", msg, name if name in self.agents else None)
+        else:
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            if p.poll() is not None:
+                self._pid_drop(p.pid)
+                try:
+                    p.stdin.close()
+                except (OSError, ValueError):
+                    pass
 
     def _read(self, a: dict, p: subprocess.Popen) -> None:
         for line in p.stdout:
@@ -666,9 +1012,13 @@ class Crew:
                 continue
             with self.lock:
                 if self.procs.get(a["name"]) is not p:
+                    p.stdout.close()
                     return  # killed and replaced
                 self._on_event(a, d)
+            self._run_jobs()  # git work the event queued (diff, auto-approve), outside the lock
             self.touch()
+        self._pid_drop(p.pid)
+        p.stdout.close()
         with self.lock:
             if self.procs.get(a["name"]) is p:
                 self.procs.pop(a["name"], None)
@@ -737,45 +1087,54 @@ class Crew:
                     txt = c if isinstance(c, str) else json.dumps(c)[:300]
                     self.log(a, "toolerr", txt[:300])
         elif t == "result":
-            a["subs"] = {}
-            total = float(d.get("total_cost_usd") or 0)
-            a["cost"] += max(0.0, total - a["proc_cost"])
-            a["proc_cost"] = total
-            if a.get("compacting"):  # a /compact turn: no task changes
-                a.update(status=a["compacting"], compacting=None, activity="")
-                self.log(a, "done", "compaction finished")
-                return
-            task = self._task(a["task"]) if a["task"] else None
-            if d.get("is_error") or st != "success":
-                msg = d.get("result") or st or "error"
-                a["status"], a["error"] = "error", str(msg)[:400]
-                if not (a["log"] and a["log"][-1]["kind"] == "text" and a["log"][-1]["text"].strip() == a["error"].strip()):
-                    self.log(a, "error", a["error"])
-                else:
-                    a["log"][-1]["kind"] = "error"
-                self.event("error", f"{a['name']}: {a['error'][:120]}", a["name"])
-                if task:
-                    self._task_event(task, "error", summary=a["error"])
-                    task["col"], task["who"] = "backlog", task.get("pinned")
-                    a["task"] = None
-                return
-            if task:
-                tk = a["tokens"]
-                task["tokens"] = tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0)
-                task["summary"] = d.get("result", "")
-                task["col"] = "review"
-                task["diff"] = self.diff(a)
-                task["finished"] = now()
-                a["status"] = "review"
-                self.event("review", f"{a['name']} finished #{task['id']} · {task['title']}", a["name"])
-                self._task_event(task, "review")
+            tid = a["task"]
+            self._on_result(a, d, st)
+            self._check_budgets(a, tid)
+
+    def _on_result(self, a: dict, d: dict, st) -> None:
+        """A turn ended: cost, refused tool calls, then the task moves to review (or back, on an error)."""
+        a["subs"] = {}
+        total = float(d.get("total_cost_usd") or 0)
+        delta = max(0.0, total - a["proc_cost"])
+        a["cost"] += delta
+        a["proc_cost"] = total
+        task = self._task(a["task"]) if a["task"] else None
+        self._charge(task, delta)
+        self._note_denials(a, d.get("permission_denials"), a["task"])
+        if a.get("compacting"):  # a /compact turn: no task changes
+            a.update(status=a["compacting"], compacting=None, activity="")
+            self.log(a, "done", "compaction finished")
+            return
+        if d.get("is_error") or st != "success":
+            msg = d.get("result") or st or "error"
+            a["status"], a["error"] = "error", str(msg)[:400]
+            if not (a["log"] and a["log"][-1]["kind"] == "text" and a["log"][-1]["text"].strip() == a["error"].strip()):
+                self.log(a, "error", a["error"])
             else:
-                a["status"] = "idle"
-            a["activity"] = ""
-            self.log(a, "done", f"turn finished · ${total:.3f} this session")
-            if a.get("launched") and tuple(a["launched"]) != self._launch_key(a):
-                self._kill_proc(a["name"])  # session is kept; next start uses the new settings
-                self.log(a, "sys", "settings changed · restarts on next task")
+                a["log"][-1]["kind"] = "error"
+            self.event("error", f"{a['name']}: {a['error'][:120]}", a["name"])
+            if task:
+                self._task_event(task, "error", summary=a["error"])
+                task["col"], task["who"] = "backlog", task.get("pinned")
+                a["task"] = None
+            return
+        if task:
+            tk = a["tokens"]
+            task["tokens"] = tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0)
+            task["summary"] = d.get("result", "")
+            task["col"] = "review"
+            self._queue_diff(task)
+            task["finished"] = now()
+            a["status"] = "review"
+            self.event("review", f"{a['name']} finished #{task['id']} · {task['title']}", a["name"])
+            self._task_event(task, "review")
+        else:
+            a["status"] = "idle"
+        a["activity"] = ""
+        self.log(a, "done", f"turn finished · ${total:.3f} this session")
+        if a.get("launched") and tuple(a["launched"]) != self._launch_key(a):
+            self._kill_proc(a["name"])  # session is kept; next start uses the new settings
+            self.log(a, "sys", "settings changed · restarts on next task")
 
     @staticmethod
     def _sub_label(a: dict, d: dict) -> str | None:
@@ -783,18 +1142,200 @@ class Crew:
         par = d.get("parent_tool_use_id")
         return (a["subs"].get(par) or {}).get("label", "subagent") if par else None
 
+    # ---- permission inbox ----------------------------------------------------------------------
+    def _note_denials(self, a: dict, raw, tid) -> None:
+        """Tool calls the permission mode refused this turn (the result event's permission_denials) go to the agent's
+        inbox, one entry per tool + rule per task. Nothing is allowed automatically."""
+        found = parse_denials(raw)
+        if not found:
+            return
+        if a.get("kind") == "boss":  # the boss is read-only by design: note it, don't offer to widen it
+            self.log(a, "sys", "blocked: " + "; ".join(f"{f['tool']} {f['cmd']}"[:80] for f in found[:3]))
+            return
+        new = []
+        for f in found:
+            have = next((x for x in a["denials"] if x["task"] == tid and x["tool"] == f["tool"] and x["rule"] == f["rule"]), None)
+            if have:
+                have.update(n=have["n"] + 1, cmd=f["cmd"], t=now())
+                continue
+            a["denials"].append({"id": self.next_denial, "tool": f["tool"], "cmd": f["cmd"], "rule": f["rule"], "task": tid, "n": 1, "t": now()})
+            self.next_denial += 1
+            new.append(f)
+        a["denials"] = a["denials"][-30:]
+        if new:
+            f = new[0]
+            self.log(a, "sys", f"blocked: {f['tool']} {f['cmd']}"[:200] + (f" (+{len(new) - 1} more)" if len(new) > 1 else "") + " · see the Blocked list")
+            self.event("blocked", f"{a['name']} was blocked from {f['tool']} {f['cmd'][:60]}" + (f" (+{len(new) - 1} more)" if len(new) > 1 else ""), a["name"])
+
+    def _drop_denials(self, tid: int) -> None:
+        for ag in self.agents.values():
+            if any(x["task"] == tid for x in ag["denials"]):
+                ag["denials"] = [x for x in ag["denials"] if x["task"] != tid]
+
+    def _end_task_rules(self, t: dict, a: dict) -> None:
+        """A task ended: its allow-once rules go, and an idle process started with them restarts without them."""
+        if t.pop("allow_once", None) and a["status"] != "running" and self._alive(a["name"]):
+            self._kill_proc(a["name"])
+
+    def _denial_allow(self, a: dict, p: dict) -> dict:
+        """Allow a refused call (always, or just until its task ends), then restart the agent with the new flags and ask
+        it to retry. The session is kept, so it carries on where it stopped."""
+        d = next((x for x in a["denials"] if x["id"] == p.get("id")), None)
+        if not d:
+            return {"error": "that blocked call is no longer in the inbox"}
+        err, rule = clean_rule(p.get("rule") or d["rule"])
+        if err:
+            return {"error": err}
+        once = bool(p.get("once"))
+        if once:
+            t = self._task(d["task"])
+            if not t or a["task"] != t["id"]:
+                return {"error": "this call isn't tied to the agent's current task: use Allow & retry instead"}
+            if rule not in t.setdefault("allow_once", []):
+                t["allow_once"].append(rule)
+        else:
+            cur = list(self.config.get("allowed_tools") or [])
+            if rule not in cur:
+                self.config["allowed_tools"] = [*cur, rule]  # a new list: DEFAULT_CONFIG's must stay as it is
+            self._save_config()
+        a["denials"] = [x for x in a["denials"] if x["id"] != d["id"] and x["rule"] != rule]
+        self.event("config", f"allowed {rule}" + (" until this task ends" if once else "") + f" · {a['name']}", a["name"])
+        for ag in self.agents.values():  # idle processes pick the rule up on their next start
+            if ag["status"] != "running" and self._alive(ag["name"]) and tuple(ag.get("launched") or ()) != self._launch_key(ag):
+                self._kill_proc(ag["name"])
+        return self._retry(a, d)
+
+    def _retry(self, a: dict, d: dict) -> dict:
+        if a["status"] == "running":
+            return {"ok": True, "note": f"{a['name']} is working: the rule applies from its next start"}
+        if a["status"] in ("killed", "paused"):
+            return {"ok": True, "note": f"{a['name']} is {a['status']}: the rule is saved, nothing was retried"}
+        if self._day_blocked():
+            return {"ok": True, "note": "the daily budget is reached: the rule is saved, nothing was retried"}
+        self._kill_proc(a["name"])  # restarts with the rule in its flags; the session is kept
+        if not self._start(a):
+            return {"error": a["error"]}
+        msg = f"The command you needed is now allowed; retry it.\n({d['tool']}: {d['cmd'][:200]})"
+        t = self._task(d["task"])
+        if t and t["col"] == "review" and t.get("who") == a["name"] and a["task"] == t["id"]:
+            t.update(col="doing", started=now())  # back at work on it, like a send-back
+        a.update(status="running", since=now(), activity="retrying…", error=None)
+        self.log(a, "you", msg)
+        if not self._send(a, msg):
+            a.update(status="error", activity="")
+            if t and t["col"] == "doing":
+                t["col"] = "review"
+            return {"error": a["error"]}
+        return {"ok": True}
+
+    # ---- budgets -----------------------------------------------------------------------------------
+    # stream-json only reports cost when a turn ends (the result event's total_cost_usd), so budgets are checked then.
+    def _budget(self, key: str) -> float:
+        try:
+            v = float(self.config.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+        return v if v > 0 else 0.0
+
+    def _roll_day(self) -> bool:
+        """New local day: today's spend starts again from zero and work held by yesterday's budget resumes."""
+        if self.day == today():
+            return False
+        self.day, self.day_spend, self.day_hit = today(), 0.0, None
+        self.event("budget", "new day: today's spend is back at $0")
+        self._budget_refresh()
+        return True
+
+    def _day_blocked(self) -> bool:
+        self._roll_day()
+        bd = self._budget("budget_day_usd")
+        return bool(bd) and self.day_spend >= bd
+
+    def _over_task(self, t: dict) -> bool:
+        bt = self._budget("budget_task_usd")
+        return bool(bt) and (t.get("cost") or 0) >= bt
+
+    def _charge(self, t: dict | None, delta: float) -> None:
+        if delta <= 0:
+            return
+        self._roll_day()
+        self.day_spend += delta
+        if t is not None:
+            t["cost"] = round((t.get("cost") or 0) + delta, 6)
+
+    def _check_budgets(self, a: dict, tid) -> None:
+        """After a turn: stop work that crossed its task budget, or everyone when the day's budget is crossed."""
+        t = self._task(tid) if tid else None
+        if t and self._over_task(t) and not t.get("budget_hit"):
+            t["budget_hit"] = True
+            msg = f"budget reached (${t['cost']:.2f} of ${self._budget('budget_task_usd'):.2f})"
+            if t["col"] == "backlog":  # it errored back into the queue: keep it from being picked up again
+                t.update(hold=True, budget_hold=True)
+            if a["status"] == "running":
+                self._stop_agent(a, f"#{t['id']} {msg}")
+            elif self._alive(a["name"]):
+                self._kill_proc(a["name"])  # the finished work stays in review; a send-back is refused until the budget is raised
+            self.log(a, "sys", f"#{t['id']} {msg}")
+            self.event("budget", f"#{t['id']} {msg}", a["name"])
+        bd = self._budget("budget_day_usd")
+        if bd and self.day_spend >= bd and self.day_hit != self.day:
+            self.day_hit = self.day
+            msg = f"budget reached (${self.day_spend:.2f} of ${bd:.2f} today)"
+            n = 0
+            for ag in [*self.agents.values(), self.boss]:
+                if ag["status"] == "running":
+                    tk = self._task(ag["task"]) if ag["task"] else None
+                    self._stop_agent(ag, msg)
+                    ag["budget_paused"] = True
+                    if tk and tk.get("hold"):
+                        tk["budget_hold"] = True
+                    n += 1
+            self.event("budget", f"{msg}: " + (f"stopped {n} agent{'s' if n != 1 else ''}; " if n else "") + "no new work until tomorrow or you raise the budget")
+
+    def _budget_refresh(self) -> None:
+        """A new day or changed budgets: clear flags that no longer apply and resume what only the budget was holding."""
+        bd = self._budget("budget_day_usd")
+        blocked = bool(bd) and self.day_spend >= bd
+        resumed = False
+        if not blocked:
+            self.day_hit = None
+            for ag in [*self.agents.values(), self.boss]:
+                if ag.get("budget_paused"):
+                    ag["budget_paused"] = False
+                    if ag["status"] == "paused":
+                        ag["status"], resumed = "idle", True
+        for t in self.tasks:
+            over = self._over_task(t)
+            if t.get("budget_hit") and not over:
+                t.pop("budget_hit")
+            if t.get("budget_hold") and not blocked and not over:
+                t.pop("budget_hold")
+                t.pop("hold", None)
+                resumed = True
+        if resumed:
+            self.event("budget", "budget cleared: held work resumes")
+
     # ---- tasks -----------------------------------------------------------------
     def _task(self, tid) -> dict | None:
         return next((t for t in self.tasks if t["id"] == tid), None)
 
-    def _begin(self, a: dict, t: dict) -> None:
+    def _begin(self, a: dict, t: dict) -> bool:
+        if self._day_blocked():
+            return False  # the daily budget is spent: the task waits in the backlog
+        if self._over_task(t):
+            self.event("budget", f"#{t['id']} is over its task budget (${t.get('cost') or 0:.2f} of ${self._budget('budget_task_usd'):.2f}): "
+                                 "raise the budget to run it again", a["name"])
+            return False
+        if self._git_busy(a["name"]):
+            return False
         if a["context"] == "fresh" and a.get("last_task") not in (None, t["id"]) and (a["session"] or self._alive(a["name"])):
             self._kill_proc(a["name"])  # new task, new session: no paying to re-read old work
             a["session"] = None
             self.log(a, "sys", f"fresh context for #{t['id']}")
         if not self._start(a):
-            return
+            return False
         a["last_task"] = t["id"]
+        a["denials"] = [x for x in a["denials"] if x["task"] == t["id"]]  # the inbox is per task
         tk = a["tokens"]
         t.update(col="doing", who=a["name"], started=now(), tok0=tk["in"] + tk["cache"] + tk["out"] - t.get("tokens", 0))
         a.update(status="running", task=t["id"], since=now(), activity="starting…")
@@ -802,22 +1343,31 @@ class Crew:
         if t.get("details"):
             body += "\n\n" + t["details"]
         self.log(a, "you", body)
-        self._send(a, body)
+        if not self._send(a, body):
+            t.update(col="backlog", who=t.get("pinned"))
+            a.update(status="error", task=None, activity="", since=None)
+            return False
         self.event("start", f"{a['name']} picked #{t['id']} · {t['title']}", a["name"])
+        return True
 
     def dispatch(self) -> None:
         with self.lock:
-            moved = False
-            for a in self.agents.values():
-                if a["status"] != "idle":
-                    continue
-                t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and
-                          (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"]))), None)
-                if t:
-                    self._begin(a, t)
-                    moved = True
+            moved = self._roll_day() | self._check_writers()
+            if not self._day_blocked():  # a spent daily budget dispatches nothing until tomorrow or a higher budget
+                for a in self.agents.values():
+                    if a["status"] != "idle" or self._git_busy(a["name"]):
+                        continue
+                    t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and not self._over_task(t) and
+                              (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"]))), None)
+                    if t:
+                        self._begin(a, t)
+                        moved = True
         if moved:
             self.touch()
+
+    def _git_busy(self, name: str) -> bool:
+        """Is a git action (approve, undo, merge, PR, diff) running on one of this agent's tasks?"""
+        return any((tk := self._task(i)) and tk.get("who") == name for i in self._busy)
 
     def _release(self, t: dict) -> None:
         """Detach a task from whoever holds it, from any column. A running owner is stopped (session kept)."""
@@ -827,6 +1377,8 @@ class Crew:
                 self._kill_proc(owner["name"])
                 self.log(owner, "sys", f"stopped: #{t['id']} was moved")
             owner.update(status="idle", task=None, activity="", since=None)
+            self._end_task_rules(t, owner)
+        self._drop_denials(t["id"])
         if t.get("summary"):  # hand the previous attempt to whoever picks it up next
             prev = owner["name"] if owner else t.get("who")
             where = f"branch {owner['branch']}" if owner and owner.get("branch") else "the shared folder"
@@ -872,25 +1424,76 @@ class Crew:
         self.event("trigger", f"⚡ {tr['name']} → #{t['id']} {title}" + (f" → {who}" if who else ""), who)
         return t
 
-    def _approve(self, t: dict, by: str = "you") -> None:
-        """Commit the owner's worktree and move the task to Done. Caller holds the lock."""
-        w = self.agents.get(t["who"])
-        if w and self.git:
-            self._stage(Path(w["cwd"]))
-            r = git(Path(w["cwd"]), "-c", "user.name=crew", "-c", "user.email=crew@localhost",
-                    "commit", "-m", f"#{t['id']} {t['title']}\n\n{(t.get('summary') or '')[:2000]}")
-            t["commit"] = git(Path(w["cwd"]), "rev-parse", "--short", "HEAD").stdout.strip() if r.returncode == 0 else None
-            t["commit_full"] = git(Path(w["cwd"]), "rev-parse", "HEAD").stdout.strip() if t["commit"] else None
+    # ---- git actions, run outside the lock ----------------------------------------------------
+    # approve, unapprove, merge, open_pr and diff shell out to git, which can take seconds. Holding self.lock that long
+    # would freeze the SSE stream and every other request, so each is split in three: _x_plan (under the lock: validate
+    # and capture what git needs), _x_git (no lock) and _x_apply (under the lock again, writing the result back). While
+    # it runs the task is marked busy: a second click or a competing action on it is refused.
+    def _git_action(self, action: str, p: dict) -> dict:
+        with self.lock:
+            t = self._task(p.get("task"))
+            if not t:
+                return {"error": f"bad action {action}"}
+            if t["id"] in self._busy:
+                return {"error": f"#{t['id']} is busy ({self._busy[t['id']]}): one moment"}
+            plan = getattr(self, f"_{action}_plan")(t, p)
+            if "error" in plan:
+                return plan
+            self._busy[t["id"]] = action
+        self.touch()  # the task shows as busy while git runs
+        try:
+            res = getattr(self, f"_{action}_git")(plan)
+        except Exception as e:  # never leave the task marked busy
+            res = {"error": f"{action} failed: {e}"}
+        with self.lock:
+            self._busy.pop(t["id"], None)
+            if t not in self.tasks:
+                out = {"error": f"#{t['id']} was removed while {action} ran"}
+            else:
+                out = getattr(self, f"_{action}_apply")(t, plan, res)
+        self.touch()
+        return out
+
+    def _approve(self, t: dict, by: str = "you") -> dict:
+        """Commit the owner's worktree and move the task to Done. Don't call it holding the lock: git runs in between."""
+        return self._git_action("approve", {"task": t["id"], "by": by})
+
+    def _approve_plan(self, t: dict, p: dict) -> dict:
+        if t["col"] != "review":
+            return {"error": "bad action approve"}
+        w = self.agents.get(t.get("who") or "")
+        return {"w": w["name"] if w else None, "cwd": Path(w["cwd"]) if w and self.git else None, "by": p.get("by", "you"),
+                "msg": f"#{t['id']} {t['title']}\n\n{(t.get('summary') or '')[:2000]}"}
+
+    def _approve_git(self, plan: dict) -> dict:
+        cwd = plan["cwd"]
+        if not cwd:
+            return {}
+        self._stage(cwd)
+        r = git(cwd, "-c", "user.name=crew", "-c", "user.email=crew@localhost", "commit", "-m", plan["msg"])
+        if r.returncode != 0:
+            return {"commit": None, "full": None}
+        return {"commit": git(cwd, "rev-parse", "--short", "HEAD").stdout.strip(), "full": git(cwd, "rev-parse", "HEAD").stdout.strip()}
+
+    def _approve_apply(self, t: dict, plan: dict, res: dict) -> dict:
+        w = self.agents.get(plan["w"] or "")
+        if plan["cwd"]:
+            t["commit"], t["commit_full"] = res.get("commit"), res.get("full")
             for k in ("merged", "merge_error", "pr"):
                 t.pop(k, None)
         t["col"] = "done"
+        if (t.get("diff") or {}).get("pending"):
+            t.pop("diff")
         if w:
             w.update(status="idle", task=None)
-        self.event("approve", f"{'auto-' if by != 'you' else ''}approved #{t['id']}" + (f" · commit {t.get('commit')} on {w['branch']}" if t.get("commit") else ""))
+            self._end_task_rules(t, w)
+        self._drop_denials(t["id"])
+        self.event("approve", f"{'auto-' if plan['by'] != 'you' else ''}approved #{t['id']}" + (f" · commit {t.get('commit')} on {w['branch']}" if t.get("commit") and w else ""))
         self._task_event(t, "done")
+        return {"ok": True, "undo": bool(t.get("commit_full"))}
 
-    def _unapprove(self, t: dict) -> dict:
-        """Undo an approval: soft-reset the agent's worktree and move the task back to Review. Caller holds the lock."""
+    def _unapprove_plan(self, t: dict, p: dict) -> dict:
+        """Undo an approval: soft-reset the agent's worktree and move the task back to Review."""
         w = self.agents.get(t.get("who") or "")
         if t["col"] != "done" or not t.get("commit_full") or not w or not self.git:
             return {"error": "nothing to undo"}
@@ -898,78 +1501,141 @@ class Crew:
             return {"error": "already merged or in a PR: can't undo"}
         if w["status"] in ("running", "review") or w.get("task"):
             return {"error": f"{w['name']} has moved on to other work: can't undo"}
-        cwd = Path(w["cwd"])
-        if git(cwd, "rev-parse", "HEAD").stdout.strip() != t["commit_full"]:
+        return {"w": w["name"], "cwd": Path(w["cwd"]), "sha": t["commit_full"]}
+
+    def _unapprove_git(self, plan: dict) -> dict:
+        cwd = plan["cwd"]
+        if git(cwd, "rev-parse", "HEAD").stdout.strip() != plan["sha"]:
             return {"error": "the branch has new commits since this approval: can't undo"}
         r = git(cwd, "reset", "--soft", "HEAD~1")
         if r.returncode != 0:
             return {"error": "undo failed: " + r.stderr.strip()[:200]}
+        return {"diff": self.diff_at(cwd)}
+
+    def _unapprove_apply(self, t: dict, plan: dict, res: dict) -> dict:
+        if "error" in res:
+            return res
         for k in ("commit", "commit_full"):
             t.pop(k, None)
         t["col"] = "review"
-        w.update(status="review", task=t["id"])
-        t["diff"] = self.diff(w)
-        self.event("reject", f"undid approval of #{t['id']}", w["name"])
+        if w := self.agents.get(plan["w"]):
+            w.update(status="review", task=t["id"])
+        t["diff"] = res["diff"]
+        self.event("reject", f"undid approval of #{t['id']}", plan["w"])
         return {"ok": True}
 
-    def _merge(self, t: dict) -> dict:
-        """Merge an approved task's branch into the project's current branch. Caller holds the lock."""
+    def _merge_plan(self, t: dict, p: dict) -> dict:
+        """Merge an approved task's branch into the project's current branch."""
         w = self.agents.get(t.get("who") or "")
         if not self.git or t["col"] != "done" or not t.get("commit") or not w or not w.get("branch"):
             return {"error": "only an approved task with a commit can be merged"}
         if t.get("merged"):
             return {"error": "already merged"}
-        base = git(self.project, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
-        if not base:
-            return {"error": "the project folder is on a detached HEAD: check out a branch first"}
-        if git(self.project, "status", "--porcelain", "--untracked-files=no").stdout.strip():
-            return {"error": f"{self.project.name} has uncommitted changes to tracked files: commit or stash them, then merge"}
-        br = w["branch"]
-        head = lambda: git(self.project, "rev-parse", "--short", "HEAD").stdout.strip()
-        if git(self.project, "merge-base", "--is-ancestor", br, "HEAD").returncode == 0:
-            t["merged"] = {"commit": head(), "at": now(), "into": base}
-            t.pop("merge_error", None)
-            return {"ok": True, "merged": t["merged"]}
-        r = git(self.project, "-c", "user.name=crew", "-c", "user.email=crew@localhost", "merge", "--no-ff", "-m", f"Merge {br}: #{t['id']} {t['title']}", br)
-        if r.returncode != 0:
-            files = git(self.project, "diff", "--name-only", "--diff-filter=U").stdout.split()
-            git(self.project, "merge", "--abort")
-            msg = (r.stderr.strip() or r.stdout.strip())[:300]
-            t["merge_error"] = {"files": files, "base": base, "at": now(), "msg": msg}
-            self.event("error", f"merging #{t['id']} into {base} " + (f"conflicts in {len(files)} file(s)" if files else "failed"), w["name"])
-            return {"error": f"merge into {base} conflicts in: {', '.join(files)}" if files else f"merge failed: {msg}", "conflicts": files}
-        t["merged"] = {"commit": head(), "at": now(), "into": base}
-        t.pop("merge_error", None)
-        self.event("approve", f"merged #{t['id']} into {base} · {t['merged']['commit']}", w["name"])
-        return {"ok": True, "merged": t["merged"]}
+        return {"br": w["branch"], "w": w["name"], "id": t["id"], "title": t["title"]}
 
-    def _open_pr(self, t: dict) -> dict:
-        """Push the task's branch (never forced) and open a PR with gh. Caller holds the lock."""
+    def _merge_git(self, plan: dict) -> dict:
+        br, proj = plan["br"], self.project
+        with self.git_mutex:  # one merge or push at a time in the project folder
+            base = git(proj, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+            if not base:
+                return {"error": "the project folder is on a detached HEAD: check out a branch first"}
+            if git(proj, "status", "--porcelain", "--untracked-files=no").stdout.strip():
+                return {"error": f"{proj.name} has uncommitted changes to tracked files: commit or stash them, then merge"}
+            head = lambda: git(proj, "rev-parse", "--short", "HEAD").stdout.strip()
+            if git(proj, "merge-base", "--is-ancestor", br, "HEAD").returncode == 0:
+                return {"merged": {"commit": head(), "at": now(), "into": base}, "already": True}
+            r = git(proj, "-c", "user.name=crew", "-c", "user.email=crew@localhost", "merge", "--no-ff", "-m", f"Merge {br}: #{plan['id']} {plan['title']}", br)
+            if r.returncode != 0:
+                files = git(proj, "diff", "--name-only", "--diff-filter=U").stdout.split()
+                git(proj, "merge", "--abort")
+                msg = (r.stderr.strip() or r.stdout.strip())[:300]
+                return {"error": f"merge into {base} conflicts in: {', '.join(files)}" if files else f"merge failed: {msg}", "conflicts": files,
+                        "merge_error": {"files": files, "base": base, "at": now(), "msg": msg}}
+            return {"merged": {"commit": head(), "at": now(), "into": base}}
+
+    def _merge_apply(self, t: dict, plan: dict, res: dict) -> dict:
+        if "merged" in res:
+            t["merged"] = res["merged"]
+            t.pop("merge_error", None)
+            if not res.get("already"):
+                self.event("approve", f"merged #{t['id']} into {t['merged']['into']} · {t['merged']['commit']}", plan["w"])
+            return {"ok": True, "merged": t["merged"]}
+        if me := res.get("merge_error"):
+            t["merge_error"] = me
+            self.event("error", f"merging #{t['id']} into {me['base']} " + (f"conflicts in {len(me['files'])} file(s)" if me["files"] else "failed"), plan["w"])
+            return {"error": res["error"], "conflicts": res["conflicts"]}
+        return {"error": res["error"]}
+
+    def _open_pr_plan(self, t: dict, p: dict) -> dict:
+        """Push the task's branch (never forced) and open a PR with gh."""
         w = self.agents.get(t.get("who") or "")
         if not self.git or t["col"] != "done" or not t.get("commit") or not w or not w.get("branch"):
             return {"error": "only an approved task with a commit can open a PR"}
         if t.get("pr"):
             return {"error": "a PR is already open: " + t["pr"]}
+        return {"br": w["branch"], "w": w["name"], "title": f"#{t['id']} {t['title']}"[:200],
+                "body": (t.get("summary") or f"Task #{t['id']} from Crew.").strip()[:4000]}
+
+    def _open_pr_git(self, plan: dict) -> dict:
         if not shutil.which("gh"):
             return {"error": "the GitHub CLI (gh) isn't installed or isn't on PATH"}
         if git(self.project, "remote", "get-url", "origin").returncode != 0:
             return {"error": "this repo has no 'origin' remote to push to"}
-        br, env = w["branch"], os.environ | {"GIT_TERMINAL_PROMPT": "0"}
+        env = os.environ | {"GIT_TERMINAL_PROMPT": "0"}
         run = lambda *cmd: subprocess.run(cmd, cwd=self.project, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90, env=env)
         try:
-            r = run("git", "push", "-u", "origin", br)
-            if r.returncode != 0:
-                return {"error": "push failed: " + (r.stderr.strip() or r.stdout.strip())[-300:]}
-            body = (t.get("summary") or f"Task #{t['id']} from Crew.").strip()[:4000]
-            r = run("gh", "pr", "create", "--head", br, "--title", f"#{t['id']} {t['title']}"[:200], "--body", body)
+            with self.git_mutex:
+                r = run("git", "push", "-u", "origin", plan["br"])
+                if r.returncode != 0:
+                    return {"error": "push failed: " + (r.stderr.strip() or r.stdout.strip())[-300:]}
+                r = run("gh", "pr", "create", "--head", plan["br"], "--title", plan["title"], "--body", plan["body"])
         except (subprocess.TimeoutExpired, OSError) as e:
             return {"error": f"PR failed: {e}"}
         m = re.search(r"https?://\S+", r.stdout + "\n" + r.stderr)
         if not m:
             return {"error": "gh pr create failed: " + (r.stderr.strip() or r.stdout.strip())[-300:]}
-        t["pr"] = m.group(0)  # also covers "a pull request already exists: <url>"
-        self.event("approve", f"opened a PR for #{t['id']}: {t['pr']}", w["name"])
+        return {"pr": m.group(0)}  # also covers "a pull request already exists: <url>"
+
+    def _open_pr_apply(self, t: dict, plan: dict, res: dict) -> dict:
+        if "pr" not in res:
+            return res
+        t["pr"] = res["pr"]
+        self.event("approve", f"opened a PR for #{t['id']}: {t['pr']}", plan["w"])
         return {"ok": True, "pr": t["pr"]}
+
+    def _diff_plan(self, t: dict, p: dict) -> dict:
+        w = self.agents.get(t.get("who") or "")
+        return {"cwd": Path(w["cwd"])} if w else {"error": "bad action diff"}
+
+    def _diff_git(self, plan: dict) -> dict:
+        return {"diff": self.diff_at(plan["cwd"])}
+
+    def _diff_apply(self, t: dict, plan: dict, res: dict) -> dict:
+        t["diff"] = res["diff"]
+        return {"ok": True}
+
+    def _queue_diff(self, t: dict) -> None:
+        """A task reached review: its diff is collected right after the event handler returns, outside the lock."""
+        if not self.git:
+            t["diff"] = self.diff_at(Path(self.project))
+            return
+        t["diff"] = {"stat": "", "patch": "", "note": "Collecting the diff…", "pending": True}
+        self._jobs.append(("diff", t["id"]))
+
+    def _run_jobs(self) -> None:
+        """Run git work queued by event handlers (diffs, workflow auto-approvals). Call without holding the lock."""
+        while True:
+            with self.lock:
+                if not self._jobs:
+                    return
+                job = self._jobs.pop(0)
+                t = self._task(job[1])
+                if not t or t["col"] != "review":
+                    continue
+            try:
+                self._git_action(job[0], {"task": t["id"], **({"by": job[2]} if len(job) > 2 else {})})
+            except Exception as e:  # keep the reader thread alive
+                print("crew: background git job failed:", e, file=sys.stderr)
 
     def _merge_rebase(self, t: dict) -> dict:
         """After a conflict: ask the owner to merge the base into its branch and resolve. Caller holds the lock."""
@@ -1212,7 +1878,7 @@ class Crew:
         if col == "error":
             run["note"] = f"step {i + 1} hit an error; it is back in the backlog and the run continues when it finishes"
         elif col == "review" and step.get("gate") == "auto":
-            self._approve(t, by="workflow")  # fires "done", which advances below
+            self._jobs.append(("approve", t["id"], "workflow"))  # committed outside the lock; "done" then advances the run
         elif col == "done":
             w = self.agents.get(t.get("who") or "")
             run["results"][i] = {"who": t.get("who") or "", "summary": (t.get("summary") or "")[:3000],
@@ -1306,9 +1972,13 @@ class Crew:
 
     # ---- actions from the UI ---------------------------------------------------
     def act(self, action: str, p: dict, via: str = "ui") -> dict:
+        if action in GIT_ACTIONS:  # git runs outside the lock
+            return self._git_action(action, p)
         with self.lock:
             a = self.agents.get(p.get("agent", ""))
             t = self._task(p.get("task"))
+            if t and t["id"] in self._busy:
+                return {"error": f"#{t['id']} is busy ({self._busy[t['id']]}): one moment"}
             if action in ("tell", "stop", "compact", "respawn", "resume", "clear_chat") and p.get("agent") == "boss":
                 a = self.boss
             if action == "add":
@@ -1354,6 +2024,7 @@ class Crew:
                             if t["col"] == "doing":
                                 self._kill_proc(owner["name"])
                             owner.update(status="idle", task=None, activity="", since=None)
+                            self._end_task_rules(t, owner)
                     t["col"] = p["col"]
                     t.pop("hold", None)
                     if p["col"] == "done":
@@ -1421,6 +2092,8 @@ class Crew:
                     return {"error": f"{new} already exists"}
                 if a["status"] == "running":
                     return {"error": f"{old} is working: stop it first"}
+                if self._git_busy(old):
+                    return {"error": f"{old} has a commit or merge in progress: one moment"}
                 self._kill_proc(old)
                 if self.git and a.get("branch"):  # keep the worktree and branch in step with the name
                     path, branch = WORK_ROOT / "wt" / self.key / new, f"crew/{new}"
@@ -1466,6 +2139,8 @@ class Crew:
             elif action == "remove_agent" and a:
                 if len(self.agents) <= 1:
                     return {"error": "keep at least one agent"}
+                if self._git_busy(a["name"]):
+                    return {"error": f"{a['name']} has a commit or merge in progress: one moment"}
                 self._kill_proc(a["name"])
                 for tk in self.tasks:
                     if tk.get("who") == a["name"] or tk.get("pinned") == a["name"]:
@@ -1480,6 +2155,7 @@ class Crew:
                 if t["col"] == "doing":
                     return {"error": "task is running"}
                 self.tasks.remove(t)
+                self._drop_denials(t["id"])
                 if (run := self._run((t.get("run") or {}).get("id"))) and run["status"] == "running":
                     run.update(status="stopped", ended=now(), note=f"step {t['run']['step'] + 1}'s task was deleted")
             elif action == "tell" and a:
@@ -1491,7 +2167,9 @@ class Crew:
                 if not self._start(a):
                     return {"error": a["error"]}
                 self.log(a, "you", text, **({"by": p["from"]} if p.get("from") else {}))
-                self._send(a, text)
+                if not self._send(a, text):
+                    a.update(status="error", activity="")
+                    return {"error": a["error"]}
                 if a["status"] in ("idle", "error", "paused"):
                     a.update(status="running", since=now(), activity="thinking…", error=None)
                 self.event("tell", f"→ {a['name']}: {text[:80]}", a["name"])
@@ -1533,7 +2211,9 @@ class Crew:
                     return {"error": "no live session to compact; its next task starts with a fresh context anyway"}
                 a.update(compacting=a["status"], status="running", since=now(), activity="compacting context…")
                 self.log(a, "you", "/compact")
-                self._send(a, "/compact")
+                if not self._send(a, "/compact"):
+                    a.update(compacting=None, status="error", activity="")
+                    return {"error": a["error"]}
                 self.event("tell", f"{a['name']}: compacting context", a["name"])
             elif action == "handoff":
                 src = self.agents.get(p.get("from") or "")
@@ -1590,10 +2270,6 @@ class Crew:
                 a.update(status="idle", error=None, activity="")
                 self.log(a, "sys", "respawned" + (" with a fresh session" if p.get("fresh") else ", session kept"))
                 self.event("respawn", f"{a['name']} respawned", a["name"])
-            elif action == "approve" and t and t["col"] == "review":
-                self._approve(t)
-                self.touch()
-                return {"ok": True, "undo": bool(t.get("commit_full"))}
             elif action in UI_TASK_ACTIONS and t:  # UI only: not in MCP_ACTIONS
                 res = getattr(self, UI_TASK_ACTIONS[action])(t)
                 self.touch()
@@ -1601,6 +2277,8 @@ class Crew:
             elif action == "reject" and t and t["col"] == "review":
                 w = self.agents.get(t["who"])
                 fb = (p.get("text") or "Please revise.").strip()
+                if self._over_task(t):
+                    return {"error": f"#{t['id']} reached its budget (${t.get('cost') or 0:.2f} of ${self._budget('budget_task_usd'):.2f}): raise the task budget to send it back"}
                 if not w or w["status"] == "killed" or not self._start(w):
                     t["col"] = "backlog"
                     return {"error": "agent unavailable; task returned to backlog"}
@@ -1609,7 +2287,10 @@ class Crew:
                 w.update(status="running", task=t["id"], since=now(), activity="revising…")
                 msg = f"Review feedback on task #{t['id']}: {fb}\nPlease address it, then summarise again."
                 self.log(w, "you", msg)
-                self._send(w, msg)
+                if not self._send(w, msg):
+                    t["col"] = "review"
+                    w.update(status="error", task=None, activity="")
+                    return {"error": w["error"]}
                 self.event("reject", f"#{t['id']} sent back to {w['name']}", w["name"])
             elif action in ("trigger_add", "trigger_update"):
                 if p.get("kind") == "poll" and via != "ui":
@@ -1681,8 +2362,31 @@ class Crew:
                 self._save_config()
                 if self.boss["status"] != "running":
                     self._kill_proc("boss")
-            elif action == "diff" and t and t.get("who") in self.agents:
-                t["diff"] = self.diff(self.agents[t["who"]])
+            elif action == "denial_dismiss" and a:  # UI only
+                before = len(a["denials"])
+                a["denials"] = [x for x in a["denials"] if x["id"] != p.get("id")]
+                if len(a["denials"]) == before:
+                    return {"error": "that blocked call is no longer in the inbox"}
+            elif action == "denial_allow" and a:  # UI only
+                res = self._denial_allow(a, p)
+                if "error" in res:
+                    return res
+                self.touch()
+                return res
+            elif action == "budgets":  # UI only
+                for k, f in (("task_usd", "budget_task_usd"), ("day_usd", "budget_day_usd")):
+                    if k in p:
+                        try:
+                            v = float(p[k] or 0)
+                        except (TypeError, ValueError):
+                            return {"error": "budgets are dollar amounts; 0 turns one off"}
+                        if not 0 <= v <= 1_000_000:
+                            return {"error": "budgets are dollar amounts; 0 turns one off"}
+                        self.config[f] = round(v, 2)
+                self._save_config()
+                self._budget_refresh()
+                self.event("config", "budgets · task " + (f"${self._budget('budget_task_usd'):.2f}" if self._budget("budget_task_usd") else "off")
+                           + " · day " + (f"${self._budget('budget_day_usd'):.2f}" if self._budget("budget_day_usd") else "off"))
             else:
                 return {"error": f"bad action {action}"}
         self.touch()
@@ -1690,7 +2394,7 @@ class Crew:
 
     def shutdown(self) -> None:
         for n in list(self.procs):  # includes the boss
-            self._kill_proc(n)
+            self._kill_proc(n, wait=True)
 
 
 CREW: Crew
@@ -1746,6 +2450,7 @@ def switch_project(path: str) -> dict:
         old.shutdown()
         new = Crew(target, old.config, old.claude)
         new.config_path = old.config_path
+        new.reap_orphans()
         new.version = old.version + 1
         CREW = new
         remember_project(target)
@@ -1761,7 +2466,8 @@ PORT = 8770
 # tier may call just the actions crew_mcp.py uses (nothing that runs shell commands or changes mode, project or MCP trust).
 UI_TOKEN = secrets.token_urlsafe(24)
 MCP_TOKEN = secrets.token_urlsafe(24)
-UI_TASK_ACTIONS = {"unapprove": "_unapprove", "merge": "_merge", "open_pr": "_open_pr", "merge_rebase": "_merge_rebase"}
+GIT_ACTIONS = ("approve", "unapprove", "merge", "open_pr", "diff")  # UI only; each runs git outside the lock (_git_action)
+UI_TASK_ACTIONS = {"merge_rebase": "_merge_rebase"}
 MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add"}
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
@@ -1938,6 +2644,15 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_error(HTTPStatus.NOT_FOUND)
 
+    def _drain(self) -> None:
+        """Read an unwanted body before refusing: closing on unread data resets the client's connection (Windows)."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            if 0 < n <= MAX_BODY:
+                self.rfile.read(n)
+        except (ValueError, OSError):
+            pass
+
     def do_POST(self):
         if self.path.startswith("/api/hook/"):  # webhook triggers: a per-trigger token, no browser header needed
             u = urlsplit(self.path)
@@ -1949,9 +2664,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(res, 403 if "error" in res else 200)
         # Custom header forces a CORS preflight, which this server never answers: other sites can't post here.
         if not self._host_ok() or self.headers.get("X-Crew") != "1":
+            self._drain()
             return self.send_error(HTTPStatus.FORBIDDEN)
         tier = self._tier()
         if not tier:
+            self._drain()
             return self._json({"error": "missing or bad X-Crew-Auth token: reload the page"}, 403)
         if (raw := self._read_body()) is None:
             return
@@ -2096,6 +2813,7 @@ def main() -> None:
     CREW = Crew(project, config, claude)
     CREW.config_path = cfg_path
     CREW.demo = args.demo
+    CREW.reap_orphans()
     remember_project(project)
     if args.demo and not CREW.tasks:
         for title, tag in DEMO_TASKS:

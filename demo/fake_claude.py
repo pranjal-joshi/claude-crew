@@ -12,6 +12,23 @@ n = 0
 arg = lambda flag, default: sys.argv[sys.argv.index(flag) + 1] if flag in sys.argv else default
 mode, model = arg("--permission-mode", "acceptEdits"), arg("--model", "opus")
 pace = float(os.environ.get("CREW_DEMO_PACE", "1"))
+# --allowedTools is variadic: the rules run up to the next flag
+allowed = []
+if "--allowedTools" in sys.argv:
+    for x in sys.argv[sys.argv.index("--allowedTools") + 1:]:
+        if x.startswith("--"):
+            break
+        allowed.append(x)
+
+
+def may_run(command):
+    """Would Claude Code's allow rules let this Bash command through? (prefix rules like Bash(npm test:*))"""
+    for rule in allowed:
+        if rule == "Bash":
+            return True
+        if rule.startswith("Bash(") and rule.endswith(")") and command.startswith(rule[5:-1].removesuffix("*").removesuffix(":").strip()):
+            return True
+    return False
 
 
 def out(o):
@@ -180,9 +197,24 @@ SCRIPTS["bug"] = ("builder", [
 ], "Due dates were parsed in local time, so tests failed after 18:30 IST. Now parsed as UTC. Added a regression test with a +05:30 timestamp.")
 
 
+SCRIPTS["deny"] = ("builder", [
+    lambda: say(text("Adding the changelog entry, then linting."), tool("Read", file_path="README.md")),
+    lambda: (write("CHANGELOG.md", "\n- Demo change that needs `npm run lint`\n", True), say(tool("Edit", file_path="CHANGELOG.md"))),
+    lambda: say(tool("Bash", command="npm run lint --silent")),
+    lambda: say(text("lint: no problems" if may_run("npm run lint") else "Claude Code refused to run `npm run lint`: it is not in the allowed tools.")),
+], "Added the changelog entry. Lint: " + ("clean." if may_run("npm run lint") else "could not run `npm run lint` (permission denied), so it is not verified."))
+
+
+def denials(title):
+    """What a real result event lists when the permission mode refused a tool call."""
+    if "deny" in title.lower() and not may_run("npm run lint"):
+        return [{"tool_name": "Bash", "tool_use_id": f"toolu_{uuid.uuid4().hex[:10]}", "tool_input": {"command": "npm run lint --silent", "description": "Lint the project"}}]
+    return []
+
+
 def pick(title):
     t = title.lower()
-    for key, words in (("test", ("test",)), ("review", ("review", "audit")), ("eval", ("evaluat", " eval", " vs ")),
+    for key, words in (("deny", ("deny",)), ("test", ("test",)), ("review", ("review", "audit")), ("eval", ("evaluat", " eval", " vs ")),
                        ("research", ("research", "compare", "queue")), ("plan", ("plan",)), ("report", ("standup", "report")),
                        ("incident", ("deploy", "incident", "ci failed", "outage")), ("bug", ("fix", "flaky", "bug")), ("ui", ("dark", "page", "settings", "ui")),
                        ("docs", ("doc", "readme", "proofread")), ("rate", ("rate", "limit", "login", "auth"))):
@@ -198,12 +230,21 @@ out({"type": "system", "subtype": "init", "session_id": sid, "model": model, "pe
 
 for line in sys.stdin:
     title = json.loads(line)["message"]["content"].splitlines()[0]
+    if "now allowed" in title:  # Crew's "retry it" after a rule was added in the permission inbox
+        say(text("Retrying the command."), tool("Bash", command="npm run lint --silent"))
+        say(text("lint: no problems" if may_run("npm run lint") else "Still refused."))
+        cost += random.uniform(0.02, 0.06)
+        out({"type": "result", "subtype": "success", "is_error": False, "session_id": sid, "total_cost_usd": round(cost, 4),
+             "result": "Ran `npm run lint`: clean." if may_run("npm run lint") else "`npm run lint` is still refused.",
+             "permission_denials": denials("deny") if not may_run("npm run lint") else []})
+        continue
     if not title.lower().startswith("task #"):  # a message from you mid-run or a send-back
         say(text("Got it, adjusting."))
-        out({"type": "result", "subtype": "success", "is_error": False, "session_id": sid, "total_cost_usd": round(cost, 4), "result": "Adjusted as asked."})
+        out({"type": "result", "subtype": "success", "is_error": False, "session_id": sid, "total_cost_usd": round(cost, 4), "result": "Adjusted as asked.", "permission_denials": []})
         continue
     _, steps, summary = pick(title)
     for step in steps:
         step()
-    cost += random.uniform(0.08, 0.32)
-    out({"type": "result", "subtype": "success", "is_error": False, "session_id": sid, "total_cost_usd": round(cost, 4), "result": summary})
+    cost += float(os.environ.get("CREW_DEMO_COST") or random.uniform(0.08, 0.32))
+    out({"type": "result", "subtype": "success", "is_error": False, "session_id": sid, "total_cost_usd": round(cost, 4), "result": summary,
+         "permission_denials": denials(title)})

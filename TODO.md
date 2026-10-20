@@ -59,9 +59,10 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
 - [x] **Review as a decision sheet:** a verdict line (files · +/- · tests), Approve & commit pinned as the one primary, diff collapsed per file, Send back secondary, Hand off in ⋮, `A` approves with an undo toast. First check the "duplicated hunk" in review.png; it may just be demo data
 - [x] **One-click merge** of approved branches into the base branch (or **Open PR** with `gh` when there is a remote). On a conflict, show the files and offer to send it back to the agent. Done shows merged / not merged
 - [x] **First-run card** on an empty board: one example task, one primary action, a line on what the boss is. A clear **demo vs real project** badge
-- [ ] **Permission inbox:** show tool calls the permission mode refused (stream-json permission denials) with Allow once / Always allow, instead of a silently stuck agent
-- [ ] **Cost caps:** cost on every card, a budget per task and per day, and an auto-stop with a note when hit
-- [ ] Move git out of the global lock (approve, diff). Record a pidfile per agent and reap orphans at startup; SIGTERM before SIGKILL
+- [x] **Permission inbox:** show tool calls the permission mode refused (stream-json permission denials) with Allow once / Always allow, instead of a silently stuck agent
+- [x] **Cost caps:** cost on every card, a budget per task and per day, and an auto-stop with a note when hit
+- [x] Move git out of the global lock (approve, unapprove, merge, PR, diff). Record a pidfile per agent and reap orphans at startup; SIGTERM before SIGKILL
+  - (still under the lock: worktree create/rename in `_ensure_worktree` and `rename_agent`, and the state write in `touch`)
 
 ### Phase 3 · v0.2 polish (do as Phase 2 lands)
 - [ ] Header: one running/review summary (queued only if > 0); Phone and the version go into a menu; Stop all appears only while something runs; rename the "worktrees · Auto" chip to **Permissions: Auto**

@@ -254,7 +254,7 @@ flowchart LR
 
 ### Permissions
 
-Headless agents can't answer permission prompts. In **Accept edits** mode, file edits are allowed and Bash commands outside `allowed_tools` are refused, and the agent is told why. Add the commands your project needs to `allowed_tools`, or switch to **Auto** to let Claude Code's classifier decide. **Bypass** skips all checks and asks you to confirm first.
+Headless agents can't answer permission prompts. In **Accept edits** mode, file edits are allowed and Bash commands outside `allowed_tools` are refused, and the agent is told why. Refused calls land in the **blocked** list in the header (and in the agent's drawer): **Allow & retry** adds a rule such as `Bash(npm test:*)` to `allowed_tools` for you, or **Allow once** keeps it until that task ends. You can also add commands to `allowed_tools` yourself, or switch to **Auto** to let Claude Code's classifier decide. **Bypass** skips all checks and asks you to confirm first.
 
 ## Security
 

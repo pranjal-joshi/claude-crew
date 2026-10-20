@@ -95,8 +95,7 @@ class SyncedFiles(GitCrewCase):
     def approve(self):
         t = {"id": 1, "title": "Task", "details": "", "tag": "feature", "col": "review", "who": "builder", "summary": "done"}
         self.crew.tasks.append(t)
-        with self.crew.lock:
-            self.crew._approve(t)
+        self.crew._approve(t)  # git runs outside the lock, so the caller must not hold it
         return t
 
     def test_approve_does_not_commit_synced_files(self):
@@ -148,8 +147,7 @@ class Merge(GitCrewCase):
         t = {"id": 1, "title": "Task", "details": "", "tag": "feature", "col": "review", "who": "builder", "summary": "done"}
         self.crew.tasks.append(t)
         self.crew.next_id = 2
-        with self.crew.lock:
-            self.crew._approve(t)
+        self.crew._approve(t)
         return t
 
     def test_clean_merge(self):
