@@ -65,11 +65,11 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
   - (still under the lock: worktree create/rename in `_ensure_worktree` and `rename_agent`, and the state write in `touch`)
 
 ### Phase 3 · v0.2 polish (do as Phase 2 lands)
-- [ ] Header: one running/review summary (queued only if > 0); Phone and the version go into a menu; Stop all appears only while something runs; rename the "worktrees · Auto" chip to **Permissions: Auto**
-- [ ] Agent drawer: role, stats and session in a collapsed **Details**; Kill behind ⋮ with a confirm; Compact and New session on the context meter
-- [ ] Words: tooltips for boss, hand-off and the ✋/⚡ gates ("Waits for approval" / "Continues automatically"); label the numbers on agent cards and drop the unlabelled slot digit; mark token totals "this session"; give each Clear a specific name
-- [ ] Accessibility: a global `:focus-visible` ring, aria-labels on icon buttons, keyboard-operable cards and chips, `prefers-reduced-motion`, and lift `--faint` contrast at small sizes
-- [ ] Workflows page: ✕ delete moves into ⋮, the Auto Workflow Builder becomes a one-line input, and the header buttons wrap at ~800 px
+- [x] Header: one running/review summary (queued only if > 0); Phone and the version go into a menu; Stop all appears only while something runs; rename the "worktrees · Auto" chip to **Permissions: Auto**
+- [x] Agent drawer: role, stats and session in a collapsed **Details**; Kill behind ⋮ with a confirm; Compact and New session on the context meter
+- [x] Words: tooltips for boss, hand-off and the ✋/⚡ gates ("Waits for approval" / "Continues automatically"); label the numbers on agent cards and drop the unlabelled slot digit; mark token totals "this session"; give each Clear a specific name
+- [x] Accessibility: a global `:focus-visible` ring, aria-labels on icon buttons, keyboard-operable cards and chips, `prefers-reduced-motion`, and lift `--faint` contrast at small sizes
+- [x] Workflows page: ✕ delete moves into ⋮, the Auto Workflow Builder becomes a one-line input, and the header buttons wrap at ~800 px
 
 ### Next · v0.3 bets
 - [ ] **Self-review critic** before the human gate: a cheap model reads the diff and test output and returns verdict + issues on the card, with one automatic send-back at most. Measure human rejection rate and review time

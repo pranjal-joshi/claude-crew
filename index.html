@@ -16,7 +16,7 @@
 :root{
   --bg:#15161b; --bg2:#1a1b21; --surface:#1f2027; --raised:#26272f; --hover:#2e2f38;
   --line:#2c2d36; --line2:#383944;
-  --text:#ececf1; --muted:#a4a5b2; --faint:#717280;
+  --text:#ececf1; --muted:#a4a5b2; --faint:#8e8f9d;
   --accent:#e07a52; --accent-soft:rgba(224,122,82,.14); --accent-line:rgba(224,122,82,.45);
   --green:#3fd48f; --green-soft:rgba(63,212,143,.12);
   --blue:#6aa4ff; --blue-soft:rgba(106,164,255,.12);
@@ -50,8 +50,10 @@ button,input,textarea,select{font:inherit;color:inherit}
 .stat{display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);font-size:12px;color:var(--muted)}
 .stat b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
 .stat{white-space:nowrap}
-@media (max-width:1280px){#palBtn{display:none}.stats .stat:nth-child(2){display:none}}
-@media (max-width:1000px){.stats .stat:nth-child(3){display:none}#mode .wt{display:none}}
+@media (max-width:1280px){#palBtn{display:none}}
+@media (max-width:1280px){.top{gap:10px}#trigBtn .tl,.projbtn .pb{display:none}.projbtn{max-width:200px}}
+@media (max-width:1100px){.stats .tokstat{display:none}}
+@media (max-width:900px){.brand{font-size:0;gap:0}#newBtn kbd{display:none}.projbtn{max-width:130px}.stats .stopall .sl,#mode .pl,#newBtn .nt{display:none}.stats .stat{padding:0 9px}.top{gap:8px;padding:0 12px}}
 .dot{width:7px;height:7px;border-radius:50%;flex:none}
 .btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:8px;border:1px solid var(--line2);background:var(--raised);cursor:pointer;font-weight:500;font-size:12.5px;transition:background .12s,border-color .12s,transform .06s}
 .btn:hover{background:var(--hover);border-color:#3a3a45}.btn:active{transform:translateY(1px)}
@@ -61,6 +63,10 @@ button,input,textarea,select{font:inherit;color:inherit}
 .btn.danger{color:var(--red)}.btn.danger:hover{background:var(--red-soft);border-color:rgba(255,93,100,.35)}
 .btn.sm{height:26px;padding:0 9px;font-size:12px;border-radius:7px}
 .btn:disabled{opacity:.45;pointer-events:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent)!important;outline-offset:1px}
+.card:focus-visible,.agent:focus-visible,.menu .mi:focus-visible{outline-offset:-2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:#1c1c22;border:1px solid var(--line2);border-bottom-width:2px;color:var(--muted)}
 
 .body{display:grid;grid-template-columns:304px 1fr;min-height:0;position:relative}
@@ -115,18 +121,23 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:#1c
 
 /* ── board ─────────────────────────────────────────────── */
 .main{display:flex;flex-direction:column;min-width:0;min-height:0}
-.toolbar{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line)}
+.toolbar{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .toolbar h2{margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em}
 .tabs{display:flex;gap:2px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:2px;flex:none}
 .tabs button{height:28px;padding:0 12px;border-radius:7px;border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .tabs button.on{background:var(--raised);color:var(--text);box-shadow:0 0 0 1px var(--line2)}
 .tabs .n{font:500 10.5px var(--mono);color:var(--teal)}
 .flows{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:22px;min-height:0}
-.flows h3{margin:0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px}
+.flows h3{margin:0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
 .flows h3 .faint{font-weight:400}
 .wfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px}
 .wf{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.wf .wh{display:flex;align-items:center;gap:8px}
+.wf .wh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wf .wh .wact{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.wf .wh .kebab{margin:0}
+.wflegend-wrap{position:sticky;top:0;left:0;height:0;z-index:3}
+.wflegend{position:absolute;top:10px;left:12px;display:flex;gap:12px;font-size:11.5px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 10px;pointer-events:none}
+.wflegend .a{color:var(--amber)}.wflegend .t{color:var(--teal)}
 .wf .wh b{font-size:14px;font-weight:600}
 .wf .wd{font-size:12.5px;color:var(--muted);line-height:1.45}
 .chain{display:flex;align-items:center;flex-wrap:wrap;gap:4px;row-gap:8px}
@@ -204,6 +215,14 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:#1c
 .kv{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .kv span{font:11px var(--mono);color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
 .dactions{display:flex;gap:6px;margin-top:12px}
+.dd{margin-top:10px}
+.dd>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;font-size:12px;color:var(--muted);padding:2px 6px 2px 0;border-radius:6px;user-select:none}
+.dd>summary::-webkit-details-marker{display:none}
+.dd>summary::before{content:"\25B8";font-size:10px;transition:transform .12s}
+.dd[open]>summary::before{transform:rotate(90deg)}
+.dd>summary:hover{color:var(--text)}
+.dd .role{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+.dh .row .kebab{margin:0}
 .stream{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 .m{max-width:100%;font-size:13px}
 .m.text{white-space:pre-wrap;word-wrap:break-word;line-height:1.55;color:#dcdce3}
@@ -411,7 +430,6 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .inherit .grp .k{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:600;width:62px;flex:none}
 .inherit .pill2{font:11px var(--mono);padding:2px 8px;border-radius:999px;background:var(--raised);border:1px solid var(--line);color:var(--muted)}
 .inherit .pill2.ok{color:var(--green);border-color:rgba(63,212,143,.3)}.inherit .pill2.auth{color:var(--amber);border-color:rgba(242,180,65,.3)}
-.phonebtn svg{color:var(--muted)}
 .lan{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
 .lan .qr{background:#fff;padding:10px;border-radius:10px;width:200px;height:200px}
 .lan .qr img,.lan .qr canvas{width:180px!important;height:180px!important}
@@ -444,11 +462,13 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 }
 
 .pill.paused{background:var(--amber-soft);color:var(--amber)}.av.paused::after{--ring:var(--amber)}
-.stopall{color:var(--red)!important;border-color:rgba(255,93,100,.35)!important;cursor:pointer}.stopall:hover{background:var(--red-soft)!important}
+.stopall{background:transparent!important;color:var(--red)!important;border-color:rgba(255,93,100,.5)!important;cursor:pointer}.stopall:hover{background:var(--red-soft)!important}
 .resumeall{color:var(--amber)!important;border-color:rgba(242,180,65,.35)!important;cursor:pointer}
 .holdb{white-space:nowrap;display:inline-flex;align-items:center;gap:4px;font:10.5px var(--mono);color:var(--amber);background:var(--amber-soft);border-radius:5px;padding:1px 6px}
 .hofrom{font:10.5px var(--mono);color:var(--violet)}
-.ctxrow{display:flex;align-items:center;gap:10px;margin-top:10px}
+.ctxrow{display:flex;align-items:center;gap:10px;margin-top:10px;padding:6px 8px 6px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg2)}
+.ctxact{border:0;background:transparent;color:var(--muted);font:500 11.5px var(--sans);padding:3px 7px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.ctxact:hover{background:var(--hover);color:var(--text)}.ctxact:disabled{opacity:.4;pointer-events:none}.ctxact+.ctxact{margin-left:-6px}
 .ctxbar{flex:1;height:6px;border-radius:99px;background:var(--raised);overflow:hidden;min-width:60px}
 .ctxbar i{display:block;height:100%;border-radius:99px;background:var(--green);transition:width .3s}
 .ctxbar i.mid{background:var(--amber)}.ctxbar i.hi{background:var(--red)}
@@ -470,8 +490,11 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .chathead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 /* auto workflow builder */
 .awb{border:1px solid var(--line);background:var(--bg2);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.awb textarea{min-height:76px}
-.awb .row{display:flex;align-items:center;gap:10px}
+.awb textarea{height:36px;min-height:0;resize:none;overflow:hidden;transition:height .15s}
+.awb:focus-within textarea,.awb.has textarea{height:96px;overflow:auto}
+.awb .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.awb:not(:focus-within):not(.has) .row{display:none}
+.awb .row .btn{white-space:nowrap}
 /* mobile app shell */
 .mnav,.colnav,.mhead{display:none}
 @media (max-width:760px){
@@ -479,8 +502,9 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
   .app{grid-template-rows:52px 1fr;height:100dvh}
   .top{padding:0 12px;gap:8px;padding-top:env(safe-area-inset-top)}
   .brand{font-size:0;gap:0}.brand .mark{width:30px;height:30px}
-  #palBtn,#newBtn,.projbtn .pb,#phoneBtn,.stats .stat:not(.stopall):not(.resumeall):not(.blockedb),#trigBtn .tl,#mode .wt,#conn{display:none!important}
-  #mode{max-width:96px;padding:0 8px;font-size:11.5px}
+  #palBtn,#newBtn,.projbtn .pb,.stats .stat:not(.stopall):not(.resumeall):not(.blockedb),#trigBtn .tl,#conn{display:none!important}
+  #mode{max-width:84px;padding:0 8px;font-size:11.5px}
+  .top{gap:6px;padding-left:10px;padding-right:10px}.top .chip{padding:0 7px}.projbtn>.faint,#trigN{display:none}#hMenu{width:30px;height:30px;flex:none}
   .projbtn{max-width:32vw!important;padding:0 8px}
   .stats .sl{display:none}
   .slash{display:none}
@@ -564,7 +588,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .av2{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font:600 12.5px var(--sans);text-transform:uppercase;color:hsl(var(--h) 75% 74%);background:hsl(var(--h) 40% 20%);border:1px solid hsl(var(--h) 40% 32%);flex:none}
 .wfchip .av2{width:22px;height:22px;font-size:11px;border-radius:6px}
 .wfcv{position:relative;overflow:auto;background-color:#18191e;background-image:radial-gradient(circle,#30313b 1px,transparent 1.3px);background-size:20px 20px}
-.wfstage{position:relative;margin:0 auto}
+.wfstage{position:relative;margin:36px auto 0}
 .wfedges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
 .wfedges path{fill:none;stroke:#5a5c69;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .wfedges path.auto{stroke:rgba(79,209,197,.6);stroke-dasharray:6 5;animation:wfflow 1s linear infinite}
@@ -675,14 +699,13 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       <span class="pn" id="projName">…</span><span class="pb" id="projGit"></span><span class="faint">▾</span>
     </button>
     <span class="chip demob" id="demoB" hidden>Demo</span>
-    <button class="chip modebtn" id="mode" title="Permission mode for all agents"></button>
+    <button class="chip modebtn" id="mode" aria-haspopup="menu"></button>
     <button class="chip trigbtn" id="trigBtn" title="Triggers: schedules, events, file watches, polls and webhooks"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> <span class="tl">Triggers</span> <b id="trigN">0</b></button>
-    <button class="chip phonebtn" id="phoneBtn" title="Open Crew on your phone" hidden><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg> Phone</button>
     <div class="stats" id="stats"></div>
     <button class="btn ghost" id="palBtn" title="Command palette">Search <kbd>Ctrl K</kbd></button>
-    <button class="btn primary" id="newBtn">＋ New task <kbd style="background:rgba(0,0,0,.18);border-color:rgba(0,0,0,.2);color:#3a1a0c">N</kbd></button>
+    <button class="btn primary" id="newBtn">＋ New<span class="nt"> task</span> <kbd style="background:rgba(0,0,0,.18);border-color:rgba(0,0,0,.2);color:#3a1a0c">N</kbd></button>
     <span class="awake" id="awake" hidden title="Keeping this computer awake while agents work. Locking the screen is fine; closing a laptop lid still sleeps.">☕</span>
-    <span class="faint" id="ver" style="font-size:11px"></span>
+    <button class="iconbtn" id="hMenu" aria-label="More: phone, version, links" aria-haspopup="menu" title="More">⋮</button>
     <span class="conn" id="conn" title="connection"></span>
   </header>
   <div class="body" id="body">
@@ -693,7 +716,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
         <div class="tabs" id="tabs"><button data-tab="board" class="on">Board</button><button data-tab="flows">Workflows <span class="n" id="runN"></span></button></div>
         <div class="filters" id="filters"></div>
         <span class="muted boardhint">Drag a card onto an agent to assign · unassigned cards go to matching roles</span>
-        <button class="btn sm ghost clearbtn" id="clearBtn" title="Clear the board">Clear ▾</button>
+        <button class="btn sm ghost clearbtn" id="clearBtn" aria-haspopup="menu" title="Remove finished or all tasks from the board">Clear board ▾</button>
       </div>
       <div class="colnav" id="colnav"></div>
       <div class="board" id="board"></div>
@@ -701,10 +724,10 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       <div class="chatbar" id="chatbar">
         <div class="chatlog" id="chatlog" hidden></div>
         <div class="chatin">
-          <button class="chatto boss" id="chatTo" title="Who you're talking to"></button>
+          <button class="chatto boss" id="chatTo" aria-haspopup="menu"></button>
           <textarea id="chatIn" rows="1" placeholder="Ask the boss to plan, delegate or run a workflow…"></textarea>
           <button class="btn primary sm" id="chatSend" style="height:36px">Send</button>
-          <button class="iconbtn" id="chatToggle" title="Show conversation">▴</button>
+          <button class="iconbtn" id="chatToggle" title="Show conversation" aria-label="Show conversation">▴</button>
         </div>
       </div>
     </section>
@@ -722,7 +745,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 
 <div class="scrim" id="taskModal">
   <div class="modal" role="dialog" aria-label="New task">
-    <div class="mh">New task <button class="iconbtn" data-close>✕</button></div>
+    <div class="mh">New task <button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb">
       <input class="field" id="tTitle" placeholder="What needs doing?" autocomplete="off">
       <textarea class="field" id="tDetails" rows="4" placeholder="Context, acceptance criteria, files to look at… (optional)"></textarea>
@@ -742,7 +765,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 
 <div class="scrim" id="agentModal">
   <div class="modal" role="dialog" aria-label="Add agent">
-    <div class="mh">Add an agent <button class="iconbtn" data-close>✕</button></div>
+    <div class="mh">Add an agent <button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb">
       <input class="field" id="aName" placeholder="Name, e.g. frontend or db-migrator" autocomplete="off" maxlength="24">
       <textarea class="field" id="aRole" rows="3" placeholder="Role: what this agent is responsible for and how it should work"></textarea>
@@ -757,7 +780,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 
 <div class="scrim" id="trigModal">
   <div class="modal tm" role="dialog" aria-label="Triggers">
-    <div class="mh"><span id="tmTitle">Triggers</span><span class="faint" style="font-weight:400;font-size:12px;margin-left:auto;margin-right:12px">Each firing adds a task; agents pick it up like any other</span><button class="iconbtn" data-close>✕</button></div>
+    <div class="mh"><span id="tmTitle">Triggers</span><span class="faint" style="font-weight:400;font-size:12px;margin-left:auto;margin-right:12px">Each firing adds a task; agents pick it up like any other</span><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb" id="tmBody"></div>
     <div class="mf" id="tmFoot"></div>
   </div>
@@ -765,10 +788,10 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 
 <div class="scrim wfs" id="wfModal">
   <div class="modal wfc" role="dialog" aria-label="Workflow">
-    <div class="mh"><input class="wfname" id="wfName" data-w="name" placeholder="Name this workflow" maxlength="60" autocomplete="off"><button class="iconbtn" data-close>✕</button></div>
+    <div class="mh"><input class="wfname" id="wfName" data-w="name" placeholder="Name this workflow" maxlength="60" autocomplete="off"><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="wfwrap">
       <div class="wfpal" id="wfPal"></div>
-      <div class="wfcv" id="wfCanvas"><div class="wfstage" id="wfStage"></div></div>
+      <div class="wfcv" id="wfCanvas"><div class="wflegend-wrap"><div class="wflegend"><span><span class="a">✋</span> Waits for your approval</span><span><span class="t">⚡</span> Continues automatically</span></div></div><div class="wfstage" id="wfStage"></div></div>
       <div class="wfins" id="wfIns"></div>
     </div>
     <div class="mf"><span class="hint">Drag blocks to reorder · drag an agent onto the canvas to add a step · ＋ on a line inserts one · Del removes the selected block</span>
@@ -778,7 +801,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 
 <div class="scrim" id="runModal">
   <div class="modal" role="dialog" aria-label="Run workflow">
-    <div class="mh"><span id="runTitle">Run</span><button class="iconbtn" data-close>✕</button></div>
+    <div class="mh"><span id="runTitle">Run</span><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb">
       <div class="chain" id="runChain"></div>
       <input class="field" id="rTitle" placeholder="What should it work on?" autocomplete="off">
@@ -790,14 +813,14 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 
 <div class="scrim" id="lanModal">
   <div class="modal" role="dialog" aria-label="Open on your phone">
-    <div class="mh">Open Crew on your phone <button class="iconbtn" data-close>✕</button></div>
+    <div class="mh">Open Crew on your phone <button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb" id="lanBody"></div>
   </div>
 </div>
 
 <div class="scrim" id="projModal">
   <div class="modal pm" role="dialog" aria-label="Project">
-    <div class="mh">Project <span class="faint" style="font-weight:400;font-size:12px">All agents work inside this folder</span><button class="iconbtn" data-close>✕</button></div>
+    <div class="mh">Project <span class="faint" style="font-weight:400;font-size:12px">All agents work inside this folder</span><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb">
       <div class="bar"><input class="field" id="pmPath" placeholder="Paste a folder path, e.g. C:\code\my-repo" autocomplete="off" spellcheck="false"><button class="btn primary" id="pmOpen">Open</button></div>
       <div id="pmRecent"></div>
@@ -810,7 +833,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 
 <div class="scrim" id="blockedModal">
   <div class="modal" role="dialog" aria-label="Blocked tool calls">
-    <div class="mh">Blocked tool calls<button class="iconbtn" data-close>✕</button></div>
+    <div class="mh">Blocked tool calls<button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb"><div class="faint" style="font-size:12px">The permission mode refused these. Nothing is allowed until you say so.</div><div id="blockedList"></div></div>
   </div>
 </div>
@@ -823,12 +846,12 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
   </div>
 </div>
 
-<div class="toasts" id="toasts"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let S = null, view = {drawer: null, filter: 'all', dragging: false, newTag: 'feature', newWho: '', seenFeed: 0};
+let S = null, view = {details: (() => { try { return localStorage.getItem('crew.details') === '1'; } catch { return false; } })(), drawer: null, filter: 'all', dragging: false, newTag: 'feature', newWho: '', seenFeed: 0};
 
 const MODE_INFO = {
   acceptEdits: {label: 'Accept edits', sub: 'Edits auto-approved. Shell and web only via the allowlist in crew.json.'},
@@ -882,27 +905,27 @@ function render() {
   if (!S) return;
   queueMicrotask(renderChat);
   $('#projName').textContent = S.project_name || S.project; if (!LAN_CLIENT) $('#projBtn').title = S.project + ' · switch project';
-  $('#ver').textContent = S.app_version ? 'v' + S.app_version : '';
   $('#projGit').textContent = S.git ? 'git' : 'no git';
   const demoB = $('#demoB'); demoB.hidden = !(S.demo || S.scratch);
   demoB.title = S.demo ? 'Demo mode: the agents are simulated, so no Claude calls or tokens are used. Tasks only edit a scratch repo under ~/.crew, never your own code.' : 'This is Crew\'s scratch demo repo under ~/.crew, not your code. Open your own project from the project menu to start real work.';
   const pm = S.permission_mode, cls = pm === 'bypassPermissions' ? 'bypass' : pm === 'auto' ? 'auto' : '';
   $('#mode').className = 'chip modebtn ' + cls;
-  $('#mode').innerHTML = `${S.git ? '<span class="dot" style="background:var(--green)"></span><span class="wt"> worktrees ·</span>' : '<span class="dot" style="background:var(--amber)"></span><span class="wt"> no git ·</span>'} ${pm === 'bypassPermissions' ? '⚠ ' : ''}<b>${esc(MODE_INFO[pm]?.label || pm)}</b> ▾`;
+  const mi = MODE_INFO[pm];
+  $('#mode').innerHTML = `${pm === 'bypassPermissions' ? '⚠ ' : ''}<span class="pl">Permissions: </span><b>${esc(mi?.label || pm)}</b> ▾`;
+  $('#mode').title = `Permission mode: ${mi?.label || pm}. ${mi?.sub || ''} It applies to every agent. Click to change.${S.git ? '' : ' This folder is not a git repo, so agents share it instead of getting their own worktrees.'}`;
   $('#trigN').textContent = (S.triggers || []).filter(t => t.enabled).length;
   if ($('#trigModal').classList.contains('on') && tv.mode === 'list') drawTriggers();
   const n = c => S.tasks.filter(t => t.col === c).length;
   const spend = S.agents.reduce((s, a) => s + (a.cost || 0), 0);
   const running = S.agents.filter(a => a.status === 'running').length;
   const subsLive = S.agents.reduce((s, a) => s + Object.keys(a.subs || {}).length, 0);
-  $('#stats').innerHTML = [
-    ['var(--green)', running, 'running'], ['var(--faint)', n('backlog'), 'queued'],
-    ['var(--blue)', n('review'), 'to review']]
-    .map(([c, v, l]) => `<div class="stat"><span class="dot" style="background:${c}"></span><b>${v}</b>${l}${l === 'running' && subsLive ? ` <span class="subtag live" title="subagents running inside agents">${SUBI}${subsLive}</span>` : ''}</div>`).join('') +
-    (running || S.boss?.status === 'running' || (S.runs || []).some(r => r.status === 'running') ? `<button class="stat stopall" data-stop-all title="Stop every running agent and workflow run. Sessions are kept; tasks wait on hold.">■<span class="sl"> Stop all</span></button>` : '') +
-    (S.agents.some(a => a.status === 'paused') ? `<button class="stat resumeall" data-resume-all title="Let paused agents pick up work again">▶<span class="sl"> Resume</span></button>` : '') +
+  const queued = n('backlog'), toReview = n('review');
+  const sum = [`<b>${running}</b> running`, ...(queued ? [`<b>${queued}</b> queued`] : []), `<b>${toReview}</b> to review`].join(' · ');
+  $('#stats').innerHTML = `<div class="stat" title="Agents running now${queued ? ', tasks waiting in the backlog' : ''} and tasks waiting for your review"><span class="dot" style="background:${running ? 'var(--green)' : toReview ? 'var(--blue)' : 'var(--faint)'}"></span><span>${sum}</span>${subsLive ? ` <span class="subtag live" title="subagents running inside agents">${SUBI}${subsLive}</span>` : ''}</div>` +
+    (running || S.boss?.status === 'running' || (S.runs || []).some(r => r.status === 'running') ? `<button class="stat stopall" data-stop-all aria-label="Stop all" title="Stop every running agent and workflow run. Sessions are kept; tasks wait on hold.">■<span class="sl"> Stop all</span></button>` : '') +
+    (S.agents.some(a => a.status === 'paused') ? `<button class="stat resumeall" data-resume-all aria-label="Resume all" title="Let paused agents pick up work again">▶<span class="sl"> Resume</span></button>` : '') +
     (blockedAll().length ? `<button class="stat blockedb" data-blocked title="Tool calls the permission mode refused: allow or dismiss them">⛔<b>${blockedAll().length}</b><span class="sl"> blocked</span></button>` : '') +
-    `<div class="stat" title="tokens: input + cache reads + output, all agents${showCost && S.budget ? ` · spent today ${money(S.budget.day_spent)}` : ''}"><span class="dot" style="background:var(--violet)"></span><b class="tok">${fmtTok(S.agents.reduce((s, a) => s + tokTotal(a), 0))}</b>tokens${showCost ? ` · <b>${money(spend)}</b>` : ''}<button class="eye" data-toggle-cost title="${showCost ? 'Hide' : 'Show'} price">${showCost ? '$' : '<s>$</s>'}</button><button class="eye" data-budgets title="Budgets: stop a task or the day at a spend limit" aria-label="Budgets">▾</button></div>`;
+    `<div class="stat tokstat" title="Tokens this session (input + cache reads + output), all agents${showCost && S.budget ? ` · spent today ${money(S.budget.day_spent)}` : ''}"><span class="dot" style="background:var(--violet)"></span><b class="tok">${fmtTok(S.agents.reduce((s, a) => s + tokTotal(a), 0))}</b>tokens${showCost ? ` · <b>${money(spend)}</b>` : ''}<button class="eye" data-toggle-cost title="${showCost ? 'Hide' : 'Show'} price" aria-label="${showCost ? 'Hide' : 'Show'} price">${showCost ? '$' : '<s>$</s>'}</button><button class="eye" data-budgets title="Budgets: stop a task or the day at a spend limit" aria-label="Budgets">▾</button></div>`;
   if ($('#blockedModal').classList.contains('on')) drawBlocked();
 
   const authErr = S.agents.find(a => /authenticat|login|OAuth/i.test(a.error || ''));
@@ -913,7 +936,23 @@ function render() {
   b.style.flexWrap = 'wrap';
   b.innerHTML = notes.map(n => `<div style="display:flex;align-items:center;gap:10px;width:100%">${n}</div>`).join('');
 
+  const fk = focusKey();
   renderAwake(); renderRail(); if (!view.dragging) renderBoard(); renderDrawer(); renderFeed();
+  restoreFocus(fk);
+}
+// a re-render replaces the cards, chips and drawer buttons: put keyboard focus back where it was
+function focusKey() {
+  const a = document.activeElement;
+  if (!a || a === document.body || !a.closest('#rail,#board,#filters,#flows,#drawer')) return null;
+  if (a.id) return {sel: '#' + CSS.escape(a.id), s: a.selectionStart, e: a.selectionEnd};
+  for (const at of a.attributes) if (at.name.startsWith('data-')) return {sel: `${a.tagName.toLowerCase()}[${at.name}="${CSS.escape(at.value)}"]`};
+  return null;
+}
+function restoreFocus(k) {
+  if (!k || document.activeElement !== document.body) return;
+  const el = document.querySelector(k.sel); if (!el) return;
+  el.focus({preventScroll: true});
+  if (k.s != null) try { el.setSelectionRange(k.s, k.e); } catch {}
 }
 
 function renderAwake() { const el = $('#awake'); if (el) el.hidden = !S.awake; }
@@ -921,33 +960,33 @@ function renderRail() {
   const mini = view.railMin && !matchMedia('(max-width:760px)').matches;
   $('#body').classList.toggle('rail-min', mini);
   if (mini) {
-    $('#rail').innerHTML = `<div class="sec"><button class="railbtn" data-rail-toggle title="Expand the agents pane">»</button></div><div class="ravs">` +
-      S.agents.map(a => `<div class="rmini ${view.drawer?.agent === a.name ? 'sel' : ''}" data-agent="${a.name}" data-drop-agent="${a.name}" title="${esc(a.name)} · ${a.status}${a.activity ? ' · ' + esc(a.activity) : ''}"><div class="av ${a.status}" ${avPaint(a)}>${avFace(a, 17)}</div><span class="sd ${a.status}"></span></div>`).join('') +
-      `<button class="railbtn" data-add-agent title="Add an agent" style="font-size:16px">＋</button></div>`;
+    $('#rail').innerHTML = `<div class="sec"><button class="railbtn" data-rail-toggle title="Expand the agents pane" aria-label="Expand the agents pane">»</button></div><div class="ravs">` +
+      S.agents.map(a => `<div class="rmini ${view.drawer?.agent === a.name ? 'sel' : ''}" tabindex="0" aria-label="${esc(a.name)}, ${a.status}" data-agent="${a.name}" data-drop-agent="${a.name}" title="${esc(a.name)} · ${a.status}${a.activity ? ' · ' + esc(a.activity) : ''}"><div class="av ${a.status}" ${avPaint(a)}>${avFace(a, 17)}</div><span class="sd ${a.status}"></span></div>`).join('') +
+      `<button class="railbtn" data-add-agent title="Add an agent" aria-label="Add an agent" style="font-size:16px">＋</button></div>`;
     return;
   }
-  $('#rail').innerHTML = `<div class="sec"><span>Agents · ${S.agents.length} <span style="font-weight:500;letter-spacing:0;text-transform:none">· ${S.agents.filter(a => a.alive).length} live</span></span><span class="sr"><button class="add" data-add-agent title="Add an agent">＋ Add</button><button class="railbtn" data-rail-toggle title="Collapse the agents pane">«</button></span></div>` +
-    S.agents.map((a, i) => {
+  $('#rail').innerHTML = `<div class="sec"><span>Agents · ${S.agents.length} <span style="font-weight:500;letter-spacing:0;text-transform:none">· ${S.agents.filter(a => a.alive).length} live</span></span><span class="sr"><button class="add" data-add-agent title="Add an agent" aria-label="Add an agent">＋ Add</button><button class="railbtn" data-rail-toggle title="Collapse the agents pane" aria-label="Collapse the agents pane">«</button></span></div>` +
+    S.agents.map(a => {
       const t = a.task ? task(a.task) : null;
       const sel = view.drawer?.agent === a.name;
       const live = a.status === 'running';
-      return `<div class="agent ${sel ? 'sel' : ''}" data-agent="${a.name}" data-drop-agent="${a.name}" draggable="true" title="Drag to reorder · drop a task here to hand it over">
+      return `<div class="agent ${sel ? 'sel' : ''}" tabindex="0" data-agent="${a.name}" data-drop-agent="${a.name}" draggable="true" title="Drag to reorder · drop a task here to hand it over">
         <div class="row1">
           <div class="av ${a.status}" ${avPaint(a)}>${avFace(a, 16)}</div>
           <div style="min-width:0"><div class="name">${esc(a.name)}</div><div class="role">${esc(a.role)}</div></div>
           <span class="pill ${a.status}"><span class="dot" style="background:currentColor"></span>${a.status}</span>
           <div class="tools">
             ${a.status === 'killed' || a.status === 'error'
-              ? `<button class="iconbtn" data-respawn="${a.name}" title="Respawn">↻</button>`
-              : a.status === 'running' ? `<button class="iconbtn danger" data-stop="${a.name}" title="Stop now (session kept, task on hold)">■</button>`
-              : a.status === 'paused' ? `<button class="iconbtn" data-resume="${a.name}" title="Resume: let it pick up work again" style="color:var(--amber)">▶</button>` : ''}
+              ? `<button class="iconbtn" data-respawn="${a.name}" title="Respawn" aria-label="Respawn ${a.name}">↻</button>`
+              : a.status === 'running' ? `<button class="iconbtn danger" data-stop="${a.name}" title="Stop now (session kept, task on hold)" aria-label="Stop ${a.name}">■</button>`
+              : a.status === 'paused' ? `<button class="iconbtn" data-resume="${a.name}" title="Resume: let it pick up work again" aria-label="Resume ${a.name}" style="color:var(--amber)">▶</button>` : ''}
           </div>
-          <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, delete…">⋮</button>
+          <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, delete…" aria-label="More actions for ${a.name}" aria-haspopup="menu">⋮</button>
         </div>
         <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : 'waiting for work'}</span>`}</div>
         ${a.activity ? `<div class="act ${live ? 'live' : ''}">› ${esc(a.activity)}</div>` : ''}
         ${subChips(a)}
-        <div class="meta" style="align-items:center">${modelChip(a.model)}${effortBars(a.effort)}<span style="margin-left:auto;white-space:nowrap">${live ? `<span data-since="${a.since}">${ago(a.since)}</span> · ` : ''}<span class="tok" title="in ${fmtTok(a.tokens?.in)} · cache ${fmtTok(a.tokens?.cache)} · out ${fmtTok(a.tokens?.out)}">${fmtTok(tokTotal(a))}</span>${costTxt(a.cost)}</span><span class="faint">${i + 1}</span></div>
+        <div class="meta" style="align-items:center">${modelChip(a.model)}${effortBars(a.effort)}<span style="margin-left:auto;white-space:nowrap">${live ? `<span data-since="${a.since}" title="Running for">${ago(a.since)}</span> · ` : ''}<span class="tok" title="Tokens this session: in ${fmtTok(a.tokens?.in)} · cache ${fmtTok(a.tokens?.cache)} · out ${fmtTok(a.tokens?.out)}">${fmtTok(tokTotal(a))}</span>${showCost ? ` · <span title="Cost this session">${money(a.cost)}</span>` : ''}</span></div>
         ${live ? '<div class="shimmer"></div>' : ''}
       </div>`;
     }).join('');
@@ -964,14 +1003,14 @@ function subChips(a) {
 function renderBoard() {
   renderColnav();
   const flows = view.tab === 'flows';
-  $('#board').hidden = flows; $('#filters').hidden = flows; $('#flows').hidden = !flows;
+  $('#board').hidden = flows; $('#filters').hidden = flows; $('#clearBtn').hidden = flows; $('#flows').hidden = !flows;
   document.querySelector('.boardhint').hidden = flows;
   const running = (S.runs || []).filter(r => r.status === 'running').length;
   $('#runN').textContent = running ? `${running} running` : '';
   if (flows) return renderFlows();
   if (document.querySelector('.menu')) return; // keep an open menu anchored
   const tags = ['all', ...S.tags];
-  $('#filters').innerHTML = tags.map(t => `<button class="fbtn ${view.filter === t ? 'on' : ''}" data-filter="${t}">${t}</button>`).join('');
+  $('#filters').innerHTML = tags.map(t => `<button class="fbtn ${view.filter === t ? 'on' : ''}" data-filter="${t}" aria-pressed="${view.filter === t}" title="${t === 'all' ? 'Show every task' : 'Show only ' + t + ' tasks'}">${t}</button>`).join('');
   const show = t => view.filter === 'all' || t.tag === view.filter;
   if (!S.tasks.length) { $('#board').innerHTML = firstRunHtml(); return; }
   $('#board').innerHTML = COLS.map(([k, label, c]) => {
@@ -1046,16 +1085,16 @@ function card(t) {
   const mst = t.merged ? `<span class="mst ok" title="Merged into ${esc(t.merged.into || 'the base branch')} · ${esc(t.merged.commit)}">✓ Merged</span>`
     : t.pr ? `<a class="mst ok" href="${esc(t.pr)}" target="_blank" rel="noopener" title="Pull request">PR open</a>`
     : t.merge_error?.files?.length ? `<span class="mst warn" title="Merge conflicts: ${esc(t.merge_error.files.join(', '))}">Conflict</span>` : t.commit ? '<span class="mst" title="Approved and committed on its branch, not merged yet">Not merged</span>' : '';
-  if (t.col === 'done' && (t.commit || t.tokens)) cta = `<div class="f mono">${t.commit ? `<span>⎇ ${esc(t.commit)}</span>` : ''}${mst}${t.tokens ? `<span class="tok" style="margin-left:auto">${fmtTok(t.tokens)} tok</span>` : ''}</div>`;
+  if (t.col === 'done' && (t.commit || t.tokens)) cta = `<div class="f mono">${t.commit ? `<span>⎇ ${esc(t.commit)}</span>` : ''}${mst}${t.tokens ? `<span class="tok" style="margin-left:auto" title="Tokens this task used">${fmtTok(t.tokens)} tok</span>` : ''}</div>`;
   const owner = t.col === 'doing' && t.who ? S.agents.find(a => a.name === t.who) : null;
   const liveSubs = owner ? Object.keys(owner.subs || {}).length : 0;
   const subs = liveSubs ? `<span class="subtag live" title="${liveSubs} subagent${liveSubs > 1 ? 's' : ''} running">${SUBI}${liveSubs}</span>`
     : t.subagents ? `<span class="subtag" title="used ${t.subagents} subagent${t.subagents > 1 ? 's' : ''}">${SUBI}${t.subagents}</span>` : '';
-  const hand = t.history?.length ? `<span class="handoff" title="Handed off ${t.history.length}x">${FWD}${esc(t.history[t.history.length - 1].who || '')}</span>` : '';
-  return `<div class="card ${t.col}" draggable="true" data-card="${t.id}">
+  const hand = t.history?.length ? `<span class="handoff" title="Handed off ${t.history.length}x. Last hand-off went to ${esc(t.history[t.history.length - 1].who || 'another agent')}">${FWD}${esc(t.history[t.history.length - 1].who || '')}</span>` : '';
+  return `<div class="card ${t.col}" draggable="true" tabindex="0" data-card="${t.id}" aria-label="#${t.id} ${esc(t.title)}, ${t.col}">
     ${t.source ? `<div class="srcl" title="Created by trigger: ${esc(t.source.name)}">${BOLT}${esc(t.source.name)}</div>` : ''}
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
-    <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Forward (hand off) to an agent">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete">⋮</button></span></div>
+    <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Hand off: forward this task to another agent as a to-do, with this task's summary as context" aria-label="Hand off task #${t.id} to another agent" aria-haspopup="menu">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete" aria-label="More actions for task #${t.id}" aria-haspopup="menu">⋮</button></span></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
     <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}from ${esc(t.handoff.from)}</span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
@@ -1090,14 +1129,17 @@ function renderAgentDrawer(d, a) {
     $('#send').onclick = sendMsg;
   }
   $('#dh').innerHTML = `<div class="row"><div class="av ${a.status}" ${avPaint(a)}>${avFace(a, 16)}</div>
-      <div style="min-width:0"><h3>${esc(a.name)}</h3><div class="muted" style="font-size:12px">${esc(a.role)}</div></div>
+      <div style="min-width:0"><h3>${esc(a.name)}</h3></div>
       <span class="pill ${a.status}" style="margin-left:auto"><span class="dot" style="background:currentColor"></span>${a.status}</span>
-      <button class="iconbtn" data-close-drawer title="Close">✕</button></div>
-    <div class="kv"><span>${a.branch ? '⎇ ' + esc(a.branch) : 'shared folder'}</span><span>${esc(MODEL_INFO[a.model || '']?.[0] || a.model)} · ${esc(a.effort || 'default')} effort</span><span class="tok" title="input · cache reads · output">${fmtTok(a.tokens?.in)} in · ${fmtTok(a.tokens?.cache)} cached · ${fmtTok(a.tokens?.out)} out${costTxt(a.cost)}</span>${a.mcp?.length || a.skills ? `<span class="mcpchip" data-inherit title="Skills, plugins and MCP servers this agent loaded: click to list">${a.skills || 0} skills · ${(a.mcp || []).filter(m => m.status === 'connected').length} MCP</span>` : ''}${a.session ? `<span title="${esc(a.session)}">session ${esc(a.session.slice(0, 8))}</span>` : ''}${t ? `<span>#${t.id} ${esc(t.title.slice(0, 32))}</span>` : ''}</div>
+      <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, kill, delete…" aria-label="More actions for ${a.name}" aria-haspopup="menu">⋮</button>
+      <button class="iconbtn" data-close-drawer title="Close" aria-label="Close">✕</button></div>
+    <details class="dd" ${view.details ? 'open' : ''}><summary data-details-sum>Details</summary>
+      <div class="role">${esc(a.role)}</div>
+      <div class="kv"><span>${a.branch ? '⎇ ' + esc(a.branch) : 'shared folder'}</span><span>${esc(MODEL_INFO[a.model || '']?.[0] || a.model)} · ${esc(a.effort || 'default')} effort</span><span class="tok" title="Cumulative for this session: input · cache reads · output">this session: ${fmtTok(a.tokens?.in)} in · ${fmtTok(a.tokens?.cache)} cached · ${fmtTok(a.tokens?.out)} out${costTxt(a.cost)}</span>${a.mcp?.length || a.skills ? `<span class="mcpchip" data-inherit title="Skills, plugins and MCP servers this agent loaded: click to list">${a.skills || 0} skills · ${(a.mcp || []).filter(m => m.status === 'connected').length} MCP</span>` : ''}${a.session ? `<span title="${esc(a.session)}">session ${esc(a.session.slice(0, 8))}</span>` : ''}${t ? `<span>#${t.id} ${esc(t.title.slice(0, 32))}</span>` : ''}</div></details>
     <div class="dactions">
       ${a.status === 'killed' || a.status === 'error'
         ? `<button class="btn sm" data-respawn="${a.name}">↻ Respawn</button><button class="btn sm ghost" data-respawn-fresh="${a.name}">Respawn with fresh session</button>`
-        : `${a.status === 'running' ? `<button class="btn sm danger" data-stop="${a.name}" title="End this run now. The session is kept and the task waits on hold.">■ Stop</button>` : ''}${a.status === 'paused' ? `<button class="btn sm" data-resume="${a.name}" style="color:var(--amber)">▶ Resume</button>` : ''}<button class="btn sm ghost danger" data-kill="${a.name}" title="Disable this agent until you respawn it">✕ Kill</button>`}
+        : `${a.status === 'running' ? `<button class="btn sm danger" data-stop="${a.name}" title="End this run now. The session is kept and the task waits on hold.">■ Stop</button>` : ''}${a.status === 'paused' ? `<button class="btn sm" data-resume="${a.name}" style="color:var(--amber)">▶ Resume</button>` : ''}`}
       <button class="btn sm ${view.showSettings ? 'on' : ''}" data-toggle-settings style="margin-left:auto">⚙ Model &amp; role</button>
     </div>
     ${ctxRow(a)}${blockedBox(a)}`;
@@ -1342,7 +1384,7 @@ function renderReviewDrawer(d, t) {
   const add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0), tn = testsNote(t);
   const verdict = files.length ? `<b>${files.length} file${files.length > 1 ? 's' : ''}</b><span class="sep">·</span><span class="ad">+${add}</span><span class="rm">−${del}</span>${tn ? `<span class="sep">·</span><span class="${tn[0]}">${tn[1]}</span>` : ''}` : `<span class="faint">no file changes</span>${tn ? `<span class="sep">·</span><span class="${tn[0]}">${tn[1]}</span>` : ''}`;
   d.innerHTML = `<div data-shell="review" data-key="${key}" style="display:contents">
-    <div class="dh"><div class="row"><span class="tag ${t.tag}">${t.tag}</span><h3 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">#${t.id} ${esc(t.title)}</h3><button class="iconbtn" data-close-drawer style="margin-left:auto">✕</button></div>
+    <div class="dh"><div class="row"><span class="tag ${t.tag}">${t.tag}</span><h3 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">#${t.id} ${esc(t.title)}</h3><button class="iconbtn" data-close-drawer aria-label="Close" title="Close" style="margin-left:auto">✕</button></div>
       <div class="verdict">${verdict}</div>
       <div class="kv"><span>by ${esc(t.who)}</span>${t.tokens ? `<span class="tok">${fmtTok(t.tokens)} tokens</span>` : ''}${t.finished && t.started ? `<span>took ${dur(t.finished - t.started)}</span>` : ''}${agent(t.who)?.branch ? `<span>⎇ ${esc(agent(t.who).branch)}</span>` : ''}</div></div>
     <div class="stream">
@@ -1376,7 +1418,7 @@ async function sendMsg() {
 /* ── interactions ──────────────────────────────────── */
 document.addEventListener('click', async e => {
   if (!e.target.closest('.menu')) closeMenu();
-  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-kill],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-filter],[data-agent],[data-close]');
+  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-filter],[data-agent],[data-close]');
   if (!el) return;
   const ds = el.dataset;
   if (ds.menu) { e.stopPropagation(); return openTaskMenu(+ds.menu, el); }
@@ -1388,7 +1430,6 @@ document.addEventListener('click', async e => {
   if ('toggleSettings' in ds) { view.showSettings = !view.showSettings; view.setSig = ''; return render(); }
   if (ds.removeAgent) return removeAgent(ds.removeAgent);
   if (ds.mi) { const f = MENU_ACTIONS[+ds.mi]; closeMenu(); return f && f(); }
-  if (ds.kill) { e.stopPropagation(); return act('kill', {agent: ds.kill}); }
   if (ds.respawn) { e.stopPropagation(); return act('respawn', {agent: ds.respawn}); }
   if (ds.respawnFresh) return act('respawn', {agent: ds.respawnFresh, fresh: true});
   if (ds.review) { view.drawer = {review: +ds.review}; return render(); }
@@ -1458,14 +1499,28 @@ let MENU_ACTIONS = [];
 function closeMenu() { const open = document.querySelectorAll('.menu'); if (!open.length) return; open.forEach(m => m.remove()); if (S && !view.dragging) renderBoard(); }
 function showMenu(anchor, html) {
   document.querySelectorAll('.menu').forEach(m => m.remove());
-  const m = document.createElement('div'); m.className = 'menu'; m.innerHTML = html; document.body.append(m);
+  const m = document.createElement('div'); m.className = 'menu'; m.setAttribute('role', 'menu'); m.innerHTML = html; document.body.append(m);
   const r = anchor.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
   m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px';
   m.style.top = (r.bottom + 6 + h > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
+  if (kbdNav) m.querySelector('.mi:not([aria-disabled=true])')?.focus();
 }
+// keyboard: cards, agents and menu items act like their click; arrows move inside a menu
+let kbdNav = false;
+document.addEventListener('pointerdown', () => { kbdNav = false; }, true);
+document.addEventListener('keydown', e => {
+  kbdNav = true;
+  const el = e.target;
+  if ((e.key === 'Enter' || e.key === ' ') && el.matches?.('[data-card],.agent[data-agent],.rmini[data-agent],.mi')) { e.preventDefault(); el.click(); return; }
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && el.closest?.('.menu')) {
+    e.preventDefault();
+    const items = [...el.closest('.menu').querySelectorAll('.mi:not([aria-disabled=true])')], i = items.indexOf(el);
+    items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
+  }
+}, true);
 function item(label, run, {sub = '', cls = '', disabled = false} = {}) {
   MENU_ACTIONS.push(run);
-  return `<div class="mi ${cls}" data-mi="${MENU_ACTIONS.length - 1}" ${disabled ? 'aria-disabled="true"' : ''}><span>${label}${sub ? `<span class="sub">${sub}</span>` : ''}</span></div>`;
+  return `<div class="mi ${cls}" role="menuitem" tabindex="${disabled ? -1 : 0}" data-mi="${MENU_ACTIONS.length - 1}" ${disabled ? 'aria-disabled="true"' : ''}><span>${label}${sub ? `<span class="sub">${sub}</span>` : ''}</span></div>`;
 }
 function openFwdMenu(id, anchor) {
   const t = task(id); if (!t) return;
@@ -1514,9 +1569,12 @@ function openAgentMenu(n, anchor) {
   if (a.status === 'running') h += item('■ Stop', () => act('stop', {agent: n}));
   if (a.status === 'paused') h += item('▶ Resume', () => act('resume', {agent: n}));
   if (a.status === 'killed' || a.status === 'error') h += item('↻ Respawn', () => act('respawn', {agent: n}));
-  else h += item('Kill', () => act('kill', {agent: n}), {sub: 'disable until respawned'});
+  else h += item('Kill…', () => killAgent(n), {sub: 'disable until respawned', cls: 'danger'});
   h += item('Delete agent', () => removeAgent(n), {cls: 'danger'});
   showMenu(anchor, h);
+}
+function killAgent(n) {
+  askConfirm(`Kill ${n}?`, `<b>${esc(n)}</b> stops now and stays disabled until you respawn it. Its session and branch are kept.`, 'Kill', () => act('kill', {agent: n}), true);
 }
 function removeAgent(n) {
   const ag = agent(n);
@@ -1703,7 +1761,7 @@ function drawTriggers() {
         <button class="sw ${tr.enabled ? 'on' : ''}" data-tr-toggle="${tr.id}" title="${tr.enabled ? 'On: click to pause' : 'Off: click to turn on'}"><span></span></button>
         <button class="btn sm" data-tr-run="${tr.id}" title="Fire once now">Run</button>
         <button class="btn sm ghost" data-tr-edit="${tr.id}">Edit</button>
-        <button class="iconbtn danger" data-tr-del="${tr.id}" title="Delete trigger">✕</button>
+        <button class="iconbtn danger" data-tr-del="${tr.id}" title="Delete trigger" aria-label="Delete trigger">✕</button>
       </div>
     </div>`).join('');
   $('#tmBody').innerHTML = `
@@ -1799,7 +1857,7 @@ function chainHtml(steps, run = null) {
     const state = run ? STEP_STATE(run, i) : '';
     const a = S.agents.find(x => x.name === st.agent);
     const node = `<span class="node ${state} ${a ? '' : 'off'}" ${run && run.tasks[i] != null ? `data-open-task="${run.tasks[i]}"` : ''} title="${esc(st.title || '{input}')}${run && run.tasks[i] != null ? ' · click to open' : ''}" style="${run && run.tasks[i] != null ? 'cursor:pointer' : ''}"><span class="mini">${state === 'done' ? '✓' : avFace(st.agent, 11)}</span>${esc(st.agent)}</span>`;
-    const link = i < steps.length - 1 ? `<span class="link ${st.gate === 'auto' ? 'auto' : 'gate'}" title="${st.gate === 'auto' ? 'Continues automatically when this step finishes' : 'Waits for you to approve this step'}"><span class="g">${st.gate === 'auto' ? '⚡' : '✋'}</span>→</span>` : '';
+    const link = i < steps.length - 1 ? `<span class="link ${st.gate === 'auto' ? 'auto' : 'gate'}" title="${st.gate === 'auto' ? 'Continues automatically when this step finishes' : 'Waits for your approval before the next step'}"><span class="g" aria-hidden="true">${st.gate === 'auto' ? '⚡' : '✋'}</span>→</span>` : '';
     return node + link;
   }).join('');
 }
@@ -1818,12 +1876,12 @@ function renderFlows() {
   const flows = S.workflows || [], runs = [...(S.runs || [])].reverse();
   $('#flows').innerHTML = `
     ${awbHtml()}
-    <div><h3>Workflows <span class="faint">Run agents in a fixed order. ✋ waits for your approval, ⚡ continues on its own.</span>
+    <div><h3>Workflows <span class="faint">Run agents in a fixed order. ✋ Waits for your approval · ⚡ Continues automatically.</span>
       <button class="btn sm" data-wf-new style="margin-left:auto">＋ New workflow</button></h3></div>
     <div class="wfgrid">${flows.map(w => `
       <div class="wf">
         <div class="wh"><b>${esc(w.name)}</b><span class="faint" style="font:11px var(--mono)">${w.steps.length} steps</span>
-          <span style="margin-left:auto;display:flex;gap:6px">${wfTrigChip(w)}<button class="btn sm run" data-wf-run="${w.id}"><i>▶</i>Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="iconbtn danger" data-wf-del="${w.id}" title="Delete workflow">✕</button></span></div>
+          <span class="wact">${wfTrigChip(w)}<button class="btn sm run" data-wf-run="${w.id}"><i>▶</i>Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="kebab" data-wf-menu="${w.id}" title="More actions" aria-label="More actions for workflow ${esc(w.name)}" aria-haspopup="menu">⋮</button></span></div>
         ${w.description ? `<div class="wd">${esc(w.description)}</div>` : ''}
         <div class="chain">${chainHtml(w.steps)}</div>
       </div>`).join('') || '<div class="empty">No workflows yet.</div>'}</div>
@@ -1835,20 +1893,24 @@ function renderFlows() {
             <div class="chain" style="margin-top:9px">${chainHtml(r.steps, r)}</div>
             <div class="rmeta">started ${ago(r.started)} ago${r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}${r.status === 'running' ? ` · step ${r.step + 1} of ${r.steps.length}` : ''}${blockedNote(r)}${r.note ? ' · ' + esc(r.note) : ''}</div>
           </div>
-          <div>${r.status === 'running' ? `<button class="btn sm danger" data-run-stop="${r.id}">Stop</button>` : `<button class="iconbtn" data-run-del="${r.id}" title="Remove from list">✕</button>`}</div>
+          <div>${r.status === 'running' ? `<button class="btn sm danger" data-run-stop="${r.id}">Stop</button>` : `<button class="iconbtn" data-run-del="${r.id}" title="Remove from list" aria-label="Remove this run from the list">✕</button>`}</div>
         </div>`).join('')}
     </div>`;
 }
 $('#tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (!b) return; view.tab = b.dataset.tab; $('#tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); render(); };
 $('#flows').addEventListener('click', async e => {
-  const el = e.target.closest('[data-wf-new],[data-wf-run],[data-wf-edit],[data-wf-del],[data-run-stop],[data-run-del],[data-open-task],[data-wf-trig],[data-awb]'); if (!el) return;
+  const el = e.target.closest('[data-wf-new],[data-wf-run],[data-wf-edit],[data-wf-menu],[data-run-stop],[data-run-del],[data-open-task],[data-wf-trig],[data-awb]'); if (!el) return;
   if (el.dataset.wfTrig) return newTrigFor({workflow: el.dataset.wfTrig});
   if ('awb' in el.dataset) return runAwb();
   const d = el.dataset, wf = id => S.workflows.find(w => w.id === id);
   if ('wfNew' in d) return openWfEditor(null);
   if (d.wfRun) return openRun(wf(d.wfRun));
   if (d.wfEdit) return openWfEditor(wf(d.wfEdit));
-  if (d.wfDel) return askConfirm('Delete workflow?', `<b>${esc(wf(d.wfDel).name)}</b> is removed. Runs already started keep going.`, 'Delete', () => act('wf_delete', {id: d.wfDel}), true);
+  if (d.wfMenu) {
+    e.stopPropagation(); MENU_ACTIONS = []; const w = wf(d.wfMenu); if (!w) return;
+    return showMenu(el, `<div class="mh">${esc(w.name)}</div>` + item('Run…', () => openRun(w)) + item('Edit', () => openWfEditor(w)) + '<div class="sep"></div>' +
+      item('Delete…', () => askConfirm('Delete workflow?', `<b>${esc(w.name)}</b> is removed. Runs already started keep going.`, 'Delete', () => act('wf_delete', {id: w.id}), true), {cls: 'danger'}));
+  }
   if (d.runStop) return askConfirm('Stop this run?', 'No more steps are created. The current step\'s task stays on the board.', 'Stop run', () => act('run_stop', {id: d.runStop}), true);
   if (d.runDel) return act('run_delete', {id: d.runDel});
   if (d.openTask) { const t = task(+d.openTask); if (!t) return; view.tab = 'board'; $('#tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.tab === 'board')); view.drawer = t.col === 'review' ? {review: t.id} : t.who ? {agent: t.who} : null; render(); }
@@ -1939,7 +2001,7 @@ function wfPlace(skip = null) {
   for (let i = 0; i < ids.length - 1; i++) {
     const e = wfEdge(L.pos[i], L.pos[i + 1], L), step = i >= 1 ? wfe.steps[i - 1] : null;
     paths += `<path d="${e.d}" class="${step && step.gate === 'auto' ? 'auto' : ''}"/>`;
-    badges += `<div class="wfbadge" data-edge="${i}" style="left:${e.mx}px;top:${e.my}px">${step ? `<button class="g ${step.gate === 'auto' ? 'auto' : 'approve'}" data-g="${step._k}" title="${step.gate === 'auto' ? 'Continues automatically when step ' + i + ' is done · click to require approval' : 'Waits for your approval of step ' + i + ' · click to continue automatically'}">${step.gate === 'auto' ? '⚡' : '✋'}</button>` : ''}<button class="plus" data-ins="${i}" title="Add a step here">＋</button></div>`;
+    badges += `<div class="wfbadge" data-edge="${i}" style="left:${e.mx}px;top:${e.my}px">${step ? `<button class="g ${step.gate === 'auto' ? 'auto' : 'approve'}" data-g="${step._k}" aria-label="${step.gate === 'auto' ? 'Continues automatically' : 'Waits for your approval'}: change" title="${step.gate === 'auto' ? 'Continues automatically when step ' + i + ' is done · click to wait for your approval instead' : 'Waits for your approval of step ' + i + ' · click to continue automatically instead'}">${step.gate === 'auto' ? '⚡' : '✋'}</button>` : ''}<button class="plus" data-ins="${i}" title="Add a step here" aria-label="Add a step here">＋</button></div>`;
   }
   svg.innerHTML = paths; st.querySelector('#wfBadges').innerHTML = badges;
 }
@@ -2109,10 +2171,18 @@ async function openLan() {
   }
   $('#lanModal').classList.add('on');
 }
-$('#phoneBtn').onclick = openLan;
 $('#lanModal').addEventListener('click', async e => { const b = e.target.closest('[data-copy-lan]'); if (!b) return; try { await navigator.clipboard.writeText(b.dataset.copyLan); toast('Link copied', 'var(--green)'); } catch { toast('Copy failed: select the link instead', 'var(--red)'); } });
-// the phone button only makes sense on the computer itself
-if (['localhost', '127.0.0.1'].includes(location.hostname)) $('#phoneBtn').hidden = false;
+// the phone entry only makes sense on the computer itself
+const REPO = 'https://github.com/pranjal-joshi/claude-crew';
+$('#hMenu').onclick = e => {
+  e.stopPropagation(); MENU_ACTIONS = [];
+  const go = u => () => window.open(u, '_blank', 'noopener');
+  let h = '';
+  if (['localhost', '127.0.0.1'].includes(location.hostname)) h += item('Open on phone…', openLan, {sub: 'Scan a code from a phone on the same Wi-Fi'}) + '<div class="sep"></div>';
+  h += `<div class="note">Crew${S?.app_version ? ' v' + esc(S.app_version) : ''}</div>`;
+  h += item('GitHub repository', go(REPO)) + item('Releases and changelog', go(REPO + '/releases'));
+  showMenu($('#hMenu'), h);
+};
 
 
 // ---- stop, clear, context -----------------------------------------------------------
@@ -2135,16 +2205,16 @@ function ctxRow(a) {
   return `<div class="ctxrow" title="Tokens in this agent's context window at its last model call. Compact summarises the conversation to free space; New session starts empty.">
     <span class="ct">context</span><div class="ctxbar"><i class="${pct > 80 ? 'hi' : pct > 55 ? 'mid' : ''}" style="width:${live ? pct : 0}%"></i></div>
     <span class="ct">${live && used ? `${fmtTok(used)} · ${pct}%` : a.context === 'fresh' ? 'fresh per task' : 'empty'}</span>
-    <button class="btn sm" data-compact="${esc(a.name)}" ${!live || a.status === 'running' ? 'disabled' : ''}>Compact</button>
-    <button class="btn sm ghost" data-newsession="${esc(a.name)}" ${a.session ? '' : 'disabled'}>New session</button></div>`;
+    <button class="ctxact" data-compact="${esc(a.name)}" title="Summarise the conversation to free context" ${!live || a.status === 'running' ? 'disabled' : ''}>Compact</button>
+    <button class="ctxact" data-newsession="${esc(a.name)}" title="Forget the conversation and start empty" ${a.session ? '' : 'disabled'}>New session</button></div>`;
 }
 $('#clearBtn').onclick = e => {
   e.stopPropagation();
   MENU_ACTIONS = [];
   const done = S.tasks.filter(t => t.col === 'done').length, all = S.tasks.length, busy = S.agents.filter(a => a.status === 'running').length;
-  let h = '<div class="mh">Clear the board</div>';
-  h += item(`Clear Done<span class="faint"> · ${done} task${done === 1 ? '' : 's'}</span>`, () => act('clear', {scope: 'done'}), {disabled: !done});
-  h += item(`Clear everything<span class="faint"> · ${all} task${all === 1 ? '' : 's'}</span>`, () => askConfirm('Clear the whole board?',
+  let h = '<div class="mh">Clear board</div>';
+  h += item(`Clear done tasks<span class="faint"> · ${done} task${done === 1 ? '' : 's'}</span>`, () => act('clear', {scope: 'done'}), {disabled: !done});
+  h += item(`Clear all tasks<span class="faint"> · ${all} task${all === 1 ? '' : 's'}</span>`, () => askConfirm('Clear the whole board?',
     `All ${all} tasks are removed${busy ? ` and ${busy} running agent${busy === 1 ? ' is' : 's are'} stopped` : ''}. Agents' branches and commits are kept.`, 'Clear everything', () => act('clear', {scope: 'all'}), true), {cls: 'danger', disabled: !all});
   showMenu(e.currentTarget, h);
 };
@@ -2177,6 +2247,8 @@ function renderChat() {
   const t = chatTarget(), boss = t === S.boss, busy = t.status === 'running';
   const to = $('#chatTo');
   to.className = 'chatto' + (boss ? ' boss' : '');
+  to.title = boss ? 'Talking to the boss: it plans, delegates tasks to the crew and runs workflows, but never edits code itself. Click to message an agent directly.' : `Talking to ${t.name} directly. Click to switch back to the boss, who delegates to the whole crew.`;
+  to.setAttribute('aria-label', `Message target: ${boss ? 'Boss' : t.name}. Change`);
   to.innerHTML = `<span class="mini" ${boss ? '' : avPaint(t)}>${boss ? '✦' : avFace(t, 12)}</span>${boss ? 'Boss' : esc(t.name)}<span class="bossdot ${busy ? 'on' : ''}"></span>▾`;
   $('#chatIn').placeholder = boss ? 'Ask the boss to plan, delegate or run a workflow…' : `Message ${t.name}… it lands mid-run if busy`;
   const lg = $('#chatlog'), open = view.chatOpen || document.body.dataset.m === 'chat';
@@ -2186,7 +2258,7 @@ function renderChat() {
   if (lg.dataset.sig === sig) return;
   const atBottom = lg.scrollHeight - lg.scrollTop - lg.clientHeight < 60;
   lg.dataset.sig = sig;
-  lg.innerHTML = `<div class="chathead">${boss ? `<b style="color:var(--text)">Boss</b> · ${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : `<b style="color:var(--text)">${esc(t.name)}</b> · ${esc(t.role.slice(0, 80))}`}${busy ? ' · <span style="color:var(--green)">working…</span>' : ''}<span style="margin-left:auto">${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear</button></div>` +
+  lg.innerHTML = `<div class="chathead">${boss ? `<b style="color:var(--text)">Boss</b> · ${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : `<b style="color:var(--text)">${esc(t.name)}</b> · ${esc(t.role.slice(0, 80))}`}${busy ? ' · <span style="color:var(--green)">working…</span>' : ''}<span style="margin-left:auto" title="Cumulative tokens and cost for this chat session; Clear chat resets them">this session: ${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear chat</button></div>` +
     (t.log.length ? renderLog(t.log.slice(-120)) : `<div class="empty">${boss ? 'Try: “Plan and build CSV export for reports, then have it tested and reviewed.”' : 'No messages yet.'}</div>`);
   if (atBottom || lg.dataset.jump) { lg.scrollTop = lg.scrollHeight; delete lg.dataset.jump; }
 }
@@ -2216,6 +2288,11 @@ function clearChat(who) {
   askConfirm('Clear this chat?', `The conversation with <b>${esc(name)}</b> is removed and its context is emptied; the next message starts a fresh session. Tasks, branches and commits are kept.`, 'Clear chat',
     async () => { const r = await act('clear_chat', {agent: who}); if (r.ok) { $('#chatlog').dataset.sig = ''; toast('Chat cleared', 'var(--green)'); } }, true);
 }
+document.addEventListener('toggle', e => {  // the drawer's Details disclosure, remembered per browser
+  if (!e.target.classList?.contains('dd')) return;
+  view.details = e.target.open;
+  try { localStorage.setItem('crew.details', view.details ? '1' : '0'); } catch {}
+}, true);
 document.addEventListener('click', e => {
   if (e.target.closest('[data-chat-clear]')) return clearChat(chatWho());
   if (e.target.closest('[data-rail-toggle]')) {
@@ -2321,11 +2398,11 @@ $('#chatTo').onclick = e => {
 
 // ---- auto workflow builder ------------------------------------------------------------------
 function awbHtml() {
-  return `<div class="awb"><h3 style="margin:0">✦ Auto Workflow Builder <span class="faint">Describe how work should flow. The boss creates or updates agents, workflows and triggers to match.</span></h3>
-    <textarea class="field" id="awbIn" placeholder="e.g. Every weekday at 10, triage new ADO bugs: reproduce with a failing test, fix, review, and post a summary to the work item. Model changes must be evaluated before and after.">${esc(view.awb || '')}</textarea>
+  return `<div class="awb ${view.awb ? 'has' : ''}"><h3 style="margin:0">✦ Auto Workflow Builder <span class="faint">Describe how work should flow. The boss creates or updates agents, workflows and triggers to match.</span></h3>
+    <textarea class="field" id="awbIn" rows="1" aria-label="Describe the process to build" placeholder="e.g. Every weekday at 10, triage new ADO bugs: reproduce with a failing test, fix, review, and post a summary to the work item. Model changes must be evaluated before and after.">${esc(view.awb || '')}</textarea>
     <div class="row"><span class="faint" style="font-size:12px">Reuses existing agents where they fit. You'll see what it did in the boss chat.</span><button class="btn sm run" data-awb style="margin-left:auto"><i style="color:var(--accent)">✦</i>Build with the boss</button></div></div>`;
 }
-document.addEventListener('input', e => { if (e.target.id === 'awbIn') view.awb = e.target.value; });
+document.addEventListener('input', e => { if (e.target.id === 'awbIn') { view.awb = e.target.value; e.target.closest('.awb').classList.toggle('has', !!view.awb); } });
 function runAwb() {
   const text = (view.awb || '').trim();
   if (!text) return $('#awbIn')?.focus();
@@ -2389,7 +2466,7 @@ function buildPalette() {
     {ic: '⚡', label: 'Triggers…', k: 'T', run: () => openTriggers()},
     {ic: '■', label: 'Stop all running agents and runs', run: () => document.querySelector('[data-stop-all]')?.click()},
     {ic: '▶', label: 'Resume paused agents', run: () => act('resume_all')},
-    {ic: '⌫', label: 'Clear Done', run: () => act('clear', {scope: 'done'})},
+    {ic: '⌫', label: 'Clear done tasks', run: () => act('clear', {scope: 'done'})},
     {ic: '⌫', label: 'Clear the whole board…', run: () => askConfirm('Clear the whole board?', 'All tasks are removed and running agents are stopped.', 'Clear everything', () => act('clear', {scope: 'all'}), true)},
     {ic: '✦', label: 'Talk to the boss', k: '/', run: () => { view.chatTo = 'boss'; view.chatOpen = true; render(); $('#chatIn').focus(); }},
     {ic: '✦', label: 'Auto Workflow Builder', run: () => { setM && document.querySelector('[data-tab="flows"]').click(); setTimeout(() => $('#awbIn')?.focus(), 50); }},
@@ -2405,7 +2482,7 @@ function buildPalette() {
     ...S.agents.map(a => ({ic: '−', label: `Remove agent ${a.name}`, run: () => { view.drawer = {agent: a.name}; view.showSettings = true; render(); setTimeout(() => document.querySelector('[data-remove-agent]')?.click(), 0); }})),
     ...S.agents.map(a => ({ic: '›', label: `Message ${a.name}`, run: () => { view.drawer = {agent: a.name}; render(); setTimeout(() => $('#msg')?.focus(), 0); }})),
     ...S.agents.map(a => ({ic: '＋', label: `New task for ${a.name}`, run: () => openTask(a.name)})),
-    ...S.agents.filter(a => a.status !== 'killed').map(a => ({ic: '✕', label: `Kill ${a.name}`, run: () => act('kill', {agent: a.name})})),
+    ...S.agents.filter(a => a.status !== 'killed').map(a => ({ic: '✕', label: `Kill ${a.name}…`, run: () => killAgent(a.name)})),
     ...S.agents.filter(a => a.status === 'killed' || a.status === 'error').map(a => ({ic: '↻', label: `Respawn ${a.name}`, run: () => act('respawn', {agent: a.name})})),
     ...S.tasks.filter(t => t.col === 'review').map(t => ({ic: '◎', label: `Review #${t.id} ${t.title}`, run: () => { view.drawer = {review: t.id}; render(); }})),
     ...S.tasks.flatMap(t => S.agents.filter(a => !['killed', 'error'].includes(a.status) && !(t.col === 'doing' && t.who === a.name)).map(a => ({ic: '↪', label: `Hand #${t.id} ${t.title} → ${a.name}`, run: () => handTo(t.id, a.name)}))),
