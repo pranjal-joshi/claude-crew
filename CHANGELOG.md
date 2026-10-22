@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- **⏹ Stop workflow on board cards:** a workflow card in In progress or Review has a Stop workflow button. It ends the run and its open step: a working agent is stopped, a waiting ⟳ or 👁 step stops checking, and the card moves to Done marked ⏹ stopped. It also ends the step of a run that was already stopped but still checking.
+
+### Changed
+- **Waiting steps show in In progress:** a ⟳ step waiting for its next check, or a 👁 step watching a command, is shown in In progress instead of Backlog.
+
 ### Fixed
 - **ADO "assigned to me" started old items after an edit:** widening the trigger (say, adding Product Backlog Item to Bug) kept the old baseline, so items already assigned to you that the new filter matched started as if new. Any change to what it matches (types, project, organization, mode, or skip/start) now takes a new baseline on the next check.
 

@@ -73,6 +73,28 @@ class UntilGate(TempCrewCase):
         self.crew.act("run_delete", {"id": self.run["id"], "tasks": True})
         self.assertEqual(([x for x in self.crew.tasks if x.get("run")], self.crew._run(self.run["id"])), ([], None))
 
+    def test_stop_workflow_from_a_waiting_card_ends_the_run_and_its_checks(self):
+        self._end_turn("PR open.")
+        self.assertTrue(self.t["wait"]["next"])
+        self.crew.act("run_stop", {"id": self.run["id"], "cards": True})
+        self.assertEqual((self.crew._run(self.run["id"])["status"], self.t["col"], self.t["decision"]["verdict"]), ("stopped", "done", "stop"))
+        self.assertNotIn("wait", self.t)
+        self._before = len(self.sent)
+        self.crew.dispatch()  # nothing picks it up again
+        self.assertEqual((self.ci["status"], len(self.sent)), ("idle", self._before))
+
+    def test_stop_workflow_stops_a_working_agent(self):
+        self.assertEqual(self.t["col"], "doing")
+        self.crew.act("run_stop", {"id": self.run["id"], "cards": True})
+        self.assertEqual((self.t["col"], self.ci["status"], self.ci["task"]), ("done", "idle", None))
+
+    def test_stop_workflow_also_ends_an_already_stopped_runs_step(self):
+        self._end_turn("PR open.")
+        self.crew.act("run_stop", {"id": self.run["id"]})  # the old Stop run: the step kept checking
+        self.assertIn("wait", self.t)
+        self.crew.act("run_stop", {"id": self.run["id"], "cards": True})
+        self.assertEqual(self.t["col"], "done")
+
     def test_bad_numbers_are_refused(self):
         r = self.crew.act("wf_save", {"name": "Bad", "steps": [{"agent": self.ci["name"], "gate": "until", "every": "soon"}]})
         self.assertIn("error", r)

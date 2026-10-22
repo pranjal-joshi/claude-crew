@@ -1132,6 +1132,7 @@ async function post(path, body) {
   const r = await fetch(path, {method: 'POST', headers: AUTH, body: JSON.stringify(body)});
   const j = await r.json().catch(() => ({})); if (j.error) toast(j.error, 'var(--red)'); return j;
 }
+const boardCol = t => t.col === 'backlog' && !t.hold && (t.wait?.next || t.wait?.probe) ? 'doing' : t.col;
 const COLS = [['backlog','Backlog','var(--faint)'],['doing','In progress','var(--green)'],['review','Review','var(--blue)'],['done','Done','var(--violet)']];
 const STATUS_DOT = {idle:'var(--faint)',running:'var(--green)',review:'var(--blue)',error:'var(--red)',killed:'var(--red)'};
 
@@ -1189,7 +1190,7 @@ function render() {
   $('#mode').innerHTML = `${pm === 'bypassPermissions' ? '⚠ ' : ''}<span class="pl">Permissions: </span><b>${esc(mi?.label || pm)}</b> ▾`;
   $('#mode').title = `Permission mode: ${mi?.label || pm}. ${mi?.sub || ''} It applies to every agent. Click to change.${S.git ? '' : ' This folder is not a git repo, so agents share it instead of getting their own worktrees.'}`;
   $('#trigN').textContent = (S.triggers || []).filter(t => t.enabled).length || '';
-  const n = c => S.tasks.filter(t => t.col === c).length;
+  const n = c => S.tasks.filter(t => boardCol(t) === c).length;
   const spend = S.agents.reduce((s, a) => s + (a.cost || 0), 0);
   const running = S.agents.filter(a => a.status === 'running').length;
   const subsLive = S.agents.reduce((s, a) => s + Object.keys(a.subs || {}).length, 0);
@@ -1340,7 +1341,7 @@ function renderBoard() {
   if (!S.tasks.length && !(S.triggers || []).length) { $('#board').innerHTML = firstRunHtml(); return; }
   const groups = runGroups();
   $('#board').innerHTML = COLS.map(([k, label, c]) => {
-    const items = S.tasks.filter(t => t.col === k && show(t) && !groups.hidden.has(t.id))
+    const items = S.tasks.filter(t => boardCol(t) === k && show(t) && !groups.hidden.has(t.id))
       .sort((a, b) => k === 'done' ? b.id - a.id : a.id - b.id);
     const html = items.map(t => groups.at.has(t.id) ? runGroup(groups.at.get(t.id), t) : card(t));
     const sh = k === 'backlog' || k === 'doing' ? schedHtml(k) : '';
@@ -1531,6 +1532,8 @@ function card(t) {
     : t.pr ? `<a class="mst ok" href="${esc(t.pr)}" target="_blank" rel="noopener" title="Pull request">PR open</a>`
     : t.merge_error?.files?.length ? `<span class="mst warn" title="Merge conflicts: ${esc(t.merge_error.files.join(', '))}">Conflict</span>` : t.commit ? '<span class="mst" title="Approved and committed on its branch, not merged yet">Not merged</span>' : '';
   if (t.col === 'done' && (t.commit || t.tokens)) cta = `<div class="f mono">${t.commit ? `<span>⎇ ${esc(t.commit)}</span>` : ''}${mst}${t.tokens ? `<span class="tok" style="margin-left:auto" title="Tokens this task used">${fmtTok(t.tokens)} tok</span>` : ''}</div>`;
+  const runOf = t.run && (S.runs || []).find(r => r.id === t.run.id);
+  if (runOf && ['doing', 'review'].includes(boardCol(t)) && (runOf.status === 'running' || t.wait)) cta += `<div class="cta"><button class="btn sm danger" data-run-stop-card="${esc(runOf.id)}" title="End ⛓ ${esc(runOf.name)}: no more steps, and this step's agent stops working and checking">⏹ Stop workflow</button></div>`;
   if (prOf(t)) cta += `<div class="cta prb">${prLink(t, 'sm')}${addrevBtn(t, 'sm')}</div>`;
   const owner = t.col === 'doing' && t.who ? S.agents.find(a => a.name === t.who) : null;
   const liveSubs = owner ? Object.keys(owner.subs || {}).length : 0;
@@ -2022,9 +2025,10 @@ async function sendMsg() {
 /* ── interactions ──────────────────────────────────── */
 document.addEventListener('click', async e => {
   if (!e.target.closest('.menu')) closeMenu();
-  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-addrev],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-new-task],[data-agent],[data-close]');
+  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-addrev],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-new-task],[data-agent],[data-close],[data-run-stop-card]');
   if (!el) return;
   const ds = el.dataset;
+  if (ds.runStopCard) { e.stopPropagation(); const r = (S.runs || []).find(x => x.id === ds.runStopCard); return askConfirm('Stop workflow?', `<b>⛓ ${esc(r?.name || 'This run')}</b> ends: no more steps start, and its open step's agent stops working and checking. The card moves to Done, marked ⏹ stopped.`, 'Stop workflow', () => act('run_stop', {id: ds.runStopCard, cards: true}), true); }
   if (ds.menu) { e.stopPropagation(); return openTaskMenu(+ds.menu, el); }
   if (ds.fwd) { e.stopPropagation(); return openFwdMenu(+ds.fwd, el); }
   if ('addAgent' in ds) return openAgentModal();

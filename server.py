@@ -1645,8 +1645,15 @@ class Crew:
             elif action == "wf_run" and (w := self._workflow(p.get("id"))):
                 if res := workflows.definitions.run(self, p):
                     return res
-            elif action == "run_stop" and (run := self._run(p.get("id"))) and run["status"] == "running":
-                workflows.runs.stop(self, run)
+            elif action == "run_stop" and (run := self._run(p.get("id"))) and (p.get("cards") or run["status"] == "running"):
+                if run["status"] == "running":
+                    workflows.runs.stop(self, run)
+                if p.get("cards"):  # from a board card: end the step too, so no agent keeps working or checking for it
+                    for tk in [x for x in self.tasks if (x.get("run") or {}).get("id") == run["id"] and x["col"] != "done"]:
+                        self._release(tk)
+                        tk.pop("wait", None)
+                        tk.update(col="done", decision={"verdict": "stop", "reason": "workflow stopped from the board", "by": "you", "t": now()})
+                        self.event("decide", f"⏹ #{tk['id']} stopped with ⛓ {run['name']}")
             elif action == "run_delete" and (run := self._run(p.get("id"))) and (p.get("tasks") or run["status"] != "running"):
                 if p.get("tasks"):  # from the board's stacked card: every step's task goes with the run, running ones stopped
                     for tk in [x for x in self.tasks if (x.get("run") or {}).get("id") == run["id"]]:
