@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Scheduled jobs on the board:** every trigger (cron, event, webhook, pipeline, Teams, ADO, poll, watch) shows at the top of the Backlog, tagged *scheduled* and its kind, soonest first, with its next time. Click one to edit it, ▶ to fire it now, or drag it to In progress to run it: it stays there while its check, workflow run or task is in progress, then goes back to the Backlog.
 - **Workflow runs grouped on the board:** each run is one frame in the column of its current step, with a stepper; its other steps show as one-line rows inside it, and ▾ collapses it. Tasks outside a workflow are unchanged.
 - **Screenshots in chat:** paste, drop or attach up to 4 images (PNG, JPEG, GIF, WebP, 5 MB each) with a message to the boss or an agent.
 - **Turn agents and workflows on and off:** a switch on every agent card and workflow card, also in their ⋮ menus. An agent that is off takes no new work: a task it is running finishes, tasks for it wait, and hand-offs to it are refused. A workflow that is off can't be run, and triggers that start it pause, so nothing they would pick up is lost. Agent cards no longer show a status pill; the avatar ring shows the status.
@@ -26,6 +27,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Resizable side panel**: drag the left edge of the agent / review panel (or focus it and use the arrow keys) to make it wider or narrower; double-click resets. The width is remembered.
 
 ### Changed
+- **Quieter agent cards:** an idle agent's card no longer shows a "waiting for work" line.
 - **Teams triggers take a link:** paste a link to the channel, chat or any message in it. Crew finds messages with message search filtered to that conversation, which works without the Team.ReadBasic.All permission that looking a channel up by name needs.
 - **Workflow steps start fresh:** every workflow step runs on a new Claude session, even for agents set to keep one session, so no run inherits another's context. Such an agent goes back to its own session afterwards, and a sent-back step resumes that step's session.
 - **Steps get the whole previous summary:** a step's summary was cut to 3,000 characters before the next step saw it, and earlier steps to 400, so comment blocks an agent had to post verbatim arrived cut off. The previous step now passes on up to 20,000 characters and earlier steps up to 4,000.

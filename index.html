@@ -149,6 +149,7 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .pill.review{background:var(--blue-soft);color:var(--blue)}
 .pill.error{background:var(--red-soft);color:var(--red)}
 .pill.killed{background:var(--red-soft);color:var(--red)}
+.agent .task:has(.faint:empty){display:none}
 .agent .task{margin-top:9px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .agent .act{margin-top:3px;font:11.5px var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .agent .act.live{color:var(--muted)}
@@ -454,6 +455,18 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .two{display:grid;grid-template-columns:160px 1fr;gap:12px}
 .field.mono{font:12.5px var(--mono)}
 .lc{text-transform:none;letter-spacing:0;font-weight:400;margin-left:6px}
+.schedh{display:flex;align-items:center;gap:6px;margin:2px 3px 6px;font:600 10.5px var(--mono);color:var(--faint);text-transform:uppercase;letter-spacing:.06em;cursor:pointer;user-select:none}
+.schedh .ln{flex:1;height:1px;background:var(--line)}.schedh:hover{color:var(--text)}
+.sched{border:1px dashed var(--line2);border-radius:var(--r);padding:8px 10px;margin-bottom:8px;background:color-mix(in srgb,var(--surface) 55%,transparent);cursor:pointer}
+.sched:hover{border-color:var(--amber)}.sched.off{opacity:.55}.sched.err{border-color:color-mix(in srgb,var(--red) 50%,transparent)}
+.sched .th{display:flex;align-items:center;gap:6px}.sched .t{flex:1;min-width:0;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sched .ic{color:var(--amber);font-size:12px;width:14px;text-align:center;flex:none}
+.sched .d{font-size:11.5px;color:var(--muted);margin:3px 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sched .f{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;color:var(--faint)}.sched .f .nx{margin-left:auto;white-space:nowrap}
+.sched.busy{border-style:solid;border-color:color-mix(in srgb,var(--amber) 45%,transparent);cursor:default}.sched .spinner{vertical-align:-2px}
+.sched .run{border:0;background:none;color:var(--faint);cursor:pointer;font-size:11px;padding:1px 6px;border-radius:5px;flex:none}.sched .run:hover{color:var(--amber);background:var(--hover)}
+.tag.scheduled{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber)}
+.tag.k-schedule,.tag.k-event,.tag.k-webhook,.tag.k-pipeline,.tag.k-watch,.tag.k-poll,.tag.k-ado,.tag.k-teams{background:var(--tag-neutral);color:var(--tag-neutral-ink)}
 .srcl{display:flex;align-items:center;gap:5px;font:10.5px var(--mono);color:var(--amber);margin-bottom:5px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .modal .mf{padding:12px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
 .alerts{margin:0 18px 4px;border:1px solid color-mix(in srgb,var(--red) 35%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--red) 5%,var(--surface));overflow:hidden}
@@ -1231,7 +1244,7 @@ function renderRail() {
           </div>
           <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, delete…" aria-label="More actions for ${a.name}" aria-haspopup="menu">⋮</button>
         </div>
-        <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : a.off ? 'turned off · takes no new work' : `waiting for work${lastActive(a) ? ` · active ${agoText(lastActive(a))}` : ''}`}</span>`}</div>
+        <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : a.off ? 'turned off · takes no new work' : ''}</span>`}</div>
         ${a.activity ? `<div class="act ${live ? 'live' : ''}">› ${esc(a.activity)}</div>` : ''}
         ${subChips(a)}
         <div class="meta" style="align-items:center">${modelChip(a.model)}${effortBars(a.effort)}<span style="margin-left:auto;white-space:nowrap">${live ? `<span data-since="${a.since}" title="Running for">${ago(a.since)}</span> · ` : ''}<span class="tok" title="Tokens this session: in ${fmtTok(a.tokens?.in)} · cache ${fmtTok(a.tokens?.cache)} · out ${fmtTok(a.tokens?.out)}">${fmtTok(tokTotal(a))}</span>${showCost ? ` · <span title="Cost this session">${money(a.cost)}</span>` : ''}</span></div>
@@ -1304,18 +1317,81 @@ function renderBoard() {
   if (flows) return renderFlows();
   if (document.querySelector('.menu')) return; // keep an open menu anchored
   const show = () => true;
-  if (!S.tasks.length) { $('#board').innerHTML = firstRunHtml(); return; }
+  if (!S.tasks.length && !(S.triggers || []).length) { $('#board').innerHTML = firstRunHtml(); return; }
   const groups = runGroups();
   $('#board').innerHTML = COLS.map(([k, label, c]) => {
     const items = S.tasks.filter(t => t.col === k && show(t) && !groups.hidden.has(t.id))
       .sort((a, b) => k === 'done' ? b.id - a.id : a.id - b.id);
     const html = items.map(t => groups.at.has(t.id) ? runGroup(groups.at.get(t.id), t) : card(t));
+    const sh = k === 'backlog' || k === 'doing' ? schedHtml(k) : '';
     return `<div class="col" data-col="${k}">
       <div class="colh"><span class="dot" style="background:${c}"></span>${label}${k === 'backlog' ? '<button class="btn sm primary addt" data-new-task title="New task (N)">＋ New</button>' : ''}<span class="n">${items.length}</span></div>
-      <div class="cards">${html.length ? html.join('') : `<div class="empty">${k === 'backlog' ? 'No tasks yet. Press <kbd>N</kbd> to add one.' : 'Nothing here'}</div>`}</div>
+      <div class="cards">${sh}${html.length || (sh && k === 'doing') ? html.join('') : `<div class="empty">${k === 'backlog' ? 'No tasks yet. Press <kbd>N</kbd> to add one.' : 'Nothing here'}</div>`}</div>
     </div>`;
   }).join('');
 }
+// Scheduled jobs at the top of the backlog: every trigger (cron, event, webhook, pipeline, Teams, ADO, poll, watch),
+// soonest first, each tagged "scheduled" and its kind. Click one to edit it; ▶ fires or checks it now. Dragging one
+// to In progress runs it; while it runs (a check, a workflow run or a task it started still in progress) it sits in
+// In progress, then goes back to the backlog.
+const SCHED_TAG = {schedule: 'cron', event: 'event', webhook: 'webhook', pipeline: 'pipeline', watch: 'watch', poll: 'poll', ado: 'ado', teams: 'teams'};
+const SCHED_ON = {event: 'on event', webhook: 'on POST', watch: 'on change'};
+function schedBusy(tr) {
+  if (tr.checking || (view.schedKick?.[tr.id] || 0) > Date.now() - 15000) return true;
+  const mine = x => x?.source?.trigger === tr.id;
+  return (S.runs || []).some(r => r.status === 'running' && mine(r)) || S.tasks.some(t => t.col === 'doing' && mine(t));
+}
+function schedHtml(col) {
+  const all = [...(S.triggers || [])].sort((a, b) => (b.enabled - a.enabled) || ((a.next || 9e12) - (b.next || 9e12)));
+  const trs = all.filter(tr => schedBusy(tr) === (col === 'doing'));
+  if (!trs.length) return '';
+  if (col === 'doing') return trs.map(tr => schedCard(tr, true)).join('');
+  const folded = view.schedFold, on = trs.filter(t => t.enabled).length;
+  const head = `<div class="schedh" data-sched-fold role="button" tabindex="0" aria-expanded="${!folded}" title="${folded ? 'Show' : 'Hide'} scheduled jobs">${folded ? '▸' : '▾'} Scheduled · ${on}${on < trs.length ? ` on, ${trs.length - on} off` : ''}<span class="ln"></span></div>`;
+  if (folded) return head;
+  return head + trs.map(tr => schedCard(tr, false)).join('');
+}
+function schedCard(tr, busy) {
+    const target = tr.task?.workflow ? `⛓ ${(S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow}` : trigAgent(tr) || 'whoever matches';
+    const live = busy && (S.tasks.find(t => t.col === 'doing' && t.source?.trigger === tr.id) || (S.runs || []).find(r => r.status === 'running' && r.source?.trigger === tr.id));
+    const nx = busy ? `<span class="spinner sm" aria-hidden="true"></span> ${live ? (live.steps ? `run · step ${live.step + 1}/${live.steps.length}` : `#${live.id} · ${esc(live.who || 'queued')}`) : tr.checking ? 'checking' : 'starting'}` : !tr.enabled ? 'off' : tr.checking ? 'checking…' : tr.next ? `<span data-until="${tr.next}">${untilTxt(tr.next)}</span>` : SCHED_ON[tr.kind] || '';
+    return `<div class="sched${tr.enabled ? '' : ' off'}${tr.error ? ' err' : ''}${busy ? ' busy' : ''}" data-sched="${esc(tr.id)}" ${busy ? '' : 'draggable="true"'} tabindex="0" title="${esc(trigWhat(tr))}${tr.error ? ' · ⚠ ' + esc(tr.error) : ''}">
+      <div class="th"><span class="ic">${TRIG_KIND[tr.kind]?.ic || '◷'}</span><span class="t">${esc(tr.name)}</span>${tr.enabled && !busy ? `<button class="run" data-sched-run="${esc(tr.id)}" title="${['ado', 'teams', 'pipeline'].includes(tr.kind) ? 'Check now' : 'Fire once now'}" aria-label="Run ${esc(tr.name)} now">▶</button>` : ''}</div>
+      <div class="d">${esc(trigWhat(tr))}</div>
+      <div class="f"><span class="tag scheduled">scheduled</span><span class="tag k-${tr.kind}">${SCHED_TAG[tr.kind] || tr.kind}</span><span title="Starts">→ ${esc(target)}</span>${tr.error ? '<span style="color:var(--red)">⚠</span>' : ''}<span class="nx">${nx}</span></div>
+    </div>`;
+}
+async function schedRun(tr) {
+  view.schedKick = {...view.schedKick, [tr.id]: Date.now()};
+  const r = await act('trigger_run', {id: tr.id});
+  if (r.ok) toast(`${tr.name}: ${['ado', 'teams', 'pipeline'].includes(tr.kind) ? 'checking now' : 'fired once'}`, 'var(--amber)');
+  else delete view.schedKick[tr.id];
+  renderBoard(); setTimeout(renderBoard, 15500);
+}
+document.addEventListener('dragstart', e => {
+  const c = e.target.closest?.('[data-sched]'); if (!c) return;
+  e.stopPropagation(); view.dragging = true; c.classList.add('dragging');
+  e.dataTransfer.setData('crew/sched', c.dataset.sched); e.dataTransfer.effectAllowed = 'move';
+}, true);
+document.addEventListener('drop', async e => {
+  const id = e.dataTransfer?.getData('crew/sched'); if (!id) return;
+  e.preventDefault(); e.stopPropagation(); view.dragging = false;
+  document.querySelectorAll('.drop').forEach(x => x.classList.remove('drop'));
+  const tr = (S.triggers || []).find(t => t.id === id), col = e.target.closest('[data-col]')?.dataset.col;
+  if (tr && col === 'doing') { if (!tr.enabled) toast(`${tr.name} is off: turn it on to run it`, 'var(--faint)'); else await schedRun(tr); }
+  else if (tr && col !== 'backlog') toast('Drop a scheduled job on In progress to run it now', 'var(--faint)');
+  render();
+}, true);
+document.addEventListener('click', async e => {
+  const f = e.target.closest('[data-sched-fold]'), run = e.target.closest('[data-sched-run]'), c = e.target.closest('[data-sched]');
+  if (!f && !run && !c) return;
+  e.stopPropagation();
+  if (f) { view.schedFold = !view.schedFold; return renderBoard(); }
+  const tr = (S.triggers || []).find(t => t.id === (run || c).dataset[run ? 'schedRun' : 'sched']); if (!tr) return;
+  if (run) return schedRun(tr);
+  editTrig(tr); $('#trigModal').classList.add('on');
+}, true);
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-sched],[data-sched-fold]')) e.target.click(); });
 // Workflow runs on the board: one frame per run, in the column of its current step (the task it is on, or its last
 // task once it ended). The run's other tasks leave their columns and show as rows inside the frame.
 function runGroups() {

@@ -158,6 +158,8 @@ Each agent starts a **fresh Claude session for every new task** by default. Old 
 
 Assigning a task is the manual trigger. Press <kbd>T</kbd> for the automatic ones. Each firing adds a task from a template, and the dispatcher hands it out like any other.
 
+Every trigger also shows at the top of the Backlog as a *scheduled* card with its kind and next time. Drag one to In progress to run it now; it comes back to the Backlog when the run finishes.
+
 | Trigger | Fires when | Example |
 | --- | --- | --- |
 | ◷ **Schedule** | A cron expression matches, in local time | `0 11 * * 1-5`: the scribe writes the standup report |
