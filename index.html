@@ -131,7 +131,15 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .agent .row1{display:flex;align-items:center;gap:10px}
 .av{position:relative;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:13px;background:var(--av);color:var(--text);flex:none;text-transform:uppercase}
 .av::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--ring,transparent)}
-.av.running::after{--ring:var(--green);animation:pulse 1.6s ease-in-out infinite}
+.av.idle::after{--ring:var(--faint);border-style:dashed;opacity:.6}
+.av.running::after{border-color:var(--green) transparent var(--green) transparent;animation:aspin 1.4s linear infinite}
+.av.paused::after{--ring:var(--amber)}
+@keyframes aspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.av.running::after{animation:none}}
+/* time on the avatar: how long it has run, or since it was last active */
+.av .tm{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);font:600 9.5px/1 var(--mono);padding:2px 4px;border-radius:5px;background:var(--surface);border:1px solid var(--line2);color:var(--faint);white-space:nowrap;text-transform:none;letter-spacing:0;z-index:1}
+.av.running .tm{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent)}
+.av.review .tm{color:var(--blue)}
 .av.review::after{--ring:var(--blue)}.av.error::after{--ring:var(--red)}.av.killed{opacity:.45}.av.killed::after{--ring:var(--red)}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(1.06)}}
 .agent .name{font-weight:600;font-size:13.5px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -274,6 +282,24 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .dd>summary:hover{color:var(--text)}
 .dd .role{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
 .dh .row .kebab{margin:0}
+/* agent drawer header: one row; the avatar ring shows the state, a line under the name says it */
+.dh{container-type:inline-size}.ahead{gap:9px}.ahead .atxt{min-width:0;flex:1}
+.ahead .av{width:36px;height:36px}.ahead .av::after{inset:-4px}
+.ameta{font-size:12px;color:var(--muted);display:flex;gap:5px;white-space:nowrap;overflow:hidden;min-width:0;margin-top:1px}
+.ameta span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ameta b{font-weight:600;color:var(--muted);flex:none}
+.ameta.running b{color:var(--green)}.ameta.review b{color:var(--blue)}.ameta.paused b{color:var(--amber)}.ameta.error b,.ameta.killed b{color:var(--red)}
+.atb{display:flex;flex:none;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--surface)}
+.atb button{height:28px;border:0;background:none;display:inline-flex;align-items:center;gap:6px;padding:0 10px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--text)}
+.atb button+button{border-left:1px solid var(--line2)}
+.atb button:hover{background:var(--hover)}
+.atb .editb{color:var(--accent-fg,var(--accent));font-weight:550}
+.atb .editb[aria-expanded="true"]{background:var(--accent-soft)}
+.atb .bin{color:var(--red);padding:0 8px}.atb .bin:hover{background:var(--red-soft)}
+.atb svg{width:14px;height:14px}
+.ahead>.btn{flex:none}
+@container (max-width:340px){.ahead .lbl{display:none}}
+
 .stream{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 .m{max-width:100%;font-size:13px}
 .m.text{white-space:pre-wrap;word-wrap:break-word;line-height:1.55;color:var(--text2)}
@@ -1149,7 +1175,7 @@ function renderRail() {
       const live = a.status === 'running';
       return `<div class="agent ${sel ? 'sel' : ''}" tabindex="0" data-agent="${a.name}" data-drop-agent="${a.name}" draggable="true" title="Drag to reorder · drop a task here to hand it over">
         <div class="row1">
-          <div class="av ${a.status}" ${avPaint(a)}>${avFace(a, 16)}</div>
+          ${avStat(a)}
           <div style="min-width:0"><div class="name" title="${esc(a.name)}">${esc(a.name)}</div><div class="role">${esc(a.role)}</div></div>
           <span class="pill ${a.status}"><span class="dot" style="background:currentColor"></span>${a.status}</span>
           <div class="tools">
@@ -1160,7 +1186,7 @@ function renderRail() {
           </div>
           <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, delete…" aria-label="More actions for ${a.name}" aria-haspopup="menu">⋮</button>
         </div>
-        <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : 'waiting for work'}</span>`}</div>
+        <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : `waiting for work${lastActive(a) ? ` · active ${agoText(lastActive(a))}` : ''}`}</span>`}</div>
         ${a.activity ? `<div class="act ${live ? 'live' : ''}">› ${esc(a.activity)}</div>` : ''}
         ${subChips(a)}
         <div class="meta" style="align-items:center">${modelChip(a.model)}${effortBars(a.effort)}<span style="margin-left:auto;white-space:nowrap">${live ? `<span data-since="${a.since}" title="Running for">${ago(a.since)}</span> · ` : ''}<span class="tok" title="Tokens this session: in ${fmtTok(a.tokens?.in)} · cache ${fmtTok(a.tokens?.cache)} · out ${fmtTok(a.tokens?.out)}">${fmtTok(tokTotal(a))}</span>${showCost ? ` · <span title="Cost this session">${money(a.cost)}</span>` : ''}</span></div>
@@ -1369,17 +1395,19 @@ function renderAgentDrawer(d, a) {
     $('#msg').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } });
     $('#send').onclick = sendMsg;
   }
-  $('#dh').innerHTML = `<div class="row"><div class="av ${a.status}" ${avPaint(a)}>${avFace(a, 16)}</div>
-      <div style="min-width:0"><h3 title="${esc(a.name)}">${esc(a.name)}</h3></div>
-      <span class="pill ${a.status}" style="margin-left:auto"><span class="dot" style="background:currentColor"></span>${a.status}</span>
+  const dt = a.task ? task(a.task) : null, dead = a.status === 'killed' || a.status === 'error';
+  const said = {running: dt ? `#${dt.id} ${esc(dt.title)}` : esc(a.activity || 'working'), review: dt ? `#${dt.id} is done, needs you` : 'needs you',
+    paused: 'paused · Resume to pick up work', error: esc((a.error || 'stopped with an error').slice(0, 90)), killed: 'process stopped · Respawn to bring it back'}[a.status] || `waiting for work${lastActive(a) ? ` · last active ${agoText(lastActive(a))}` : ''}`;
+  $('#dh').innerHTML = `<div class="row ahead">
+      ${avStat(a)}
+      <div class="atxt"><h3 title="${esc(a.name)}">${esc(a.name)}</h3>
+        <div class="ameta ${a.status}" title="${said}"><b>${AST[a.status] || esc(a.status)}</b><span>· ${said}${a.status === 'running' && a.since ? ` · <span data-since="${a.since}">${ago(a.since)}</span>` : ''}</span></div></div>
+      ${dead ? `<button class="btn sm" data-respawn="${a.name}" title="Respawn, keeping its session">↻ <span class="lbl">Respawn</span></button><button class="btn sm ghost" data-respawn-fresh="${a.name}" title="Respawn with a fresh session">Fresh</button>`
+        : a.status === 'running' ? `<button class="btn sm danger" data-stop="${a.name}" title="End this run now. The session is kept and the task waits on hold.">■ <span class="lbl">Stop</span></button>`
+        : a.status === 'paused' ? `<button class="btn sm" data-resume="${a.name}" style="color:var(--amber)">▶ <span class="lbl">Resume</span></button>` : ''}
+      <div class="atb"><button class="editb" data-toggle-settings aria-expanded="${!!view.showSettings}" title="Model, effort, role, tags, look and triggers">${PEN}<span class="lbl">${view.showSettings ? 'Done' : 'Edit'}</span></button><button class="bin" data-remove-agent="${a.name}" title="Delete ${esc(a.name)}" aria-label="Delete ${esc(a.name)}">${BIN}</button></div>
       <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, kill, delete…" aria-label="More actions for ${a.name}" aria-haspopup="menu">⋮</button>
       <button class="iconbtn" data-close-drawer title="Close" aria-label="Close">✕</button></div>
-    <div class="dactions">
-      ${a.status === 'killed' || a.status === 'error'
-        ? `<button class="btn sm" data-respawn="${a.name}">↻ Respawn</button><button class="btn sm ghost" data-respawn-fresh="${a.name}">Respawn with fresh session</button>`
-        : `${a.status === 'running' ? `<button class="btn sm danger" data-stop="${a.name}" title="End this run now. The session is kept and the task waits on hold.">■ Stop</button>` : ''}${a.status === 'paused' ? `<button class="btn sm" data-resume="${a.name}" style="color:var(--amber)">▶ Resume</button>` : ''}`}
-      <button class="btn sm primary editb" data-toggle-settings aria-expanded="${!!view.showSettings}" title="Model, effort, role, tags, look and triggers">${PEN} ${view.showSettings ? 'Done' : 'Edit'}</button><button class="iconbtn bin" data-remove-agent="${a.name}" title="Delete ${esc(a.name)}" aria-label="Delete ${esc(a.name)}">${BIN}</button>
-    </div>
     ${ctxRow(a)}${blockedBox(a)}`;
   const inh = $('#dinh'); if (inh) { inh.hidden = !view.showInherit; if (view.showInherit) { const h = inheritHtml(a); if (inh.dataset.sig !== h) { inh.innerHTML = h; inh.dataset.sig = h; } } }
   renderSettings(a);
@@ -1487,6 +1515,15 @@ function renderSettings(a) {
 // add-agent modal
 $('#aRole').oninput = e => fitRole(e.target);
 const newAgent = {tags: [], model: 'sonnet', effort: ''};
+function lastActive(a) { return a.log?.length ? a.log[a.log.length - 1].t : 0; }
+function shortAgo(t) { const s = Math.max(0, Math.floor(Date.now() / 1000 - t)); return s < 60 ? s + 's' : s < 3600 ? Math.floor(s / 60) + 'm' : s < 86400 ? Math.floor(s / 3600) + 'h' : Math.floor(s / 86400) + 'd'; }
+// avatar with the status ring and a small time tag: run time while running, otherwise time since last active
+function avStat(a) {
+  const t = a.status === 'running' ? a.since : lastActive(a);
+  const tip = a.status === 'running' ? 'Running for' : 'Last active';
+  return `<div class="av ${a.status}" ${avPaint(a)}>${avFace(a, 16)}${t && a.status !== 'killed' ? `<span class="tm" data-since-s="${t}" title="${tip}">${shortAgo(t)}</span>` : ''}</div>`;
+}
+const AST = {idle: 'Idle', running: 'Running', review: 'To review', paused: 'Paused', error: 'Error', killed: 'Killed'};
 function openAgentModal() {
   Object.assign(newAgent, {tags: [], model: 'sonnet', effort: ''});
   $('#aName').value = ''; $('#aRole').value = ''; fitRole($('#aRole')); $('#aTagNew').value = '';
@@ -3160,7 +3197,7 @@ document.addEventListener('keydown', e => {
 });
 
 // live timers
-setInterval(() => { document.querySelectorAll('[data-since]').forEach(el => el.textContent = ago(+el.dataset.since)); document.querySelectorAll('[data-until]').forEach(el => el.textContent = untilTxt(+el.dataset.until)); }, 1000);
+setInterval(() => { document.querySelectorAll('[data-since]').forEach(el => el.textContent = ago(+el.dataset.since)); document.querySelectorAll('[data-since-s]').forEach(el => el.textContent = shortAgo(+el.dataset.sinceS)); document.querySelectorAll('[data-until]').forEach(el => el.textContent = untilTxt(+el.dataset.until)); }, 1000);
 
 // deep links: #agent=builder[&settings], #review=3 (or any), #modal=project|task, #palette
 let deepLink = location.hash.length > 1 ? new URLSearchParams(location.hash.slice(1)) : null;
