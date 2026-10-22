@@ -292,7 +292,8 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .trigbtn{cursor:pointer}.trigbtn:hover{border-color:var(--line2);color:var(--text)}
 .trigbtn svg{color:var(--amber)}.trigbtn b{color:var(--text);font-weight:500}
 .modal.tm{width:min(860px,calc(100vw - 32px))}
-.modal.tm .mb{max-height:min(68vh,720px);overflow:auto}
+.modal.tm{width:min(760px,calc(100vw - 32px))}
+.modal.tm .mb{max-height:min(82vh,900px);overflow:auto}
 .trow{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--bg2)}
 .trow.off{opacity:.55}
 .trow.manual{background:transparent;border-style:dashed}
@@ -302,9 +303,12 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .tic.k-webhook{background:var(--amber-soft);color:var(--amber)}.tic.k-ado{background:var(--blue-soft);color:var(--blue)}
 .adochip{font:600 10.5px var(--mono);color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:5px;padding:0 5px;background:var(--blue-soft)}
 .adochip:hover{text-decoration:underline}
-.adoout{border:1px solid var(--line);border-radius:9px;background:var(--bg2);padding:8px 10px;font-size:12px;max-height:200px;overflow:auto}
-.adoout .ai{display:flex;gap:8px;padding:2px 0}.adoout .ai b{font:600 11px var(--mono);color:var(--blue);flex:none}
-.adoout .ai span:last-child{color:var(--faint);flex:none;margin-left:auto}.adoout .err{color:var(--red)}
+.adoout{flex:none;border:1px solid var(--line);border-radius:10px;background:var(--bg2);font-size:12.5px;min-height:96px;max-height:min(420px,46vh);overflow:auto;overscroll-behavior:contain}
+.adoout .ah{position:sticky;top:0;padding:9px 12px;background:var(--bg2);border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
+.adoout .ai{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:8px 12px;border-bottom:1px solid var(--line)}
+.adoout .ai:last-child{border-bottom:0}.adoout .ai b{font:600 11.5px var(--mono);color:var(--blue)}
+.adoout .ai .t{color:var(--text);line-height:1.4}.adoout .ai .m{color:var(--faint);font-size:11.5px;white-space:nowrap}
+.adoout .err,.adoout .none{padding:12px}.adoout .err{color:var(--red)}.adoout .none{color:var(--faint)}
 .chkrow{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px}.chkrow label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .tmain{min-width:0;display:flex;flex-direction:column;gap:4px}
 .tmain .tn{font-weight:600;font-size:13.5px}
@@ -1824,7 +1828,7 @@ function drawTrigForm() {
       <div><div class="label">After pickup</div>${seg('s', 'after', [['tag_picked', `add tag ${tg}-picked`], ['remove_tag', `remove the tag ${tg}`], ['none', 'do nothing']], sp.after)}
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sc="comment" ${sp.comment ? 'checked' : ''}> Post a comment: “Picked up by Crew: …, run #…”</label></div></div>
       <div><button class="btn sm" data-ado-test ${out?.busy ? 'disabled' : ''}>${out?.busy ? 'Asking Azure DevOps…' : 'Test: list matching items'}</button><span class="faint" style="font-size:11.5px;margin-left:8px">Read-only: starts nothing, writes nothing.</span></div>
-      ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="faint" style="margin-bottom:4px">${out.total} item${out.total === 1 ? '' : 's'} would start${out.total > 10 ? ' (10 per check)' : ''}</div>` + out.items.map(i => `<div class="ai"><b>AB#${+i.id}</b><span>${esc(i.title)}</span><span>${esc(i.type)} · ${esc(i.state)}</span></div>`).join('') : '<div class="faint">No open items carry that tag yet.</div>'}</div>` : ''}
+      ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="ah">${out.total} item${out.total === 1 ? '' : 's'} would start${out.total > 10 ? ' · 10 per check' : ''}${out.total > out.items.length ? ` · showing ${out.items.length}` : ''}</div>` + out.items.map(i => `<div class="ai"><b>AB#${+i.id}</b><span class="t">${esc(i.title)}</span><span class="m">${esc(i.type)} · ${esc(i.state)}</span></div>`).join('') : '<div class="none">No open items carry that tag yet.</div>'}</div>` : ''}
       <div class="thint">Needs the Azure CLI signed in (<code>az login</code>) with <code>az extension add --name azure-devops</code>. Items you tag get picked up, started once each, and marked in Azure DevOps.</div>`;
   }
   if (k === 'webhook') spec = `<div class="thint">Saving creates a URL and a secret token. POST to it from CI, a git hook or a script; the body becomes <code>{payload}</code>. The server only listens on this computer, so remote services need a tunnel.</div>`;
