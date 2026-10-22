@@ -197,6 +197,7 @@ At most 10 items start per check, and closed, done and removed items are skipped
 | 💬 **Talk mid-run** | Message any agent while it works. The message lands in the running session. |
 | ☕ **Keep-awake** | `--awake` stops idle sleep while agents work, so runs and schedules aren't paused. |
 | 📱 **Phone app feel** | `--lan` plus a QR code. On a phone: bottom navigation, swipeable columns, bottom sheets, Android back closes sheets. |
+| 🌗 **Light and dark** | Header **⋮** menu: System, Dark or Light. System follows your OS. |
 | ■ **Stop, kill, clear** | Stop a run (session kept, task on hold), stop everything at once, or clear the board. Agent ⋮ menus rename, recolour and kill. |
 | 🔐 **Permission modes** | Accept edits (default), Auto (Claude Code's safety classifier) or Bypass, from the **Permissions** chip in the header. |
 | 🔢 **Tokens and cost** | Live token counts per agent, per task and in total. Hide the dollar amounts with one click. Totals are marked "this session". |

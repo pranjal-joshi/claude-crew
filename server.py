@@ -1564,7 +1564,12 @@ class Crew:
     # Assigning a task is the manual trigger. These add the automatic ones: each firing adds a
     # backlog task from the trigger's template, and the dispatcher hands it out like any other.
     def _public_triggers(self) -> list[dict]:
-        return [{k: v for k, v in tr.items() if not k.startswith("_")} for tr in self.triggers]
+        out = [{k: v for k, v in tr.items() if not k.startswith("_")} for tr in self.triggers]
+        for pub, tr in zip(out, self.triggers):
+            if tr["kind"] in ("poll", "ado"):  # same rule as tick_triggers: never checked means due now
+                pub["next"] = tr.get("_checked", 0) + tr["spec"]["every"] * 60 if tr["enabled"] else None
+                pub["checking"] = bool(tr.get("_running"))
+        return out
 
     def _trigger(self, tid) -> dict | None:
         return next((tr for tr in self.triggers if tr["id"] == tid), None)

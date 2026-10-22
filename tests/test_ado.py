@@ -106,6 +106,16 @@ class AdoTriggerCase(AdoCase):
         agent = self.add(workflow="", agent=next(iter(self.crew.agents)))
         self.assertEqual(agent["spec"]["workflow"], "")
 
+    def test_public_next_check(self):
+        tr = self.add(every=7)
+        pub = lambda: next(t for t in self.crew._public_triggers() if t["id"] == tr["id"])
+        self.assertEqual((pub()["next"], pub()["checking"]), (7 * 60, False))  # never checked: due now
+        tr["_checked"], tr["_running"] = 1000.0, True
+        self.assertEqual((pub()["next"], pub()["checking"]), (1000.0 + 7 * 60, True))
+        tr["enabled"] = False
+        self.assertIsNone(pub()["next"])
+        self.assertNotIn("_checked", pub())
+
     def test_mcp_callers_are_refused(self):
         body = {"name": "b", "kind": "ado", "spec": self.SPEC, "task": {}}
         for via in ("mcp", "boss"):
