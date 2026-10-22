@@ -94,7 +94,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .stat b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
 .stat{white-space:nowrap}
 @media (max-width:1280px){#palBtn{display:none}}
-@media (max-width:1280px){.top{gap:10px}#trigBtn .tl,.projbtn .pb{display:none}.projbtn{max-width:200px}}
+@media (max-width:1280px){.top{gap:10px}.projbtn .pb{display:none}.projbtn{max-width:200px}}
 @media (max-width:1100px){.stats .tokstat{display:none}}
 @media (max-width:900px){.brand{font-size:0;gap:0}#newBtn kbd{display:none}.projbtn{max-width:130px}.stats .stopall .sl,#mode .pl,#newBtn .nt{display:none}.stats .stat{padding:0 9px}.top{gap:8px;padding:0 12px}}
 .dot{width:7px;height:7px;border-radius:50%;flex:none}
@@ -186,6 +186,15 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .flows{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:22px;min-height:0}
 .flows h3{margin:0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
 .flows h3 .faint{font-weight:400}
+.trigs{padding:0;gap:0}
+.tpg{width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding:18px;flex:1 0 auto;min-height:0}
+.tph{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap}
+.tph h3{font-size:15px}.tph .tsub{font-size:12px;flex:1;min-width:200px}
+.tpio{display:flex;gap:6px;flex-wrap:wrap}
+.tpb{display:flex;flex-direction:column;gap:12px}
+.tpf{position:sticky;bottom:0;margin:auto -18px 0;padding:12px 18px;border-top:1px solid var(--line);background:var(--bg);display:flex;justify-content:flex-end;gap:8px;z-index:2}
+.tpf:empty{display:none}
+.tabs svg{color:var(--amber);flex:none}
 .wfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px}
 .wf{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .wf .wh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -402,13 +411,6 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .seg button.on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-ink2)}
 .top .btn,.top .chip,.top .stat{white-space:nowrap;flex:none}
 @media (max-width:1600px){#palBtn{display:none}}
-.trigbtn{cursor:pointer}.trigbtn:hover{border-color:var(--line2);color:var(--text)}
-.trigbtn svg{color:var(--amber)}.trigbtn b{color:var(--text);font-weight:500}
-.modal.tm{width:min(860px,calc(100vw - 32px))}
-.modal.tm{width:min(760px,calc(100vw - 32px))}
-.modal.tm{max-height:calc(88vh - 24px);display:flex;flex-direction:column}  /* the scrim starts it 12vh down */
-.modal.tm .mb{flex:1 1 auto;min-height:0;overflow:auto}
-.modal.tm .mb>*,.modal.tm .mh,.modal.tm .mf{flex-shrink:0}
 .kindsel{display:flex;align-items:center;gap:10px}.kindsel select{max-width:260px;font-weight:600}
 .pchips{display:flex;flex-wrap:wrap;gap:6px}.pchips .pc{display:inline-flex;align-items:center;gap:6px;font:12px var(--mono);border:1px solid var(--line2);background:var(--bg2);border-radius:7px;padding:3px 4px 3px 9px}
 .pchips .pc button{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;padding:0 4px;border-radius:5px}.pchips .pc button:hover{color:var(--red);background:var(--red-soft)}
@@ -491,6 +493,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .spinner.sm{width:13px;height:13px;border-width:2px}
 .iolist{display:flex;flex-direction:column;gap:4px;max-height:min(52vh,460px);overflow:auto;margin:0 -4px;padding:0 4px}
 .iorow{display:grid;grid-template-columns:18px 30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--bg2);cursor:pointer}
+.iorow .tic{width:28px;height:28px;font-size:13px}
 .iorow:hover{background:var(--hover)}.iorow.off{opacity:.55}.iorow .av{width:28px;height:28px;font-size:12px}
 .iorow b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .iorow .r{font-size:11.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -678,9 +681,9 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   .app{grid-template-rows:52px 1fr;height:100dvh}
   .top{padding:0 12px;gap:8px;padding-top:env(safe-area-inset-top)}
   .brand{font-size:0;gap:0}.brand .mark{width:30px;height:30px}
-  #palBtn,#newBtn,.projbtn .pb,.stats .stat:not(.stopall):not(.resumeall):not(.blockedb),#trigBtn .tl,#conn{display:none!important}
+  #palBtn,#newBtn,.projbtn .pb,.stats .stat:not(.stopall):not(.resumeall):not(.blockedb),#conn{display:none!important}
   #mode{max-width:84px;padding:0 8px;font-size:11.5px}
-  .top{gap:6px;padding-left:10px;padding-right:10px}.top .chip{padding:0 7px}.projbtn>.faint,#trigN{display:none}#hMenu{width:30px;height:30px;flex:none}
+  .top{gap:6px;padding-left:10px;padding-right:10px}.top .chip{padding:0 7px}.projbtn>.faint{display:none}#hMenu{width:30px;height:30px;flex:none}
   .projbtn{max-width:32vw!important;padding:0 8px}
   .stats .sl{display:none}
   .slash{display:none}
@@ -708,12 +711,15 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   .colnav button{flex:none;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg2);color:var(--muted);font-weight:600;font-size:12.5px;display:inline-flex;align-items:center;gap:6px}
   .colnav button.on{background:var(--raised);color:var(--text);border-color:var(--line2)}
   .colnav button .n{font:500 11px var(--mono);color:var(--faint)}
-  body[data-m="flows"] .colnav{display:none}
+  body[data-m="flows"] .colnav,body[data-m="trigs"] .colnav{display:none}
   .board,.body.drawer-open .board{display:flex!important;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;padding:10px 12px;scrollbar-width:none;overscroll-behavior-x:contain}
   .board::-webkit-scrollbar{display:none}
+  .board[hidden],.body.drawer-open .board[hidden]{display:none!important}
   .board .col{flex:0 0 calc(100vw - 24px);scroll-snap-align:center;min-height:0;display:flex;flex-direction:column}
   .board .col .cards{overflow:auto;flex:1}
   .flows{padding:12px}
+  .trigs{padding:0}.tpg{padding:12px}.tpf{margin:auto -12px 0;padding:10px 12px}.tph h3{font-size:14px}.tph .tsub{display:none}
+  .trow{grid-template-columns:30px 1fr}.trow .tact{grid-column:1/-1;justify-content:flex-end}
   .wfgrid{grid-template-columns:1fr}
   .wf .wh{flex-wrap:wrap}
   .chatbar{display:none}
@@ -725,7 +731,7 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   .drawer{position:fixed!important;inset:auto 0 0 0!important;top:max(36px,env(safe-area-inset-top))!important;width:100vw!important;z-index:30;border:0;border-radius:18px 18px 0 0;box-shadow:0 -10px 40px var(--sh-pop);animation:sheet .22s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom)}
   .drawer::before,.modal::before{content:"";display:block;width:40px;height:4px;border-radius:9px;background:var(--line2);margin:8px auto 0;flex:none}
   .scrim{align-items:flex-end;padding:0}
-  .modal,.modal.tm,.modal.pm{width:100vw!important;max-height:92dvh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;animation:sheet .22s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom)}
+  .modal,.modal.pm{width:100vw!important;max-height:92dvh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;animation:sheet .22s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom)}
   .modal .mb{overflow:auto}
   .modal .mh .faint{display:none}
   .menu{left:8px!important;right:8px!important;top:auto!important;bottom:calc(8px + env(safe-area-inset-bottom))!important;max-width:none!important;max-height:70dvh;overflow:auto;border-radius:16px;animation:sheet .18s ease-out}
@@ -927,7 +933,6 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
     </button>
     <span class="chip demob" id="demoB" hidden>Demo</span>
     <button class="chip modebtn" id="mode" aria-haspopup="menu"></button>
-    <button class="chip trigbtn" id="trigBtn" title="Triggers: schedules, events, file watches, polls and webhooks"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> <span class="tl">Triggers</span> <b id="trigN">0</b></button>
     <div class="stats" id="stats"></div>
     <button class="btn ghost" id="palBtn" title="Command palette">Search <kbd>Ctrl K</kbd></button>
     <span class="awake" id="awake" hidden title="Keeping this computer awake while agents work. Locking the screen is fine; closing a laptop lid still sleeps.">☕</span>
@@ -939,7 +944,7 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
     <section class="main">
       <div class="banner" id="banner"></div>
       <div class="toolbar">
-        <div class="tabs" id="tabs"><button data-tab="board" class="on">Board</button><button data-tab="flows">Workflows <span class="n" id="runN"></span></button></div>
+        <div class="tabs" id="tabs"><button data-tab="board" class="on">Board</button><button data-tab="flows">Workflows <span class="n" id="runN"></span></button><button data-tab="trigs"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> Triggers <span class="n" id="trigN"></span></button></div>
         <span class="muted boardhint">Drag a card onto an agent to assign · unassigned cards go to matching roles</span>
         <button class="btn sm ghost clearbtn" id="clearBtn" aria-haspopup="menu" title="Remove finished or all tasks from the board">Clear board ▾</button>
       </div>
@@ -947,6 +952,13 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
       <div class="colnav" id="colnav"></div>
       <div class="board" id="board"></div>
       <div class="flows" id="flows" hidden></div>
+      <div class="flows trigs" id="trigs" hidden>
+        <div class="tpg">
+          <div class="tph"><h3 id="tmTitle">Triggers</h3><span class="faint tsub">Each firing adds a task; agents pick it up like any other</span><div class="tpio" id="tmIo"></div></div>
+          <div class="tpb" id="tmBody"></div>
+          <div class="tpf" id="tmFoot"></div>
+        </div>
+      </div>
       <div class="chatbar" id="chatbar">
         <div class="chatlog" id="chatlog" hidden></div>
         <div class="chatpeek" id="chatPeek" hidden role="button" tabindex="0"></div>
@@ -968,6 +980,7 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 <nav class="mnav" id="mnav">
   <button data-m="board" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg>Board<span class="badge" id="mBadge" hidden></span></button>
   <button data-m="flows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 6h9M6.5 8.2l4.2 7.6M17.5 8.2l-4.2 7.6"/></svg>Flows</button>
+  <button data-m="trigs"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Triggers</button>
   <button class="fab" data-m="new" aria-label="New"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
   <button data-m="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.6c2.4.3 4 1.9 4.6 4.6"/></svg>Agents</button>
   <button data-m="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>Boss</button>
@@ -1005,14 +1018,6 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
       <div><div class="label">Effort</div><div class="seg tight" id="aEffort"></div></div>
     </div>
     <div class="mf"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="aCreate">Add agent</button></div>
-  </div>
-</div>
-
-<div class="scrim" id="trigModal">
-  <div class="modal tm" role="dialog" aria-label="Triggers">
-    <div class="mh"><span id="tmTitle">Triggers</span><span class="faint" style="font-weight:400;font-size:12px;margin-left:auto;margin-right:12px">Each firing adds a task; agents pick it up like any other</span><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
-    <div class="mb" id="tmBody"></div>
-    <div class="mf" id="tmFoot"></div>
   </div>
 </div>
 
@@ -1173,8 +1178,7 @@ function render() {
   const mi = MODE_INFO[pm];
   $('#mode').innerHTML = `${pm === 'bypassPermissions' ? '⚠ ' : ''}<span class="pl">Permissions: </span><b>${esc(mi?.label || pm)}</b> ▾`;
   $('#mode').title = `Permission mode: ${mi?.label || pm}. ${mi?.sub || ''} It applies to every agent. Click to change.${S.git ? '' : ' This folder is not a git repo, so agents share it instead of getting their own worktrees.'}`;
-  $('#trigN').textContent = (S.triggers || []).filter(t => t.enabled).length;
-  if ($('#trigModal').classList.contains('on') && tv.mode === 'list') drawTriggers();
+  $('#trigN').textContent = (S.triggers || []).filter(t => t.enabled).length || '';
   const n = c => S.tasks.filter(t => t.col === c).length;
   const spend = S.agents.reduce((s, a) => s + (a.cost || 0), 0);
   const running = S.agents.filter(a => a.status === 'running').length;
@@ -1309,12 +1313,13 @@ $('#alerts').addEventListener('keydown', e => { if (e.key === 'Enter' && e.targe
 
 function renderBoard() {
   renderColnav();
-  const flows = view.tab === 'flows';
-  $('#board').hidden = flows; $('#clearBtn').hidden = flows; $('#flows').hidden = !flows;
-  document.querySelector('.boardhint').hidden = flows;
+  const tab = view.tab || 'board', flows = tab === 'flows', onBoard = tab === 'board';
+  $('#board').hidden = !onBoard; $('#clearBtn').hidden = !onBoard; $('#flows').hidden = !flows; $('#trigs').hidden = tab !== 'trigs';
+  document.querySelector('.boardhint').hidden = !onBoard;
   const running = (S.runs || []).filter(r => r.status === 'running').length;
   $('#runN').textContent = running ? `${running} running` : '';
   if (flows) return renderFlows();
+  if (tab === 'trigs') return renderTrigs();
   if (document.querySelector('.menu')) return; // keep an open menu anchored
   const show = () => true;
   if (!S.tasks.length && !(S.triggers || []).length) { $('#board').innerHTML = firstRunHtml(); return; }
@@ -1389,7 +1394,7 @@ document.addEventListener('click', async e => {
   if (f) { view.schedFold = !view.schedFold; return renderBoard(); }
   const tr = (S.triggers || []).find(t => t.id === (run || c).dataset[run ? 'schedRun' : 'sched']); if (!tr) return;
   if (run) return schedRun(tr);
-  editTrig(tr); $('#trigModal').classList.add('on');
+  openTriggers(); editTrig(tr);
 }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-sched],[data-sched-fold]')) e.target.click(); });
 // Workflow runs on the board: one frame per run, in the column of its current step (the task it is on, or its last
@@ -2311,7 +2316,20 @@ function hookBox(tr) {
   const curl = `curl -X POST "${location.origin}/api/hook/${tr.id}" -H "X-Crew-Token: ${tr.spec.token}" -d "deploy finished"`;
   return `<div class="hook"><code title="${esc(curl)}">${esc(curl)}</code><button class="btn sm" data-copy="${esc(curl)}">Copy</button></div>`;
 }
-function openTriggers() { tv = {mode: 'list'}; drawTriggers(); $('#trigModal').classList.add('on'); }
+// Triggers is a tab: every old entry point (palette, T, deep link, board cards, agent/workflow links) lands here.
+function gotoTab(t) {
+  view.tab = t;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
+  if (document.body.dataset.m) { document.body.dataset.m = t; document.querySelectorAll('#mnav [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === t)); }
+  closeModals(); render();
+}
+let trigSig = '';
+function openTriggers() { tv = {mode: 'list'}; trigSig = ''; gotoTab('trigs'); }
+const focusSoon = sel => setTimeout(() => $(sel)?.focus(), 0);
+function renderTrigs() {
+  if (tv.mode === 'list' || !$('#tmBody').firstChild) drawTriggers();
+}
+function trigBack(id) { tv = {mode: 'list'}; drawTriggers(); focusSoon(id ? `[data-tr-edit="${id}"]` : '[data-tr-new]'); }
 function blankTrig(kind = 'schedule') {
   return {name: '', kind, enabled: true, spec: {cron: '0 9 * * 1-5', on: 'done', tag: '', agent: '', glob: 'src/**/*', every: kind === 'poll' || kind === 'ado' ? 5 : 10, cooldown: 60, command: '', when: 'change',
                   org: '', project: '', workflow: '', types: [], after: 'tag_picked', comment: true, where: '', mode: 'mention', about: '', pipelines: [], result: ['any'], mine: true},
@@ -2320,7 +2338,7 @@ function blankTrig(kind = 'schedule') {
 function editTrig(tr) {
   const b = blankTrig(tr?.kind);
   tv = {mode: 'form', id: tr?.id || null, f: tr ? {...b, name: tr.name, kind: tr.kind, enabled: tr.enabled, spec: {...b.spec, ...tr.spec}, task: {...b.task, ...tr.task}} : b};
-  drawTriggers();
+  drawTriggers(); focusSoon('#tmBody [data-f="name"]');
 }
 function presetForm(i) {
   const pr = TRIG_PRESETS[i], b = blankTrig(pr.kind);
@@ -2341,7 +2359,7 @@ function ttRow(tr) {
 }
 function drawTriggers() {
   if (tv.mode === 'form') return drawTrigForm();
-  $('#tmTitle').textContent = 'Triggers';
+  $('#tmTitle').textContent = 'Triggers'; $('.tsub').hidden = false;
   const rows = (S.triggers || []).map(tr => `
     <div class="trow ${tr.enabled ? '' : 'off'}">
       <div class="tic k-${tr.kind}">${TRIG_KIND[tr.kind].ic}</div>
@@ -2360,16 +2378,22 @@ function drawTriggers() {
         <button class="iconbtn bin" data-tr-del="${tr.id}" title="Delete trigger" aria-label="Delete trigger">${BIN}</button>
       </div>
     </div>`).join('');
-  $('#tmBody').innerHTML = `
+  const html = `
     <div class="trow manual"><div class="tic">✋</div><div class="tmain"><div class="tn">Assign a task <span class="faint" style="font-weight:400">· Manual</span></div>
       <div class="tw" style="white-space:normal">Drag a card onto an agent, use a card's ⋯ menu, or press N. Always on.</div></div><div></div></div>
     ${rows || '<div class="empty">No automatic triggers yet. Start from a preset or build your own.</div>'}
     <div><div class="label">Start from a preset</div><div class="presets">${TRIG_PRESETS.map((pr, i) => `<button class="preset" data-tr-preset="${i}"><b>${TRIG_KIND[pr.kind].ic} ${esc(pr.name)}</b><span>${esc(pr.blurb)}</span></button>`).join('')}</div></div>`;
-  $('#tmFoot').innerHTML = `<button class="btn primary" data-tr-new>＋ New trigger</button>`;
+  if (trigSig === html) return;  // nothing changed: keep focus and scroll where they are
+  const fa = document.activeElement, mine = fa && $('#trigs').contains(fa);  // keep keyboard focus on the same control across a redraw
+  const key = mine ? ['data-tr-edit', 'data-tr-toggle', 'data-tr-run', 'data-tr-del', 'data-tr-new', 'data-tr-preset', 'data-io'].map(k => fa.hasAttribute(k) ? `[${k}="${fa.getAttribute(k)}"]` : '').find(Boolean) : '';
+  trigSig = html; $('#tmBody').innerHTML = html;
+  $('#tmIo').innerHTML = `<button class="btn sm ghost" data-io="export-triggers">Export…</button><button class="btn sm ghost" data-io="import-triggers">Import…</button><button class="btn sm primary" data-tr-new>＋ New trigger</button>`;
+  $('#tmFoot').innerHTML = '';
+  if (key) $(key)?.focus();
 }
 function drawTrigForm() {
   const f = tv.f, sp = f.spec, k = f.kind;
-  $('#tmTitle').textContent = tv.id ? 'Edit trigger' : 'New trigger';
+  $('#tmTitle').textContent = tv.id ? 'Edit trigger' : 'New trigger'; trigSig = ''; $('#tmIo').innerHTML = ''; $('.tsub').hidden = true;
   const seg = (attr, key, opts, cur) => `<div class="seg">${opts.map(([v, l]) => `<button data-${attr}="${key}" data-v="${esc(v)}" class="${(cur || '') === v ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>`;
   const CRONS = [['0 9 * * 1-5', 'Weekdays 9:00'], ['0 11 * * 1-5', 'Weekdays 11:00'], ['0 * * * *', 'Hourly'], ['*/15 * * * *', 'Every 15 min'], ['0 2 * * *', 'Nightly 2:00'], ['0 10 * * 1', 'Mondays 10:00']];
   let spec = '';
@@ -2476,7 +2500,6 @@ function drawTrigForm() {
   }
   $('#tmFoot').innerHTML = `<button class="btn ghost" data-tr-back>Back</button><button class="btn primary" data-tr-save>${tv.id ? 'Save' : 'Create trigger'}</button>`;
 }
-$('#trigBtn').onclick = openTriggers;
 const TEAMS_TASK = {title: '{title}', details: 'Teams message from {from} in {where} ({when}):\n\n{text}\n\n{link}'};
 function setTrigKind(kind) {
   const f = tv.f, was = f.kind;
@@ -2491,12 +2514,12 @@ function setTrigKind(kind) {
   f.kind = kind; f.spec.every = kind === 'poll' || kind === 'ado' || kind === 'pipeline' ? 5 : kind === 'watch' || kind === 'teams' ? 10 : f.spec.every;
   drawTrigForm();
 }
-$('#trigModal').addEventListener('change', e => { if (e.target.id === 'kindSel') setTrigKind(e.target.value); });
-$('#trigModal').addEventListener('click', async e => {
-  const b = e.target.closest('button'); if (!b || b.hasAttribute('data-close')) return;
+$('#trigs').addEventListener('change', e => { if (e.target.id === 'kindSel') setTrigKind(e.target.value); });
+$('#trigs').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b || b.dataset.io) return;
   const d = b.dataset, find = id => S.triggers.find(t => t.id === id);
   if ('trNew' in d) return editTrig(null);
-  if (d.trPreset) { tv = presetForm(+d.trPreset); return drawTriggers(); }
+  if (d.trPreset) { tv = presetForm(+d.trPreset); drawTriggers(); return focusSoon('#tmBody [data-f="name"]'); }
   if (d.trEdit) return editTrig(find(d.trEdit));
   if (d.trToggle) { const tr = find(d.trToggle); return act('trigger_update', {id: tr.id, enabled: !tr.enabled}); }
   if (d.trRun) { const r = await act('trigger_run', {id: d.trRun}); if (r.ok) toast(`${find(d.trRun)?.name}: ${({ado: 'checking the board', teams: 'checking Teams'})[find(d.trRun)?.kind] || 'fired once'}`, 'var(--amber)'); return; }
@@ -2524,13 +2547,12 @@ $('#trigModal').addEventListener('click', async e => {
     if (d.adoTarget === 'agent') { sp.workflow = ''; sp.agent = sp.agent || S.agents[0]?.name || ''; } else { sp.agent = ''; sp.workflow = sp.workflow || S.workflows?.[0]?.id || ''; }
     return drawTrigForm();
   }
-  if (d.trDel) { const tr = find(d.trDel); return askConfirm('Delete trigger?', `<b>${esc(tr.name)}</b> stops firing. Tasks it already created stay on the board.`, 'Delete', async () => { await act('trigger_delete', {id: tr.id}); openTriggers(); }, true); }
-  if ('trBack' in d) { tv = {mode: 'list'}; return drawTriggers(); }
+  if (d.trDel) { const tr = find(d.trDel); return askConfirm('Delete trigger?', `<b>${esc(tr.name)}</b> stops firing. Tasks it already created stay on the board.`, 'Delete', async () => { await act('trigger_delete', {id: tr.id}); trigBack(); }, true); }
+  if ('trBack' in d) return trigBack(tv.id);
   if ('trSave' in d) {
     const save = async () => {
-      $('#trigModal').classList.add('on');  // the confirm closed it
       const r = await act(tv.id ? 'trigger_update' : 'trigger_add', tv.id ? {...tv.f, id: tv.id} : tv.f);
-      if (r.ok) { toast(tv.id ? 'Trigger saved' : 'Trigger created', 'var(--amber)'); tv = {mode: 'list'}; drawTriggers(); }
+      if (r.ok) { toast(tv.id ? 'Trigger saved' : 'Trigger created', 'var(--amber)'); trigBack(tv.id); }
     };
     if (tv.f.kind === 'poll') return askConfirm('Run this command on your computer?', `Every ${esc(String(tv.f.spec.every || 5))} min Crew runs this in your shell, in <b>${esc(S.project)}</b>, with your permissions:<br><code style="display:block;margin-top:8px;white-space:pre-wrap;word-break:break-all">${esc(tv.f.spec.command || '')}</code>`, 'Save trigger', save, true);
     return save();
@@ -2547,7 +2569,7 @@ $('#trigModal').addEventListener('click', async e => {
   }
   if (d.k) { tv.f.task[d.k] = d.v; return drawTrigForm(); }
 });
-$('#trigModal').addEventListener('input', e => {
+$('#trigs').addEventListener('input', e => {
   const el = e.target, d = el.dataset;
   if (d.f) tv.f[d.f] = el.value;
   if (d.k) tv.f.task[d.k] = el.value;
@@ -2596,7 +2618,7 @@ function renderFlows() {
   if (ft === 'runs') { $('#flows').innerHTML = tabs + runsView(runs); return; }
   $('#flows').innerHTML = `${tabs}
     <div><h3>Workflows <span class="faint">Run agents in a fixed order. ✋ Waits for your approval · ⚡ Continues automatically.</span>
-      <button class="btn sm primary" data-wf-new style="margin-left:auto">＋ New workflow</button></h3></div>
+      <span class="wio" style="margin-left:auto;display:inline-flex;gap:6px;flex-wrap:wrap"><button class="btn sm ghost" data-io="export-workflows">Export…</button><button class="btn sm ghost" data-io="import-workflows">Import…</button><button class="btn sm primary" data-wf-new>＋ New workflow</button></span></h3></div>
     <div class="wfgrid">${flows.map(w => `
       <div class="wf ${w.off ? 'off' : ''}">
         <div class="wh">${offSw('workflow', w.id, w.off)}<b>${esc(w.name)}</b>${w.off ? '<span class="offtag">off</span>' : ''}<span class="faint" style="font:11px var(--mono)">${w.steps.length} steps</span>
@@ -2924,11 +2946,14 @@ function applyTheme() {
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', light ? '#F6EEDD' : '#18191f');
 }
 mqLight.addEventListener('change', applyTheme);
-// ---- export / import agents ------------------------------------------------------------
-// A file holds each agent's settings only (name, role, tags, model, effort, context, icon, colour): no sessions,
-// logs, costs or worktrees, so it is safe to share and to keep as a backup.
+// ---- export / import: agents, workflows, triggers -----------------------------------------------------
+// One dialog, three kinds. A file holds settings only, so it is safe to share and to keep as a backup:
+//   agents:    name, role, tags, model, effort, context, icon, colour (no sessions, logs, costs or worktrees)
+//   workflows: {"crew": "workflows", "version": 1, "items": [...]}: steps, gates, output, on/off
+//   triggers:  {"crew": "triggers", "version": 1, "items": [...]}: never the webhook token or what a trigger fired; the
+//              server builds both files, and imported triggers arrive turned off
 const AGENT_KEYS = ['name', 'role', 'tags', 'model', 'effort', 'context', 'icon', 'color'];
-let io = {mode: 'export', items: [], sel: new Set(), existing: 'skip', file: '', busy: false};
+let io = {kind: 'agents', mode: 'export', items: [], sel: new Set(), existing: 'skip', file: '', busy: false};
 function agentSpec(a) {  // keep only known keys with safe values: a shared file is untrusted input
   const o = {};
   for (const k of AGENT_KEYS) if (a[k] != null && a[k] !== '' && !(Array.isArray(a[k]) && !a[k].length)) o[k] = a[k];
@@ -2943,72 +2968,130 @@ function agentSpec(a) {  // keep only known keys with safe values: a shared file
   if (!/^[A-Za-z0-9-]{1,24}$/.test(o.name)) o.bad = 'name: 1-24 letters, digits or dashes';
   return o;
 }
-function openIO(mode) {
-  io = {mode, items: mode === 'export' ? S.agents.map(agentSpec) : [], sel: new Set(), existing: 'skip', file: '', busy: false};
+const IO_WORD = {agents: ['agent', 'agents'], workflows: ['workflow', 'workflows'], triggers: ['trigger', 'triggers']};
+const ioHas = n => S.agents.some(a => a.name === n);
+const ioWf = ref => (S.workflows || []).some(w => w.id === ref || w.name.toLowerCase() === String(ref).toLowerCase());
+// the rows the dialog lists: {name, bad?, warn?, sub, id?, raw?}. Exports list what this crew has; imports list a file.
+function ioItem(kind, x) {
+  if (kind === 'agents') return agentSpec(x);
+  const name = String(x?.name || '').trim().slice(0, 60);
+  if (kind === 'workflows') {
+    const steps = Array.isArray(x?.steps) ? x.steps : [], gone = [...new Set(steps.map(s => s?.agent).filter(a => a && !ioHas(a)))];
+    return {name, id: x?.id, raw: x, off: !!x?.off, bad: !name ? 'no name' : !steps.length ? 'no steps' : '',
+      warn: gone.length ? `no agent ${gone.join(', ')}: its run would fail at that step` : '',
+      sub: `${steps.length} step${steps.length === 1 ? '' : 's'}${steps.length ? ': ' + steps.map(s => s?.agent).join(' → ') : ''}`};
+  }
+  const kinds = TRIG_KIND, tk = kinds[x?.kind], sp = x?.spec || {}, tg = x?.task || {};
+  const wf = [sp.workflow, tg.workflow].find(Boolean), ag = [sp.agent, tg.agent].find(Boolean);
+  return {name: name || (tk ? tk.label : ''), id: x?.id, raw: x, off: x?.enabled === false,
+    bad: !tk ? 'unknown trigger type' : wf && !ioWf(wf) ? `no workflow ${wf} in this crew: import workflows first` : ag && !ioHas(ag) ? `no agent ${ag} in this crew` : '',
+    sub: tk ? `${tk.label} · ${(() => { try { return trigWhat({kind: x.kind, spec: sp, task: tg, enabled: true}); } catch { return ''; } })()}` : ''};
+}
+function ioExistingList(kind) {
+  return kind === 'agents' ? S.agents : kind === 'workflows' ? (S.workflows || []) : (S.triggers || []);
+}
+function openIO(mode, kind = 'agents') {
+  const src = ioExistingList(kind);
+  io = {kind, mode, items: mode === 'export' ? src.map(x => ioItem(kind, x)) : [], sel: new Set(), existing: 'skip', file: '', busy: false};
   if (mode === 'export') io.items.forEach(a => io.sel.add(a.name));
+  if (mode === 'export' && !io.items.length) return toast(`No ${IO_WORD[kind][1]} to export yet`, 'var(--amber)');
   drawIO(); $('#ioModal').classList.add('on');
 }
-const ioExists = n => S.agents.some(a => a.name.toLowerCase() === n.toLowerCase());
+const ioExists = n => ioExistingList(io.kind).some(a => a.name.toLowerCase() === n.toLowerCase());
+function ioRow(a, on, exp) {
+  const badge = a.bad ? `<span class="tag incident" title="${esc(a.bad)}">${io.kind === 'triggers' && !a.bad.startsWith('unknown') ? 'cannot import' : 'invalid'}</span>`
+    : exp ? (a.off ? `<span class="tag research">${io.kind === 'workflows' ? 'off' : 'paused'}</span>` : '')
+    : ioExists(a.name) ? `<span class="tag ${io.existing === 'update' ? 'review' : 'research'}">${io.existing === 'update' ? 'will update' : 'exists · skip'}</span>`
+    : a.warn ? `<span class="tag review" title="${esc(a.warn)}">agent missing</span>` : '<span class="tag test">new</span>';
+  const lead = io.kind === 'agents' ? `<div class="av" ${avPaint(a)}>${avFace(a, 15)}</div>`
+    : io.kind === 'triggers' ? `<div class="tic k-${esc(a.raw?.kind)}">${TRIG_KIND[a.raw?.kind]?.ic || '⚡'}</div>` : '<div class="tic">⛓</div>';
+  const sub = io.kind === 'agents' ? [a.model || 'default model', a.effort ? a.effort + ' effort' : '', (a.tags || []).join(', ')].filter(Boolean).join(' · ') + (a.role ? ' — ' + a.role : '') : a.sub;
+  const why = a.bad || a.warn;
+  return `<label class="iorow ${on ? '' : 'off'}" title="${esc(why || a.role || a.sub || '')}"><input type="checkbox" data-io-pick="${esc(a.name)}" ${on ? 'checked' : ''} ${a.bad ? 'disabled' : ''}>
+    ${lead}<div style="min-width:0"><b>${esc(a.name)}</b><div class="r">${esc(sub || '')}${!exp && why ? ' · ' + esc(why) : ''}</div></div>${badge}</label>`;
+}
 function drawIO() {
-  const exp = io.mode === 'export', n = io.items.filter(a => io.sel.has(a.name) && !a.bad && (exp || io.existing === 'update' || !ioExists(a.name))).length;
-  $('#ioTitle').textContent = exp ? 'Export agents' : 'Import agents';
-  const rows = io.items.map(a => {
-    const on = io.sel.has(a.name) && !a.bad;
-    const badge = a.bad ? `<span class="tag incident" title="${esc(a.bad)}">invalid</span>`
-      : exp ? '' : ioExists(a.name) ? `<span class="tag ${io.existing === 'update' ? 'review' : 'research'}">${io.existing === 'update' ? 'will update' : 'exists · skip'}</span>` : '<span class="tag test">new</span>';
-    const sub = [a.model || 'default model', a.effort ? a.effort + ' effort' : '', (a.tags || []).join(', ')].filter(Boolean).join(' · ');
-    return `<label class="iorow ${on ? '' : 'off'}" title="${esc(a.role || '')}"><input type="checkbox" data-io-pick="${esc(a.name)}" ${on ? 'checked' : ''} ${a.bad ? 'disabled' : ''}>
-      <div class="av" ${avPaint(a)}>${avFace(a, 15)}</div><div style="min-width:0"><b>${esc(a.name)}</b><div class="r">${esc(sub)}${a.role ? ' — ' + esc(a.role) : ''}</div></div>${badge}</label>`;
-  }).join('');
+  const exp = io.mode === 'export', [one, many] = IO_WORD[io.kind];
+  const n = io.items.filter(a => io.sel.has(a.name) && !a.bad && (exp || io.existing === 'update' || !ioExists(a.name))).length;
+  $('#ioTitle').textContent = `${exp ? 'Export' : 'Import'} ${many}`;
+  const rows = io.items.map(a => ioRow(a, io.sel.has(a.name) && !a.bad, exp)).join('');
   const all = `<button class="lk" data-io-all>Select all</button><button class="lk" data-io-none>None</button>`;
+  const note = io.kind === 'triggers' ? 'No webhook tokens or history' : io.kind === 'workflows' ? 'Definitions only: no runs' : 'Settings only: no chats, sessions or costs';
   if (exp) {
-    $('#ioBody').innerHTML = `<div class="iobar">${n} of ${io.items.length} selected · ${all}<span class="faint" style="margin-left:auto">Settings only: no chats, sessions or costs</span></div><div class="iolist">${rows}</div>`;
-    $('#ioFoot').innerHTML = `<button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-io-download ${n ? '' : 'disabled'}>Download ${n} agent${n === 1 ? '' : 's'}</button>`;
+    $('#ioBody').innerHTML = `<div class="iobar">${n} of ${io.items.length} selected · ${all}<span class="faint" style="margin-left:auto">${note}</span></div><div class="iolist">${rows}</div>`;
+    $('#ioFoot').innerHTML = `<button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-io-download ${n && !io.busy ? '' : 'disabled'}>Download ${n} ${n === 1 ? one : many}</button>`;
     return;
   }
   if (!io.items.length) {
-    $('#ioBody').innerHTML = `<div class="iodrop" id="ioDrop"><div>Drop a Crew agents file here, or</div><button class="btn" data-io-choose>Choose a JSON file…</button><div class="faint" style="font-size:12px">An export from Crew, or a crew.json. Its agents are listed first; nothing is added until you press Import.</div></div>`;
+    $('#ioBody').innerHTML = `<div class="iodrop" id="ioDrop"><div>Drop a Crew ${many} file here, or</div><button class="btn" data-io-choose>Choose a JSON file…</button><div class="faint" style="font-size:12px">${io.kind === 'agents' ? 'An export from Crew, or a crew.json. ' : 'An export from Crew. '}Its ${many} are listed first; nothing is added until you press Import.${io.kind === 'triggers' ? ' Imported triggers arrive turned off.' : ''}</div></div>`;
     $('#ioFoot').innerHTML = `<button class="btn ghost" data-close>Cancel</button>`;
     return;
   }
   const clash = io.items.some(a => !a.bad && ioExists(a.name));
   $('#ioBody').innerHTML = `<div class="iobar"><span class="mono" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px" title="${esc(io.file)}">${esc(io.file)}</span> · ${n} of ${io.items.length} selected · ${all}</div>` +
-    (clash ? `<div class="iobar">Agents that already exist: <div class="seg tight" data-io-existing><button data-v="skip" class="${io.existing === 'skip' ? 'on' : ''}">Skip them</button><button data-v="update" class="${io.existing === 'update' ? 'on' : ''}">Update their settings</button></div></div>` : '') +
+    (clash ? `<div class="iobar">${many[0].toUpperCase() + many.slice(1)} that already exist: <div class="seg tight" data-io-existing><button data-v="skip" class="${io.existing === 'skip' ? 'on' : ''}">Skip them</button><button data-v="update" class="${io.existing === 'update' ? 'on' : ''}">Update them</button></div></div>` : '') +
+    (io.kind === 'triggers' ? '<div class="iobar">Imported triggers arrive <b>turned off</b>, so nothing starts work until you switch them on. Webhooks get a new URL token.</div>' : '') +
+    (io.kind === 'workflows' && io.items.some(a => a.warn) ? '<div class="iobar">Steps that name an agent you do not have are imported, but their run fails at that step until you add the agent.</div>' : '') +
     `<div class="iolist">${rows}</div>`;
-  $('#ioFoot').innerHTML = `<button class="btn ghost" data-io-choose style="margin-right:auto">Choose another file…</button><button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-io-import ${n && !io.busy ? '' : 'disabled'}>${io.busy ? 'Importing…' : `Import ${n} agent${n === 1 ? '' : 's'}`}</button>`;
+  $('#ioFoot').innerHTML = `<button class="btn ghost" data-io-choose style="margin-right:auto">Choose another file…</button><button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-io-import ${n && !io.busy ? '' : 'disabled'}>${io.busy ? 'Importing…' : `Import ${n} ${n === 1 ? one : many}`}</button>`;
 }
 async function ioLoad(f) {
   if (!f) return;
-  if (f.size > 1_000_000) return toast('That file is over 1 MB: not an agents file', 'var(--red)');
+  const kind = io.kind, [, many] = IO_WORD[kind];
+  if (f.size > 1_000_000) return toast(`That file is over 1 MB: not a ${many} file`, 'var(--red)');
   let j;
   try { j = JSON.parse(await f.text()); } catch { return toast(`${f.name} is not valid JSON`, 'var(--red)'); }
-  const list = Array.isArray(j) ? j : Array.isArray(j?.agents) ? j.agents : null;
-  if (!list?.length) return toast(`No agents found in ${f.name}`, 'var(--red)');
+  const has = j && typeof j === 'object' ? (j.crew || (j.crew_agents ? 'agents' : '')) : '';
+  if (kind !== 'agents' || has === 'workflows' || has === 'triggers') {
+    if (has && has !== kind) return toast(`${f.name} is a ${has} file, not a ${many} file: use Import ${has} instead`, 'var(--red)');
+    if (!has && kind !== 'agents') return toast(`${f.name} is not a Crew ${many} file`, 'var(--red)');
+  }
+  if (j?.crew && +j.version > 1) return toast(`${f.name} comes from a newer Crew: update Crew to import it`, 'var(--red)');
+  const list = Array.isArray(j) ? j : kind === 'agents' ? (Array.isArray(j?.agents) ? j.agents : null) : (Array.isArray(j?.items) ? j.items : null);
+  if (!list?.length) return toast(`No ${many} found in ${f.name}`, 'var(--red)');
   const seen = new Set();
-  io.items = list.filter(a => a && typeof a === 'object').map(agentSpec)
-    .filter(a => !seen.has(a.name.toLowerCase()) && seen.add(a.name.toLowerCase()));
+  io.items = list.filter(a => a && typeof a === 'object').map(a => ioItem(kind, a))
+    .filter(a => a.name && !seen.has(a.name.toLowerCase()) && seen.add(a.name.toLowerCase()));
+  if (!io.items.length) return toast(`No ${many} found in ${f.name}`, 'var(--red)');
   io.sel = new Set(io.items.filter(a => !a.bad).map(a => a.name)); io.file = f.name; drawIO();
 }
-function ioDownload() {
-  const agents = io.items.filter(a => io.sel.has(a.name)).map(({bad, ...a}) => a);
-  const body = {crew_agents: 1, app_version: S.app_version || '', exported: new Date().toISOString(), agents};
+function ioSave(body, name, count, one, many) {
   const proj = (S.project.split(/[\\/]/).filter(Boolean).pop() || 'crew').replace(/[^\w.-]+/g, '-');
   const url = URL.createObjectURL(new Blob([JSON.stringify(body, null, 2) + '\n'], {type: 'application/json'}));
-  const link = Object.assign(document.createElement('a'), {href: url, download: `crew-agents-${proj}-${new Date().toISOString().slice(0, 10)}.json`});
+  const link = Object.assign(document.createElement('a'), {href: url, download: `crew-${name}-${proj}-${new Date().toISOString().slice(0, 10)}.json`});
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-  closeModals(); toast(`Exported ${agents.length} agent${agents.length === 1 ? '' : 's'}`, 'var(--green)');
+  closeModals(); toast(`Exported ${count} ${count === 1 ? one : many}`, 'var(--green)');
+}
+async function ioDownload() {
+  const [one, many] = IO_WORD[io.kind], chosen = io.items.filter(a => io.sel.has(a.name));
+  if (io.kind === 'agents') {
+    const agents = chosen.map(({bad, ...a}) => a);
+    return ioSave({crew_agents: 1, app_version: S.app_version || '', exported: new Date().toISOString(), agents}, 'agents', agents.length, one, many);
+  }
+  io.busy = true; drawIO();
+  const r = await act('export_' + io.kind, {ids: chosen.map(a => a.id)});
+  io.busy = false;
+  if (!r.ok) return drawIO();
+  ioSave({...r.file, app_version: S.app_version || '', exported: new Date().toISOString()}, io.kind, r.file.items.length, one, many);
 }
 async function ioImport() {
-  const agents = io.items.filter(a => io.sel.has(a.name) && !a.bad).map(({bad, ...a}) => a);
+  const kind = io.kind, chosen = io.items.filter(a => io.sel.has(a.name) && !a.bad);
   io.busy = true; drawIO();
-  const r = await act('import_agents', {agents, existing: io.existing});
+  const r = kind === 'agents' ? await act('import_agents', {agents: chosen.map(({bad, ...a}) => a), existing: io.existing})
+    : await act('import_' + kind, {items: chosen.map(a => a.raw), existing: io.existing});
   io.busy = false;
   if (!r.ok) return drawIO();
   closeModals();
   const done = [r.added.length && `${r.added.length} added`, r.updated.length && `${r.updated.length} updated`, r.skipped.length && `${r.skipped.length} skipped`].filter(Boolean).join(', ');
-  toast(`Import: ${done || 'nothing to do'}`, r.added.length || r.updated.length ? 'var(--green)' : 'var(--amber)');
+  toast(`Import: ${done || 'nothing to do'}${kind === 'triggers' && (r.added.length || r.updated.length) ? ' · all turned off' : ''}`, r.added.length || r.updated.length ? 'var(--green)' : 'var(--amber)');
   if (r.skipped.length) toast('Skipped ' + r.skipped.map(x => `${x.name} (${x.why})`).join(', '), 'var(--amber)', {label: 'OK', ms: 9000, fn: () => {}});
+  if (r.missing?.length) toast('Missing agents: ' + r.missing.map(x => `${x.name} needs ${x.agents.join(', ')}`).join('; '), 'var(--amber)', {label: 'OK', ms: 9000, fn: () => {}});
+  if (kind === 'triggers' && (r.added.length || r.updated.length)) gotoTab('trigs');
 }
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-io]'); if (!b) return;
+  const [m, k] = b.dataset.io.split('-'); openIO(m, k);
+});
 $('#ioModal').addEventListener('click', e => {
   const b = e.target.closest('[data-io-all],[data-io-none],[data-io-choose],[data-io-download],[data-io-import],[data-io-existing] button');
   if (!b) return;
@@ -3106,6 +3189,10 @@ $('#hMenu').onclick = e => {
   if (['localhost', '127.0.0.1'].includes(location.hostname)) h += item('Open on phone…', openLan, {sub: 'Scan a code from a phone on the same Wi-Fi'}) + '<div class="sep"></div>';
   h += '<div class="mh">Agents</div>' + item('Export agents…', () => openIO('export'), {sub: 'Save all or some agents as a JSON file'}) +
     item('Import agents…', () => openIO('import'), {sub: 'Add agents from an exported file'}) + '<div class="sep"></div>';
+  h += '<div class="mh">Workflows</div>' + item('Export workflows…', () => openIO('export', 'workflows'), {sub: 'Steps, gates and output as a JSON file'}) +
+    item('Import workflows…', () => openIO('import', 'workflows'), {sub: 'Add workflows from an exported file'}) + '<div class="sep"></div>';
+  h += '<div class="mh">Triggers</div>' + item('Export triggers…', () => openIO('export', 'triggers'), {sub: 'No webhook tokens or history'}) +
+    item('Import triggers…', () => openIO('import', 'triggers'), {sub: 'They arrive turned off'}) + '<div class="sep"></div>';
   h += '<div class="mh">Theme</div>' + [['system', 'System'], ['dark', 'Dark'], ['light', 'Light']].map(([v, l]) => item(l, () => { try { localStorage.setItem('crew.theme', v); } catch {} applyTheme(); }, {cls: themePref() === v ? 'cur' : ''})).join('') + '<div class="sep"></div>';
   h += `<div class="note">Crew${S?.app_version ? ' v' + esc(S.app_version) : ''}</div>`;
   h += item('GitHub repository', go(REPO)) + item('Releases and changelog', go(REPO + '/releases'));
@@ -3162,13 +3249,12 @@ function wfTrigChip(w) {
   return `<button class="btn sm ghost" data-wf-trig="${w.id}" title="${n ? n + ' trigger' + (n > 1 ? 's' : '') + ' start this workflow · add another' : 'Start this workflow on a schedule, event, file change, poll, webhook, ADO tag, Teams message or pipeline run'}">⚡${n ? ' ' + n : ''}</button>`;
 }
 function newTrigFor({agent = '', workflow = ''}) {
-  closeModals();
   openTriggers();
   const b = blankTrig('schedule'), a = S.agents.find(x => x.name === agent), w = (S.workflows || []).find(x => x.id === workflow);
   b.name = a ? `${a.name} on a schedule` : w ? `${w.name} on a schedule` : '';
   b.task = {...b.task, agent, workflow, tag: a ? (a.tags[0] || '') : '', title: w ? `${w.name}: {date}` : a ? `${a.name}: ` : ''};
   tv = {mode: 'form', id: null, f: b};
-  drawTriggers();
+  drawTriggers(); focusSoon('#tmBody [data-f="name"]');
 }
 
 // ---- boss chat -----------------------------------------------------------------------------
@@ -3377,10 +3463,10 @@ $('#chatTo').onclick = e => {
 // ---- auto workflow builder ------------------------------------------------------------------
 // ---- mobile app shell ---------------------------------------------------------------------
 function setM(m) {
-  if (m === 'new') return document.body.dataset.m === 'flows' ? openWfEditor(null) : openTask();
+  if (m === 'new') return document.body.dataset.m === 'flows' ? openWfEditor(null) : document.body.dataset.m === 'trigs' ? (openTriggers(), editTrig(null)) : openTask();
   document.body.dataset.m = m;
   document.querySelectorAll('#mnav [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m));
-  if (m === 'board' || m === 'flows') { view.tab = m; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === m)); }
+  if (m === 'board' || m === 'flows' || m === 'trigs') { view.tab = m; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === m)); }
   render();
   if (m === 'chat') { $('#chatlog').dataset.jump = '1'; renderChat(); }
 }
@@ -3427,7 +3513,7 @@ function buildPalette() {
     {ic: '＋', label: 'Add agent', run: () => openAgentModal()},
     ...(LAN_CLIENT ? [] : [{ic: '⌂', label: 'Switch project…', run: () => openProjectModal()}]),
     ...(['localhost', '127.0.0.1'].includes(location.hostname) ? [{ic: '▯', label: 'Open on phone…', run: () => openLan()}] : []),
-    {ic: '⚡', label: 'Triggers…', k: 'T', run: () => openTriggers()},
+    {ic: '⚡', label: 'Triggers', k: 'T', run: () => gotoTab('trigs')},
     {ic: '■', label: 'Stop all running agents and runs', run: () => document.querySelector('[data-stop-all]')?.click()},
     {ic: '▶', label: 'Resume paused agents', run: () => act('resume_all')},
     {ic: '⌫', label: 'Clear done tasks', run: () => act('clear', {scope: 'done'})},
@@ -3435,7 +3521,8 @@ function buildPalette() {
     {ic: '✦', label: 'Talk to the boss', k: '/', run: () => { view.chatTo = 'boss'; view.chatOpen = true; render(); $('#chatIn').focus(); }},
     ...S.agents.filter(a => a.status === 'running').map(a => ({ic: '■', label: `Stop ${a.name}`, run: () => act('stop', {agent: a.name})})),
     ...S.agents.filter(a => a.alive && a.status !== 'running').map(a => ({ic: '⇣', label: `Compact ${a.name}'s context`, run: () => act('compact', {agent: a.name})})),
-    {ic: '⛓', label: 'Workflows', k: 'W', run: () => document.querySelector('[data-tab="flows"]').click()},
+    {ic: '▦', label: 'Board', k: 'B', run: () => gotoTab('board')},
+    {ic: '⛓', label: 'Workflows', k: 'W', run: () => gotoTab('flows')},
     {ic: '⛓', label: 'New workflow', run: () => openWfEditor(null)},
     ...(S.workflows || []).map(w => ({ic: '▶', label: `Run workflow: ${w.name}`, run: () => openRun(w)})),
     {ic: '⚡', label: 'New trigger', run: () => { openTriggers(); editTrig(null); }},
@@ -3467,11 +3554,11 @@ $('#mode').onclick = e => { e.stopPropagation(); openModeMenu($('#mode')); };
 // global keys
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette(); }
-  if ((e.key === 'w' || e.key === 'b') && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return document.querySelector(`[data-tab="${e.key === 'w' ? 'flows' : 'board'}"]`).click(); }
+  if ((e.key === 'w' || e.key === 'b') && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return gotoTab(e.key === 'w' ? 'flows' : 'board'); }
   if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); view.chatOpen = true; renderChat(); return $('#chatIn').focus(); }
-  if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return openTriggers(); }
+  if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return gotoTab('trigs'); }
   if (e.key === 'Escape' && document.querySelector('.menu')) return closeMenu();
-  if (e.key === 'Escape') { if (document.querySelector('.scrim.on')) return closeModals(); if (view.drawer) { view.drawer = null; render(); } return; }
+  if (e.key === 'Escape') { if (document.querySelector('.scrim.on')) return closeModals(); if (view.tab === 'trigs' && tv.mode === 'form') return trigBack(tv.id); if (view.drawer) { view.drawer = null; render(); } return; }
   if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || document.querySelector('.scrim.on')) return;
   if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.isContentEditable && view.drawer?.review && task(view.drawer.review)?.col === 'review') { e.preventDefault(); return approveTask(view.drawer.review); }
   if (e.key.toLowerCase() === 'n') { e.preventDefault(); openTask(); }
@@ -3491,6 +3578,7 @@ function applyDeepLink() {
   if (h.get('modal') === 'project') setTimeout(openProjectModal, 0);
   if (h.get('modal') === 'task') setTimeout(() => openTask(), 0);
   if (h.get('tab') === 'flows') { view.tab = 'flows'; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === 'flows')); }
+  if (h.get('tab') === 'triggers') setTimeout(() => gotoTab('trigs'), 0);
   if (h.get('wf')) setTimeout(() => { const w = S.workflows.find(x => x.id === h.get('wf')); if (w) openWfEditor(w); }, 0);
   if (h.get('modal') === 'triggers') setTimeout(() => { openTriggers(); if (h.get('preset')) { tv = presetForm(+h.get('preset')); drawTriggers(); } }, 0);
   if (h.has('palette')) setTimeout(openPalette, 0);

@@ -4,7 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-22
+
 ### Added
+- **Export and import workflows and triggers** (header ⋮ menu, and **Export… / Import…** on the Workflows and Triggers tabs), next to the agent ones: one dialog, three kinds. Files are `{"crew": "workflows" | "triggers", "version": 1, "items": [...]}`. Trigger files never hold a webhook token (a new one is made on import) or what a trigger fired, and imported triggers arrive **turned off**. A workflow step that names an agent you do not have is flagged; a trigger aimed at a missing workflow or agent is skipped. Existing names are skipped or updated, as for agents.
 - **Pipeline triggers fire on several results:** pick any of succeeds, partially succeeds, fails, is canceled, or finishes; a run with any of them fires it. Triggers saved with one result keep working.
 - **Scheduled jobs on the board:** every trigger (cron, event, webhook, pipeline, Teams, ADO, poll, watch) shows at the top of the Backlog, tagged *scheduled* and its kind, soonest first, with its next time. Click one to edit it, ▶ to fire it now, or drag it to In progress to run it: it stays there while its check, workflow run or task is in progress, then goes back to the Backlog.
 - **Workflow runs grouped on the board:** each run is one frame in the column of its current step, with a stepper; its other steps show as one-line rows inside it, and ▾ collapses it. Tasks outside a workflow are unchanged.
@@ -27,7 +30,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Export and import agents** (header ⋮ menu): download all or selected agents as JSON (settings only), and import a file with a preview, per-agent selection, and skip-or-update for names that already exist. Values from the file are validated on both sides; import is UI-only.
 - **Resizable side panel**: drag the left edge of the agent / review panel (or focus it and use the arrow keys) to make it wider or narrower; double-click resets. The width is remembered.
 
+### Fixed
+- **Pipeline "Only runs for me" matched almost every run:** ADO links a build to every work item since the last fully successful build, so on a pipeline that keeps partly succeeding the same assigned items rode along on every run. A run now counts only the work items the previous run on its branch didn't have, and reads up to 500 linked items instead of ADO's default 50.
+
 ### Changed
+- **Triggers is a tab:** it sits next to Board and Workflows (with a count of the ones that are on) instead of a chip in the top bar that opened a dialog. The list, presets and the new/edit form are the same, on a full page. <kbd>T</kbd> opens it (like <kbd>W</kbd> and <kbd>B</kbd>), <kbd>Esc</kbd> in the form goes back to the list, and on a phone it is in the bottom bar. The palette, scheduled cards on the Board, agent and workflow ⚡ buttons and `#tab=triggers` all land there.
 - **Quieter agent cards:** an idle agent's card no longer shows a "waiting for work" line.
 - **Teams triggers take a link:** paste a link to the channel, chat or any message in it. Crew finds messages with message search filtered to that conversation, which works without the Team.ReadBasic.All permission that looking a channel up by name needs.
 - **Workflow steps start fresh:** every workflow step runs on a new Claude session, even for agents set to keep one session, so no run inherits another's context. Such an agent goes back to its own session afterwards, and a sent-back step resumes that step's session.
@@ -117,3 +124,4 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 
 [0.1.0]: https://github.com/pranjal-joshi/claude-crew/releases/tag/v0.1.0
 [0.2.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.1.0...v0.2.0
+[0.3.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.2.0...v0.3.0

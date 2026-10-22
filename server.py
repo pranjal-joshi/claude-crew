@@ -36,7 +36,7 @@ except ImportError:
     import workflows
     from triggers import azure
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the
@@ -1366,6 +1366,15 @@ class Crew:
                 return res
             elif action == "import_agents":
                 res = agents.record.import_agents(self, p.get("agents"), update=p.get("existing") == "update")
+                if "error" not in res:
+                    self.touch()
+                return res
+            elif action in ("export_workflows", "export_triggers"):
+                mod = workflows.definitions if action == "export_workflows" else triggers.transfer
+                return mod.export_file(self, set(p.get("ids") or []))
+            elif action in ("import_workflows", "import_triggers"):
+                mod = workflows.definitions if action == "import_workflows" else triggers.transfer
+                res = getattr(mod, action)(self, p.get("items"), p.get("existing") == "update")
                 if "error" not in res:
                     self.touch()
                 return res

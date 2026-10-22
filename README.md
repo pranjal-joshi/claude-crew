@@ -37,7 +37,7 @@ Crew is pure standard-library Python (3.10 or newer) and installs as a `crew` co
 
 ```bash
 pipx install claude-crew                      # from PyPI, once published
-pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.2.0/claude_crew-0.2.0-py3-none-any.whl   # a release wheel
+pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.3.0/claude_crew-0.3.0-py3-none-any.whl   # a release wheel
 pipx install git+https://github.com/pranjal-joshi/claude-crew   # latest main
 ```
 
@@ -150,13 +150,15 @@ Give each agent an icon (two dozen dev line icons) and a colour in its settings;
 
 **Export and import agents** from the header **⋮** menu: pick all or some agents and download them as a JSON file (settings only: name, role, tags, model, effort, context, icon, colour; no chats, sessions or costs), to back them up or share them. Import lists a file's agents first (an export or a `crew.json`), lets you untick some, and skips or updates agents whose names already exist.
 
+**Workflows and triggers export the same way** (header **⋮** menu, or **Export… / Import…** on the Workflows and Triggers tabs). A workflow file holds steps, gates, output and on/off; a step that names an agent you do not have is imported but flagged, since its run would fail there. A trigger file holds the name, type, spec and task template, never a webhook token (a new one is made on import) or what the trigger fired, and **imported triggers arrive turned off**. A trigger aimed at a workflow or agent this crew lacks is skipped: import the workflows first.
+
 ## Context per task
 
 Each agent starts a **fresh Claude session for every new task** by default. Old tasks aren't re-read on every turn, so tokens stay low and context doesn't fill up. What should carry over already travels with the task: the hand-off summary, the previous step's branch, the workflow brief. Going back to a task resumes that task's own session, even if the agent did other tasks since: replies, Send back and re-running it continue the same conversation, so the agent revises its own work. Only new tasks (from you, the boss or a trigger) start fresh. Switch any agent to **Keep across tasks** in ⚙ Model & role. Each agent's drawer shows how full its context is, with **Compact** (Claude Code's `/compact`) and **New session**.
 
 ## Triggers
 
-Assigning a task is the manual trigger. Press <kbd>T</kbd> for the automatic ones. Each firing adds a task from a template, and the dispatcher hands it out like any other.
+Assigning a task is the manual trigger. Open the **Triggers** tab (<kbd>T</kbd>) for the automatic ones. Each firing adds a task from a template, and the dispatcher hands it out like any other.
 
 Every trigger also shows at the top of the Backlog as a *scheduled* card with its kind and next time. Drag one to In progress to run it now; it comes back to the Backlog when the run finishes.
 
@@ -184,15 +186,15 @@ Nine presets cover the common loops: daily standup, test what ships, review what
 Tag a work item, and Crew starts a workflow for it. No copy and paste.
 
 1. **Prerequisites.** The Azure CLI, signed in (`az login`), with the DevOps extension (`az extension add --name azure-devops`). Crew uses your `az` session; it stores no token. Defaults from `az devops configure --defaults organization=... project=...` prefill the form.
-2. **Set up the trigger.** Press <kbd>T</kbd>, **New trigger**, **ADO tag**. Pick the tag you will use (you choose it, for example `crew`), the organization and project, and a workflow (or one agent). Optionally limit it to Bug, Product Backlog Item, Task or User Story, and set how often to check (5 min by default). **Test** lists the items that match right now, read-only.
+2. **Set up the trigger.** Open the **Triggers** tab (<kbd>T</kbd>), **New trigger**, **ADO tag**. Pick the tag you will use (you choose it, for example `crew`), the organization and project, and a workflow (or one agent). Optionally limit it to Bug, Product Backlog Item, Task or User Story, and set how often to check (5 min by default). **Test** lists the items that match right now, read-only.
 3. **Tag items.** Add your tag to a work item on the board. At the next check Crew starts one run for it, titled `AB#123 <title>`, with the item's type, state, link and description in the brief. The card shows an `AB#123` chip that opens the item.
 4. **What Crew writes back.** By default it adds the tag `crew-picked` (so it is never picked twice) and posts a comment: "Picked up by Crew: Bug fix, run #3". You can instead remove your tag, or leave tags alone. If the write fails, the run still goes ahead and the item is not started again; the trigger shows the warning.
 
 **Pipeline trigger.** **New trigger**, **Pipeline**: add the pipelines by name (the list offers your project's names), choose *succeeds*, *partially succeeds*, *fails* or *finishes*, and an agent or workflow to start. Each finished run starts work once, titled `pipeline result`, with the run link, branch, commit, who it ran for and the run's linked work items. **Only runs for me** keeps runs requested for you or carrying a work item assigned to you (a release build runs as whoever merged, so its linked items tell whose work shipped); your items are listed first and the card links the first one, so an agent like ADO-QA can update or close them. Uses your `az` sign-in, read-only. **Test** lists matching runs from the last 7 days.
 
-**Teams trigger.** It reads Teams through the **Microsoft 365** connector in your Claude Code, so Crew needs no tokens of its own. Sign the connector in once (run `claude`, type `/mcp`, pick *claude.ai Microsoft 365*). Then **New trigger**, **Teams**: name the channel or chat the way you would to a person, choose *@mentions of me* or *every new message*, optionally a topic, and what each message starts. Each check is a short Haiku run (about a cent) allowed only the Microsoft 365 tools, read-only; every new message starts one task titled in about 6 words, with the sender, text and a link. **Test** lists the last 24 hours without starting anything.
+**Teams trigger.** It reads Teams through the **Microsoft 365** connector in your Claude Code, so Crew needs no tokens of its own. Sign the connector in once (run `claude`, type `/mcp`, pick *claude.ai Microsoft 365*). Then **New trigger**, **Teams**: paste a link to the channel or chat, or to any message in it (in Teams: ⋯ → *Copy link*), choose *@mentions of me* or *every new message*, optionally a topic, and what each message starts. Each check is a short Haiku run (about a cent) allowed only the Microsoft 365 tools, read-only; every new message starts one task titled in about 6 words, with the sender, text and a link. **Test** lists the last 24 hours without starting anything.
 
-At most 10 items start per check, and closed, done and removed items are skipped. Crew only reads and updates the tags and discussion of items you tagged. Only the Triggers panel can create this trigger, not the boss or an agent, because it writes to ADO.
+At most 10 items start per check, and closed, done and removed items are skipped. Crew only reads and updates the tags and discussion of items you tagged. Only the Triggers tab can create this trigger, not the boss or an agent, because it writes to ADO.
 
 ## Features
 
@@ -200,7 +202,10 @@ At most 10 items start per check, and closed, done and removed items are skipped
 | --- | --- |
 | 🧑‍🤝‍🧑 **An SDLC crew** | Planner, researcher, designer, builder, tester, reviewer, evaluator, ops, ticketer and scribe by default. Add, remove and re-role agents from the UI. |
 | ⛓ **Workflows** | Chain agents in order (plan → build → test → review → write-up) on an n8n-style canvas, with an approval or auto gate per step and a choice of output: board, report file, webhook or next workflow. |
-| ⚡ **Triggers** | Schedules, task events, file watches, command polls and webhooks start work on their own. Presets included. |
+| ⚡ **Triggers** | Schedules, task events, file watches, command polls, webhooks, Azure DevOps tags, pipeline runs and Teams messages start work on their own, from their own tab. Presets included. Each shows in the Backlog as a *scheduled* card: drag it to In progress to run it now. |
+| 📦 **Export and import** | Agents, workflows and triggers as JSON files, to back up or share. Imported triggers arrive off, without secrets. |
+| 🗂 **Runs grouped on the board** | Each workflow run is one frame with a stepper, in the column of its current step. |
+| 🔌 **On and off switches** | Turn any agent or workflow off without deleting it. |
 | 🧹 **Fresh context per task** | A new session per task keeps tokens down; send-back still resumes. Per-agent switch. |
 | 🧠 **Model and effort per agent** | Opus for the builder, Sonnet for the tester, Fable for research: each agent gets its own model and effort level (low to max). |
 | 🪢 **Subagents, visible** | When an agent fans out to subagents, you see each one live on the agent card, a count on the task, and a labelled thread in the transcript. |
@@ -210,7 +215,7 @@ At most 10 items start per check, and closed, done and removed items are skipped
 | 🚫 **Blocked inbox** | Tool calls the permission mode refused are listed: Allow & retry, Allow once, or Dismiss. |
 | 💲 **Budgets** | Cost on every card, plus a per-task and a per-day budget that stops runs. |
 | ↪️ **Hand-offs** | Drag any card, in any column, onto another agent. The earlier summary, branch and commit go along as context. |
-| ✦ **Boss chat** | A chat bar that runs the crew: tasks, workflows, agents and triggers, from plain requests. |
+| ✦ **Boss chat** | A chat bar that runs the crew: tasks, workflows, agents and triggers, from plain requests. Replies render Markdown, and you can paste screenshots into it. |
 | ⌨ **Slash picker** | Type `/` in any chat box for Crew commands plus the agent's Claude Code commands and skills. **Clear chat** wipes a chat and its context. |
 | 💬 **Talk mid-run** | Message any agent while it works. The message lands in the running session. |
 | ☕ **Keep-awake** | `--awake` stops idle sleep while agents work, so runs and schedules aren't paused. |
@@ -221,7 +226,7 @@ At most 10 items start per check, and closed, done and removed items are skipped
 | 🔢 **Tokens and cost** | Live token counts per agent, per task and in total. Hide the dollar amounts with one click. Totals are marked "this session". |
 | 🧩 **Your skills and MCP servers** | Agents are ordinary Claude Code sessions, so they load your skills, plugins and MCP servers. |
 | 📁 **Projects** | Switch repos from the header. Each project keeps its own board, sessions and worktrees. |
-| ⌨️ **Keyboard first** | `/` talk to the boss, `N` new task, `T` triggers, `W` / `B` workflows / board, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
+| ⌨️ **Keyboard first** | `/` talk to the boss, `N` new task, `T` / `W` / `B` triggers / workflows / board tabs, `1`–`9` open an agent, `Ctrl K` command palette, `Esc` close. |
 
 ## Screenshots
 
