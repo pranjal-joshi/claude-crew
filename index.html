@@ -298,7 +298,7 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 /* ── drawer ────────────────────────────────────────────── */
 .drawer{border-left:1px solid var(--line);background:var(--bg2);display:flex;flex-direction:column;min-height:0;min-width:0}
 .dh{padding:14px 16px 12px;border-bottom:1px solid var(--line)}
-.dh .row{display:flex;align-items:center;gap:10px}
+.dh .row{display:flex;align-items:center;gap:10px}.dh .row>.tag{flex:none}
 .dh h3{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:600;letter-spacing:-.01em}
 .kv{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .kv span{font:11px var(--mono);color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
@@ -416,7 +416,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .seg button.on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-ink2)}
 .top .btn,.top .chip,.top .stat{white-space:nowrap;flex:none}
 @media (max-width:1600px){#palBtn{display:none}}
-.kindsel{display:flex;align-items:center;gap:10px}.kindsel select{max-width:260px;font-weight:600}
+.kindsel{display:flex;align-items:center;gap:10px}.kindsel select{max-width:260px;font-weight:600}@media (max-width:760px){.kindsel select{max-width:none;flex:1;min-width:0}}
 .pchips{display:flex;flex-wrap:wrap;gap:6px}.pchips .pc{display:inline-flex;align-items:center;gap:6px;font:12px var(--mono);border:1px solid var(--line2);background:var(--bg2);border-radius:7px;padding:3px 4px 3px 9px}
 .pchips .pc button{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;padding:0 4px;border-radius:5px}.pchips .pc button:hover{color:var(--red);background:var(--red-soft)}
 .tic.k-pipeline{background:var(--green-soft);color:var(--green)}
@@ -754,9 +754,37 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   .mnav .fab{flex:none;width:54px;height:54px;border-radius:18px;background:var(--accent);color:var(--on-accent);margin:0 4px;box-shadow:0 6px 20px color-mix(in srgb,var(--accent) 35%,transparent);font-size:0}
   .mnav .fab svg{width:26px;height:26px}
   .mnav .badge{position:absolute;top:6px;right:calc(50% - 22px);min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--blue);color:var(--on-blue);font:700 10px/16px var(--sans)}
-  #toasts{top:auto!important;bottom:calc(76px + env(safe-area-inset-bottom))!important;left:12px;right:12px}
-  .toast{max-width:none}
+  #toasts{top:auto!important;bottom:calc(76px + env(safe-area-inset-bottom))!important;left:12px;right:12px;align-items:stretch}
+  .toast{max-width:none;min-width:0}
+  /* the + button floats above the bar (Material FAB), so the five tabs share the bar evenly */
+  .mnav .fab{position:fixed;right:16px;bottom:calc(64px + 16px + env(safe-area-inset-bottom));margin:0;width:56px;height:56px;border-radius:18px;z-index:26}
+  body[data-m="chat"] .mnav .fab,body[data-m="agents"] .mnav .fab,body:has(.trigs:not([hidden]) .tpf .btn.primary) .mnav .fab,body:has(.drawer-open) .mnav .fab{display:none}
+  body:is([data-m="board"],[data-m="flows"],[data-m="trigs"]) #toasts{bottom:calc(148px + env(safe-area-inset-bottom))!important}
+  .board .col .cards{padding-bottom:76px}
+  .flows:not(.trigs){padding-bottom:88px}
+  /* the board's toolbar holds only Clear board on a phone: it lives in the ⋮ menu instead */
+  .toolbar{display:none}
+  .colnav{padding-top:10px}
+  .colh .n{display:none}
+  .dk{display:none}body .mo{display:inline}
+  .btn kbd,.modal kbd.k{display:none}
+  /* card buttons: Approve on its own row, the rest share the next one */
+  .card .cta .btn:not(.approvec){flex:1 1 0;justify-content:center;min-width:0}
+  /* workflow cards: title and actions on one row */
+  .wf .wh{flex-wrap:nowrap!important}.wf .wh b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wf .wh>.faint{display:none}.wf .wh .wact{flex:none;flex-wrap:nowrap}
+  /* review panel */
+  .reviewbar .acts{flex-wrap:wrap}.reviewbar .acts .btn{flex:1 1 auto;justify-content:center}.reviewbar .acts .btn.green{flex:1 1 100%}.reviewbar .acts .btn.ghost{flex:none}
+  /* forms: one column even where a row sets its own columns */
+  .two{grid-template-columns:1fr!important}
+  .railbtn{display:none}
+  /* chat header: one line, the description shortens */
+  .chathead .hidebtn,.chathead .chc .lbl{display:none}
+  textarea::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* menus are bottom sheets: dim what is behind them */
+  .menu{box-shadow:0 0 0 100vmax var(--scrim2),var(--shadow)}
 }
+.mo{display:none}
 @keyframes sheet{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
 /* workflow canvas */
 .scrim.wfs{padding-top:4vh}
@@ -889,6 +917,7 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .chatpeek:hover{border-color:var(--line2);color:var(--text)}
 .chatpeek .pt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chatpeek b{color:var(--text);font-weight:600}
+.chathead .chd{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chathead .chc{white-space:nowrap;flex:none}
 .chathead .hidebtn{border:0;background:none;color:var(--faint);cursor:pointer;font:12px var(--sans);padding:2px 6px;border-radius:6px;white-space:nowrap;flex:none}
 .chathead .hidebtn:hover{color:var(--text);background:var(--hover)}
 /* workflows page: Workflows | Runs */
@@ -1340,6 +1369,7 @@ function renderBoard() {
   const show = () => true;
   if (!S.tasks.length && !(S.triggers || []).length) { $('#board').innerHTML = firstRunHtml(); return; }
   const groups = runGroups();
+  const keep = Object.fromEntries([...document.querySelectorAll('#board .col')].map(c => [c.dataset.col, c.querySelector('.cards')?.scrollTop || 0]));
   $('#board').innerHTML = COLS.map(([k, label, c]) => {
     const items = S.tasks.filter(t => boardCol(t) === k && show(t) && !groups.hidden.has(t.id))
       .sort((a, b) => k === 'done' ? b.id - a.id : a.id - b.id);
@@ -1347,9 +1377,10 @@ function renderBoard() {
     const sh = k === 'backlog' || k === 'doing' ? schedHtml(k) : '';
     return `<div class="col" data-col="${k}">
       <div class="colh"><span class="dot" style="background:${c}"></span>${label}${k === 'backlog' ? '<button class="btn sm primary addt" data-new-task title="New task (N)">＋ New</button>' : ''}<span class="n">${items.length}</span></div>
-      <div class="cards">${sh}${html.length || (sh && k === 'doing') ? html.join('') : `<div class="empty">${k === 'backlog' ? 'No tasks yet. Press <kbd>N</kbd> to add one.' : 'Nothing here'}</div>`}</div>
+      <div class="cards">${sh}${html.length || (sh && k === 'doing') ? html.join('') : `<div class="empty">${k === 'backlog' ? '<span class="dk">No tasks yet. Press <kbd>N</kbd> to add one.</span><span class="mo">No tasks yet. Tap + to add one.</span>' : 'Nothing here'}</div>`}</div>
     </div>`;
   }).join('');
+  document.querySelectorAll('#board .col').forEach(c => { const y = keep[c.dataset.col]; if (y) c.querySelector('.cards').scrollTop = y; });
 }
 // Scheduled jobs at the top of the backlog: every trigger (cron, event, webhook, pipeline, Teams, ADO, poll, watch),
 // soonest first, each tagged "scheduled" and its kind. Click one to edit it; ▶ fires or checks it now. Dragging one
@@ -1533,7 +1564,10 @@ function card(t) {
     : t.merge_error?.files?.length ? `<span class="mst warn" title="Merge conflicts: ${esc(t.merge_error.files.join(', '))}">Conflict</span>` : t.commit ? '<span class="mst" title="Approved and committed on its branch, not merged yet">Not merged</span>' : '';
   if (t.col === 'done' && (t.commit || t.tokens)) cta = `<div class="f mono">${t.commit ? `<span>⎇ ${esc(t.commit)}</span>` : ''}${mst}${t.tokens ? `<span class="tok" style="margin-left:auto" title="Tokens this task used">${fmtTok(t.tokens)} tok</span>` : ''}</div>`;
   const runOf = t.run && (S.runs || []).find(r => r.id === t.run.id);
-  if (runOf && ['doing', 'review'].includes(boardCol(t)) && (runOf.status === 'running' || t.wait)) cta += `<div class="cta"><button class="btn sm danger" data-run-stop-card="${esc(runOf.id)}" title="End ⛓ ${esc(runOf.name)}: no more steps, and this step's agent stops working and checking">⏹ Stop workflow</button></div>`;
+  if (runOf && ['doing', 'review'].includes(boardCol(t)) && (runOf.status === 'running' || t.wait)) {
+    const stop = `<button class="btn sm danger" data-run-stop-card="${esc(runOf.id)}" title="End ⛓ ${esc(runOf.name)}: no more steps, and this step's agent stops working and checking">⏹ Stop workflow</button>`;
+    cta = t.col === 'review' && cta ? cta.replace(/<\/div>$/, stop + '</div>') : cta + `<div class="cta">${stop}</div>`;
+  }
   if (prOf(t)) cta += `<div class="cta prb">${prLink(t, 'sm')}${addrevBtn(t, 'sm')}</div>`;
   const owner = t.col === 'doing' && t.who ? S.agents.find(a => a.name === t.who) : null;
   const liveSubs = owner ? Object.keys(owner.subs || {}).length : 0;
@@ -2315,7 +2349,7 @@ const TRIG_KIND = {
   watch: {label: 'File watch', ic: '◉', hint: 'When files in the project folder change (not the agents\' worktrees).'},
   poll: {label: 'Poll command', ic: '⟳', hint: 'Runs a command in the project folder and fires on its result: CI status, queues, APIs.'},
   webhook: {label: 'Webhook', ic: '⇢', hint: 'An HTTP endpoint with a secret token, for CI, git hooks and scripts.'},
-  ado: {label: 'ADO tag', ic: '⬡', hint: 'Start a workflow when you tag a work item on your Azure DevOps board. Needs the az CLI, signed in.'},
+  ado: {label: 'ADO board', ic: '⬡', hint: 'Start a workflow when you tag a work item on your Azure DevOps board, or when one is assigned to you. Needs the az CLI, signed in.'},
   pipeline: {label: 'Pipeline', ic: '▶', hint: 'When an Azure Pipelines run finishes (a CD release, a build). Optionally only runs requested for you or carrying your work items. Needs the az CLI, signed in.'},
   teams: {label: 'Teams', ic: '✉', hint: 'When someone @mentions you, or posts, in a Teams channel or chat. Reads Teams through the Microsoft 365 connector in your Claude Code; each check is a short Haiku run.'},
 };
@@ -3265,6 +3299,7 @@ $('#hMenu').onclick = e => {
   const go = u => () => window.open(u, '_blank', 'noopener');
   let h = '';
   if (['localhost', '127.0.0.1'].includes(location.hostname)) h += item('Open on phone…', openLan, {sub: 'Scan a code from a phone on the same Wi-Fi'}) + '<div class="sep"></div>';
+  if (matchMedia('(max-width:760px)').matches && (view.tab || 'board') === 'board') h += item('Clear board…', () => setTimeout(() => clearMenu($('#hMenu'))), {sub: 'Remove finished or all tasks'}) + '<div class="sep"></div>';
   h += '<div class="mh">Agents</div>' + item('Export agents…', () => openIO('export'), {sub: 'Save all or some agents as a JSON file'}) +
     item('Import agents…', () => openIO('import'), {sub: 'Add agents from an exported file'}) + '<div class="sep"></div>';
   h += '<div class="mh">Workflows</div>' + item('Export workflows…', () => openIO('export', 'workflows'), {sub: 'Steps, gates and output as a JSON file'}) +
@@ -3301,16 +3336,16 @@ function ctxRow(a) {
     <button class="ctxact" data-compact="${esc(a.name)}" title="Summarise the conversation to free context" ${!live || a.status === 'running' ? 'disabled' : ''}>Compact</button>
     <button class="ctxact" data-newsession="${esc(a.name)}" title="Forget the conversation and start empty" ${a.session ? '' : 'disabled'}>New session</button></div>`;
 }
-$('#clearBtn').onclick = e => {
-  e.stopPropagation();
+$('#clearBtn').onclick = e => { e.stopPropagation(); clearMenu(e.currentTarget); };
+function clearMenu(anchor) {
   MENU_ACTIONS = [];
   const done = S.tasks.filter(t => t.col === 'done').length, all = S.tasks.length, busy = S.agents.filter(a => a.status === 'running').length;
   let h = '<div class="mh">Clear board</div>';
   h += item(`Clear done tasks<span class="faint"> · ${done} task${done === 1 ? '' : 's'}</span>`, () => act('clear', {scope: 'done'}), {disabled: !done});
   h += item(`Clear all tasks<span class="faint"> · ${all} task${all === 1 ? '' : 's'}</span>`, () => askConfirm('Clear the whole board?',
     `All ${all} tasks are removed${busy ? ` and ${busy} running agent${busy === 1 ? ' is' : 's are'} stopped` : ''}. Agents' branches and commits are kept.`, 'Clear everything', () => act('clear', {scope: 'all'}), true), {cls: 'danger', disabled: !all});
-  showMenu(e.currentTarget, h);
-};
+  showMenu(anchor, h);
+}
 
 // ---- triggers per agent / workflow ------------------------------------------------------
 function agentTriggers(a) {
@@ -3360,7 +3395,7 @@ function renderChat() {
   if (lg.dataset.sig === sig) return;
   const atBottom = lg.scrollHeight - lg.scrollTop - lg.clientHeight < 60;
   lg.dataset.sig = sig;
-  lg.innerHTML = `<div class="chathead">${boss ? `<b style="color:var(--text)">Boss</b> · ${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : `<b style="color:var(--text)">${esc(t.name)}</b> · ${esc(t.role.slice(0, 80))}`}${busy ? ' · <span style="color:var(--green)">working…</span>' : ''}<span style="margin-left:auto" title="Cumulative tokens and cost for this chat session; Clear chat resets them">this session: ${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear chat</button><button class="hidebtn" data-chat-hide title="Hide the conversation (Esc)">Hide ▾</button></div>` +
+  lg.innerHTML = `<div class="chathead"><b style="color:var(--text);flex:none">${boss ? 'Boss' : esc(t.name)}</b><span class="chd">· ${boss ? `${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : esc(t.role.slice(0, 80))}</span>${busy ? ' <span style="color:var(--green);flex:none">· working…</span>' : ''}<span class="chc" style="margin-left:auto" title="Cumulative tokens and cost for this chat session; Clear chat resets them"><span class="lbl">this session: </span>${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear chat</button><button class="hidebtn" data-chat-hide title="Hide the conversation (Esc)">Hide ▾</button></div>` +
     (t.log.length ? renderLog(t.log.slice(-120)) : `<div class="empty">${boss ? 'Try: “Plan and build CSV export for reports, then have it tested and reviewed.”' : 'No messages yet.'}</div>`);
   if (atBottom || lg.dataset.jump) { lg.scrollTop = lg.scrollHeight; delete lg.dataset.jump; }
 }
@@ -3552,7 +3587,7 @@ $('#body').addEventListener('click', e => { if (e.target === $('#body') && view.
 $('#mnav').onclick = e => { const b = e.target.closest('[data-m]'); if (b) setM(b.dataset.m); };
 function renderColnav() {
   const nav = $('#colnav'); if (!nav || !S) return;
-  const counts = Object.fromEntries(COLS.map(([k]) => [k, S.tasks.filter(t => t.col === k).length]));
+  const counts = Object.fromEntries(COLS.map(([k]) => [k, S.tasks.filter(t => boardCol(t) === k).length]));
   const cur = view.mcol || 'backlog';
   nav.innerHTML = COLS.map(([k, label]) => `<button data-col-go="${k}" class="${k === cur ? 'on' : ''}">${label}<span class="n">${counts[k]}</span></button>`).join('');
   const b = $('#mBadge'); if (b) { b.textContent = counts.review; b.hidden = !counts.review; }
