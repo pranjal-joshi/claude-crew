@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Resizable side panel**: drag the left edge of the agent / review panel (or focus it and use the arrow keys) to make it wider or narrower; double-click resets. The width is remembered.
 
 ### Changed
+- **Triggers are modular**: each kind (schedule, event, watch, poll, webhook, ado, teams, pipeline) now lives in its own module in the new `triggers/` package, found through a registry, so a new kind is one dropped-in file (see `triggers/README.md`). `server.py` no longer lists kinds or branches on them. A general `/api/trigger/<kind>` route serves the form helpers; `/api/ado` and `/api/teams` stay as aliases. No change in behavior or in the `crew.json` format.
 - **Triggers dialog**: the trigger type is a dropdown (same icons), and the dialog fits the window and scrolls instead of squashing its fields. Switching away from Teams no longer leaves its task text behind.
 - **Short card titles**: tasks, hand-offs and runs created by agents or the boss must have short titles (about 6 words, no links), so cards read at a glance; Crew refuses longer ones and asks for the rest in details. ADO-triggered tasks show `AB#id` plus the first 6 words of the item's title, with the full title at the top of the details. Titles you type are never changed.
 - **Delete agent** (was Remove): the dialog now opens with Cancel focused, so a stray Enter doesn't delete. The same goes for every other delete or stop dialog.

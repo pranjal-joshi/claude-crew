@@ -1,7 +1,9 @@
 import json
 import unittest
 
+import triggers
 from tests.helpers import TempCrewCase, server
+from triggers import azure, pipeline, teams
 
 
 class Workflows(TempCrewCase):
@@ -364,9 +366,9 @@ class AdoBase(TempCrewCase):
 
 class Titles(TempCrewCase):
     def test_short_title(self):
-        self.assertEqual(server.short_title("Model Editor: 'Harness Tool Suite completely offline' mid-session after a week"),
+        self.assertEqual(triggers.short_title("Model Editor: 'Harness Tool Suite completely offline' mid-session after a week"),
                          "Model Editor: 'Harness Tool Suite completely…")
-        self.assertEqual(server.short_title("see https://x.y/z fix login"), "see fix login")
+        self.assertEqual(triggers.short_title("see https://x.y/z fix login"), "see fix login")
 
     def test_agents_must_use_short_titles(self):
         a = next(iter(self.crew.agents))
@@ -400,19 +402,19 @@ class TeamsTrigger(TempCrewCase):
         msgs = {"messages": [{"id": "m1", "from": "Asha", "time": "2026-10-22T09:00:00Z", "text": "@Pranjal prod deploy failed",
                               "link": "https://teams.microsoft.com/l/message/1", "title": "Check failed prod deploy"}]}
         self._fake_claude("Here you go:\n" + json.dumps(msgs))
-        self.crew._run_teams(tr)
+        triggers.get("teams").check(self.crew, tr)
         t = self.crew.tasks[-1]
         self.assertEqual((t["title"], tr["picked"], tr["error"]), ("Check failed prod deploy", 1, None))
         self.assertIn("https://teams.microsoft.com/l/message/1", t["details"])
-        self.assertIn(server.TEAMS_TOOLS, self.calls[0])  # only the Microsoft 365 tools are allowed
+        self.assertIn(teams.TEAMS_TOOLS, self.calls[0])  # only the Microsoft 365 tools are allowed
         n = len(self.crew.tasks)
-        self.crew._run_teams(tr)  # the same message again: nothing new
+        triggers.get("teams").check(self.crew, tr)  # the same message again: nothing new
         self.assertEqual(len(self.crew.tasks), n)
 
     def test_errors_raise_an_alert(self):
         tr = self._trigger()
         self._fake_claude('{"error": "not signed in to Microsoft 365"}')
-        self.crew._run_teams(tr)
+        triggers.get("teams").check(self.crew, tr)
         self.assertIn("not signed in", tr["error"])
         self.assertTrue(any(x["key"] == f"trigger:{tr['id']}" for x in self.crew.alerts))
 
@@ -444,10 +446,10 @@ class PipelineTrigger(TempCrewCase):
             if a.startswith("account show"):
                 return "me@x.com"
             raise AssertionError(a)
-        old = server.az
-        server.az = fake_az
-        self.addCleanup(setattr, server, "az", old)
-        server._me = None
+        old = azure.az
+        azure.az = fake_az
+        self.addCleanup(setattr, azure, "az", old)
+        azure._me = None
         self.qa = list(self.crew.agents)[0]
 
     def _add(self, **spec):
@@ -460,7 +462,7 @@ class PipelineTrigger(TempCrewCase):
 
     def test_only_mine_keeps_runs_with_my_work_items(self):
         tr = self._add(mine=True, result="any")
-        self.crew._run_pipeline(tr)
+        triggers.get("pipeline").check(self.crew, tr)
         made = [t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]
         self.assertEqual(len(made), 1)  # 501 carries AB#8, assigned to me; 502 is someone else's with nothing of mine
         t = made[0]
@@ -468,21 +470,21 @@ class PipelineTrigger(TempCrewCase):
         self.assertIn("AB#8 Fix upload timeout (Resolved)", t["details"])
         self.assertIn("buildId=501", t["details"])
         self.assertEqual(sorted(tr["seen"]), [501, 502])
-        self.crew._run_pipeline(tr)  # seen: nothing fires twice
+        triggers.get("pipeline").check(self.crew, tr)  # seen: nothing fires twice
         self.assertEqual(len([t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]), 1)
 
     def test_result_filter(self):
         tr = self._add(mine=False, result="failed")
-        self.crew._run_pipeline(tr)
+        triggers.get("pipeline").check(self.crew, tr)
         made = [t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]
         self.assertEqual([t["title"] for t in made], ["Api.Release failed"])
 
     def test_unknown_pipeline_is_an_error(self):
         tr = self._add()
         tr["spec"]["pipelines"] = ["Nope.Release"]
-        self.crew._run_pipeline(tr)
+        triggers.get("pipeline").check(self.crew, tr)
         self.assertIn("no pipeline called Nope.Release", tr["error"])
 
     def test_iso_ts(self):
-        self.assertEqual(server.iso_ts("1970-01-01T00:01:00.1234567Z"), 60.123456)
-        self.assertEqual(server.iso_ts(""), 0.0)
+        self.assertEqual(pipeline.iso_ts("1970-01-01T00:01:00.1234567Z"), 60.123456)
+        self.assertEqual(pipeline.iso_ts(""), 0.0)

@@ -1,13 +1,15 @@
 """ADO tag trigger: WIQL building, one run per item, the types filter, tag write-back, and the UI-only rule.
-No real `az` runs: server.az is replaced by a fake that records its calls."""
+No real `az` runs: triggers.azure.az is replaced by a fake that records its calls."""
 import unittest
 from unittest import mock
 
 from tests.helpers import TempCrewCase, server
+import triggers
+from triggers import ado, azure
 
 
 class FakeAz:
-    """Stands in for server.az. `items` are the query results; `fail` lists substrings of commands that should fail."""
+    """Stands in for triggers.azure.az. `items` are the query results; `fail` lists substrings of commands that should fail."""
 
     def __init__(self, items=(), fail=()):
         self.items = {i["id"]: i for i in items}
@@ -18,7 +20,7 @@ class FakeAz:
         self.calls.append(args)
         line = " ".join(args)
         if any(f in line for f in self.fail):
-            raise server.AzError("boom")
+            raise azure.AzError("boom")
         if args[:2] == ("boards", "query"):
             return [{"id": i["id"], "fields": {"System.Title": i["title"], "System.WorkItemType": i.get("type", "Bug"),
                                                 "System.State": "New", "System.Tags": i.get("tags", "crew")}}
@@ -48,15 +50,15 @@ class AdoCase(TempCrewCase):
         return self.crew.triggers[-1]
 
     def check(self, tr, fake):
-        with mock.patch.object(server, "az", fake):
+        with mock.patch.object(azure, "az", fake):
             tr["_running"] = True
-            self.crew._run_ado(tr)
+            triggers.get("ado").check(self.crew, tr)
         return fake
 
 
 class WiqlCase(unittest.TestCase):
     def test_builds_the_query(self):
-        q = server.ado_wiql({"tag": "crew", "project": "Proj", "types": ["Bug", "Task"], "after": "tag_picked"})
+        q = ado.ado_wiql({"tag": "crew", "project": "Proj", "types": ["Bug", "Task"], "after": "tag_picked"})
         self.assertIn("[System.Tags] CONTAINS 'crew'", q)
         self.assertIn("[System.Tags] NOT CONTAINS 'crew-picked'", q)
         self.assertIn("[System.State] NOT IN ('Closed', 'Done', 'Removed')", q)
@@ -64,28 +66,28 @@ class WiqlCase(unittest.TestCase):
         self.assertIn("[System.TeamProject] = 'Proj'", q)
 
     def test_escapes_single_quotes(self):
-        q = server.ado_wiql({"tag": "o'brien", "project": "it's", "types": ["a'b"], "after": "tag_picked"})
+        q = ado.ado_wiql({"tag": "o'brien", "project": "it's", "types": ["a'b"], "after": "tag_picked"})
         self.assertIn("CONTAINS 'o''brien'", q)
         self.assertIn("'o''brien-picked'", q)
         self.assertIn("= 'it''s'", q)
         self.assertIn("IN ('a''b')", q)
 
     def test_no_exclusion_unless_tag_picked_and_no_empty_filters(self):
-        q = server.ado_wiql({"tag": "crew", "project": "", "types": [], "after": "remove_tag"})
+        q = ado.ado_wiql({"tag": "crew", "project": "", "types": [], "after": "remove_tag"})
         self.assertNotIn("NOT CONTAINS", q)
         self.assertNotIn("WorkItemType] IN", q)
         self.assertNotIn("TeamProject", q)
 
     def test_spec_rejects_what_cmd_would_read_as_syntax(self):
         for bad in ("a&b", "a|b", "100%", 'a"b', "a;b"):
-            self.assertIsNotNone(server.ado_spec({"tag": bad})[0], bad)
-        self.assertIn("tag", server.ado_spec({"tag": "  "})[0])
+            self.assertIsNotNone(ado.ado_spec({"tag": bad})[0], bad)
+        self.assertIn("tag", ado.ado_spec({"tag": "  "})[0])
 
     def test_html_to_text(self):
-        self.assertEqual(server.html_text("<div>Hi&nbsp;<b>you</b><br>next &amp; last</div><p>x</p>"), "Hi you\nnext & last\nx")
+        self.assertEqual(ado.html_text("<div>Hi&nbsp;<b>you</b><br>next &amp; last</div><p>x</p>"), "Hi you\nnext & last\nx")
 
     def test_tag_write_back_strings(self):
-        f = server.ado_tags_after
+        f = ado.ado_tags_after
         self.assertEqual(f("bug; crew", "crew", "tag_picked"), "bug; crew; crew-picked")
         self.assertEqual(f("crew; crew-picked", "crew", "tag_picked"), "crew; crew-picked")
         self.assertEqual(f("bug; crew; ui", "crew", "remove_tag"), "bug; ui")
@@ -215,9 +217,9 @@ class AdoTriggerCase(AdoCase):
 
     def test_seen_is_capped(self):
         tr = self.add()
-        tr["seen"] = list(range(1000, 1000 + server.ADO_SEEN_MAX))
+        tr["seen"] = list(range(1000, 1000 + ado.ADO_SEEN_MAX))
         self.check(tr, FakeAz([item(1)]))
-        self.assertEqual(len(tr["seen"]), server.ADO_SEEN_MAX)
+        self.assertEqual(len(tr["seen"]), ado.ADO_SEEN_MAX)
         self.assertEqual(tr["seen"][-1], 1)
         self.assertNotIn(1000, tr["seen"])
 
@@ -225,9 +227,9 @@ class AdoTriggerCase(AdoCase):
         self.add(every=5)
         fake = FakeAz([item(1)])
         done = []
-        real = self.crew._run_ado
-        self.crew._run_ado = lambda t: (real(t), done.append(1))
-        with mock.patch.object(server, "az", fake):
+        trig = triggers.get("ado")
+        real = trig.check
+        with mock.patch.object(azure, "az", fake), mock.patch.object(trig, "check", lambda c, t: (real(c, t), done.append(1))):
             self.crew.tick_triggers()
             for _ in range(200):
                 if done:
@@ -247,36 +249,36 @@ class AdoHelpersCase(AdoCase):
 
     def test_defaults_are_read_from_az_configure(self):
         text = "Use git alias = No\nOrganization = https://dev.azure.com/acme\nProject = My Proj\n"
-        with mock.patch.object(server, "az", lambda *a, raw=False, timeout=90: text):
-            self.assertEqual(server.ado_defaults(), {"org": "https://dev.azure.com/acme", "project": "My Proj"})
-        with mock.patch.object(server, "az", lambda *a, raw=False, timeout=90: "Use git alias = No\n"):
-            self.assertEqual(server.ado_defaults(), {})
+        with mock.patch.object(azure, "az", lambda *a, raw=False, timeout=90: text):
+            self.assertEqual(azure.ado_defaults(), {"org": "https://dev.azure.com/acme", "project": "My Proj"})
+        with mock.patch.object(azure, "az", lambda *a, raw=False, timeout=90: "Use git alias = No\n"):
+            self.assertEqual(azure.ado_defaults(), {})
 
     def test_test_button_is_read_only_and_shows_errors(self):
         fake = FakeAz([item(1), item(2)])
-        with mock.patch.object(server, "az", fake):
-            res = server.ado_form({"op": "test", "spec": self.SPEC})
+        with mock.patch.object(azure, "az", fake):
+            res = triggers.get("ado").form(self.crew, {"op": "test", "spec": self.SPEC})
         self.assertEqual((res["total"], [i["id"] for i in res["items"]]), (2, [1, 2]))
         self.assertEqual(fake.updates(), [])
         self.assertEqual([c[:2] for c in fake.calls], [("boards", "query")])
         self.assertEqual(self.crew.runs, [])
-        with mock.patch.object(server, "az", FakeAz(fail=["boards query"])):
-            self.assertEqual(server.ado_form({"op": "test", "spec": self.SPEC}), {"error": "boom"})
-        self.assertIn("tag", server.ado_form({"op": "test", "spec": {"tag": ""}})["error"])
+        with mock.patch.object(azure, "az", FakeAz(fail=["boards query"])):
+            self.assertEqual(triggers.get("ado").form(self.crew, {"op": "test", "spec": self.SPEC}), {"error": "boom"})
+        self.assertIn("tag", triggers.get("ado").form(self.crew, {"op": "test", "spec": {"tag": ""}})["error"])
 
     def test_az_error_hints(self):
-        self.assertIn("az login", server.az_hint("ERROR: Please run 'az login' to setup account."))
-        self.assertIn("az extension add --name azure-devops", server.az_hint("ERROR: 'boards' is misspelled or not recognized"))
-        self.assertEqual(server.az_hint("a\nlast line"), "last line")
+        self.assertIn("az login", azure.az_hint("ERROR: Please run 'az login' to setup account."))
+        self.assertIn("az extension add --name azure-devops", azure.az_hint("ERROR: 'boards' is misspelled or not recognized"))
+        self.assertEqual(azure.az_hint("a\nlast line"), "last line")
 
     def test_missing_az_and_unsafe_args(self):
         with mock.patch.object(server.shutil, "which", return_value=None):
-            with self.assertRaises(server.AzError) as cm:
-                server.az("boards", "query")
+            with self.assertRaises(azure.AzError) as cm:
+                azure.az("boards", "query")
         self.assertIn("az not found", str(cm.exception))
         with mock.patch.object(server.shutil, "which", return_value="az"), mock.patch.object(server.subprocess, "run") as run:
-            with self.assertRaises(server.AzError):
-                server.az("boards", "x & calc")
+            with self.assertRaises(azure.AzError):
+                azure.az("boards", "x & calc")
             run.assert_not_called()
 
 
