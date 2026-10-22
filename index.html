@@ -253,7 +253,7 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .tag.incident{background:var(--red-soft);color:var(--red-ink)}
 .tag.qa{background:var(--green-soft);color:var(--green)}
 .tag.refactor,.tag.spike{background:var(--accent-soft);color:var(--accent-ink)}
-.card .cta{margin-top:9px;display:flex;gap:6px}
+.card .cta{margin-top:9px;display:flex;gap:6px}.card .cta.prb{flex-wrap:wrap}a.btn{text-decoration:none}
 .card.review{border-color:color-mix(in srgb,var(--blue) 28%,transparent)}
 .card.doing .bar{height:2px;margin:10px -11px -10px;border-radius:0 0 var(--r) var(--r);background:linear-gradient(90deg,transparent,var(--green),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:sh 1.6s linear infinite}
 .empty{color:var(--faint);font-size:12px;text-align:center;padding:22px 8px;border:1px dashed var(--line);border-radius:var(--r)}
@@ -1247,11 +1247,15 @@ const avPaint = x => { const c = avCss(x); return c ? `style="${c}"` : ''; };
 const BIN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14M10 11v6M14 11v6"/></svg>';
 const FWD = '<svg class="fwd" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 4.5v4.2C7.6 9.6 4.3 14.1 3 19.5c2.6-3.6 6.2-5.3 11-5.3v4.3l7.5-7z"/></svg>';
 // a task whose agent opened a PR: one click runs the /address-review skill in that agent, in the task's own session
+// PRs: the one Crew opened (t.pr) or the latest one an agent opened or worked on itself (t.prs, read from its output)
+const prOf = t => t.pr || t.prs?.at(-1) || '';
+const prLink = (t, sz = '') => { const u = prOf(t), n = (/\/pull(?:request)?\/(\d+)/i.exec(u) || [])[1];
+  return `<a class="btn ${sz}" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">Open PR${n ? ' #' + n : ''} ↗</a>`; };
 const addrevOk = t => { const a = agent(t.who); return a && (!a.skill_names?.length || a.skill_names.includes('address-review')); };
-function addrevBtn(t) {
-  if (!addrevOk(t)) return '';
+function addrevBtn(t, sz = '') {
+  if (!addrevOk(t) || t.col === 'doing') return '';
   const a = agent(t.who), busy = t.reviewing && a.status === 'running';
-  return `<div class="cta"><button class="btn sm" data-addrev="${t.id}" ${busy || a.status === 'running' ? 'disabled' : ''} title="${busy ? `${esc(a.name)} is addressing the review` : a.status === 'running' ? `${esc(a.name)} is busy; try when it's done` : `Ask ${esc(a.name)} to run /address-review on ${esc(t.pr)}: fetch the comments, fix, reply and resolve`}">${busy ? '<span class="spinner sm" aria-hidden="true"></span> Addressing review…' : '↻ Address review'}</button></div>`;
+  return `<button class="btn ${sz}" data-addrev="${t.id}" ${a.status === 'running' ? 'disabled' : ''} title="${busy ? `${esc(a.name)} is addressing the review` : a.status === 'running' ? `${esc(a.name)} is busy; try when it's done` : `Ask ${esc(a.name)} to run /address-review on ${esc(prOf(t))}: fetch the comments, fix, reply and resolve`}">${busy ? '<span class="spinner sm" aria-hidden="true"></span> Addressing review…' : '↻ Address review'}</button>`;
 }
 async function addressReview(id) {
   const r = await act('address_review', {task: id});
@@ -1272,7 +1276,7 @@ function card(t) {
     : t.pr ? `<a class="mst ok" href="${esc(t.pr)}" target="_blank" rel="noopener" title="Pull request">PR open</a>`
     : t.merge_error?.files?.length ? `<span class="mst warn" title="Merge conflicts: ${esc(t.merge_error.files.join(', '))}">Conflict</span>` : t.commit ? '<span class="mst" title="Approved and committed on its branch, not merged yet">Not merged</span>' : '';
   if (t.col === 'done' && (t.commit || t.tokens)) cta = `<div class="f mono">${t.commit ? `<span>⎇ ${esc(t.commit)}</span>` : ''}${mst}${t.tokens ? `<span class="tok" style="margin-left:auto" title="Tokens this task used">${fmtTok(t.tokens)} tok</span>` : ''}</div>`;
-  if (t.pr) cta += addrevBtn(t);
+  if (prOf(t)) cta += `<div class="cta prb">${prLink(t, 'sm')}${addrevBtn(t, 'sm')}</div>`;
   const owner = t.col === 'doing' && t.who ? S.agents.find(a => a.name === t.who) : null;
   const liveSubs = owner ? Object.keys(owner.subs || {}).length : 0;
   const subs = liveSubs ? `<span class="subtag live" title="${liveSubs} subagent${liveSubs > 1 ? 's' : ''} running">${SUBI}${liveSubs}</span>`
@@ -1594,15 +1598,15 @@ async function openPr(id) {
 function reviewBarHtml(t) {
   const w = t.who, a = agent(w);
   if (t.col === 'review') return `<div class="inputwrap"><textarea id="fb" rows="1" placeholder="Feedback for ${esc(w)} if you send it back…"></textarea></div>
-      <div class="acts"><button class="btn green" data-approve="${t.id}" ${t.busy ? 'disabled' : ''}>✓ Approve &amp; commit <kbd>A</kbd></button><button class="btn" data-reject="${t.id}" ${t.busy ? 'disabled' : ''}>↺ Send back</button><button class="btn ghost" data-fwd="${t.id}" title="Hand off to another agent" aria-label="Hand off to another agent">⋮</button></div>`;
+      <div class="acts"><button class="btn green" data-approve="${t.id}" ${t.busy ? 'disabled' : ''}>✓ Approve &amp; commit <kbd>A</kbd></button><button class="btn" data-reject="${t.id}" ${t.busy ? 'disabled' : ''}>↺ Send back</button>${prOf(t) ? prLink(t) + addrevBtn(t) : ''}<button class="btn ghost" data-fwd="${t.id}" title="Hand off to another agent" aria-label="Hand off to another agent">⋮</button></div>`;
   const me = t.merge_error, st = t.merged ? `<span>✓ <b>Merged</b> into ${esc(t.merged.into || 'the base branch')} · ${esc(t.merged.commit)}</span>`
-    : t.pr ? `<span>PR open: <a href="${esc(t.pr)}" target="_blank" rel="noopener">${esc(t.pr)}</a></span>` : t.commit ? '<span><b>Not merged</b> yet</span>' : '<span>Nothing to commit: no file changes</span>';
+    : prOf(t) ? `<span>PR open: <a href="${esc(prOf(t))}" target="_blank" rel="noopener">${esc(prOf(t))}</a></span>` : t.commit ? '<span><b>Not merged</b> yet</span>' : '<span>Nothing to commit: no file changes</span>';
   const conflict = me?.files?.length ? `<div class="cflict">Merging into <b>${esc(me.base)}</b> hit conflicts, so nothing was changed. Conflicting files:<br>${me.files.map(f => `<code>${esc(f)}</code>`).join(' ')}
       ${me.sent ? `<div class="faint" style="margin-top:6px">Sent back to ${esc(w)} as #${me.sent}.</div>` : `<div style="margin-top:8px"><button class="btn sm" data-rebase="${t.id}">↺ Send back to ${esc(w)} to rebase</button></div>`}</div>` : '';
   if (t.decision) { const dc = t.decision; return `<div class="rstate"><span>${dc.verdict === 'stop' ? '⏹ <b>Stopped</b>' : '→ <b>Passed on</b>'} by ${esc(dc.by)}: ${esc(dc.reason)}</span></div>`; }
   const can = t.commit && !t.merged;
   return `<div class="rstate"><span>✓ <b>Approved</b>${t.commit ? ` · commit ${esc(t.commit)}${a?.branch ? ' on ' + esc(a.branch) : ''}` : ''}</span>${st}</div>${conflict}
-      <div class="acts">${can ? `<button class="btn green" data-merge="${t.id}" ${t.busy ? 'disabled' : ''}>${t.busy === 'merge' ? 'Merging…' : 'Merge into current branch'}</button><button class="btn" data-openpr="${t.id}" ${t.pr || t.busy ? 'disabled' : ''}>${t.busy === 'open_pr' ? 'Opening…' : 'Open PR'}</button>` : ''}${t.pr && addrevOk(t) ? `<button class="btn" data-addrev="${t.id}" ${agent(t.who)?.status === 'running' ? 'disabled' : ''} title="Run /address-review on the PR">${t.reviewing && agent(t.who)?.status === 'running' ? 'Addressing review…' : '↻ Address review'}</button>` : ''}${t.commit_full && !t.merged && !t.pr ? `<button class="btn ghost" data-undo="${t.id}" style="margin-left:auto">↶ Undo approval</button>` : ''}</div>`;
+      <div class="acts">${can ? `<button class="btn green" data-merge="${t.id}" ${t.busy ? 'disabled' : ''}>${t.busy === 'merge' ? 'Merging…' : 'Merge into current branch'}</button>${prOf(t) ? '' : `<button class="btn" data-openpr="${t.id}" ${t.busy ? 'disabled' : ''} title="Push the branch and open a pull request">${t.busy === 'open_pr' ? 'Opening…' : 'Create PR'}</button>`}` : ''}${prOf(t) ? prLink(t) + addrevBtn(t) : ''}${t.commit_full && !t.merged && !prOf(t) ? `<button class="btn ghost" data-undo="${t.id}" style="margin-left:auto">↶ Undo approval</button>` : ''}</div>`;
 }
 function renderReviewDrawer(d, t) {
   if (!t || (t.col !== 'review' && t.col !== 'done')) { view.drawer = null; return renderDrawer(); }

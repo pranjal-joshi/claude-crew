@@ -291,6 +291,7 @@ def local_mcp_servers(project: Path) -> dict:
 TRIGGER_KINDS = ["schedule", "event", "watch", "poll", "webhook", "ado"]
 EVENT_ON = ["review", "done", "error"]
 POLL_WHEN = ["change", "fail", "output"]
+PR_URL = re.compile(r"https://(?:github\.com/[\w.-]+/[\w.-]+/pull/\d+|dev\.azure\.com/[\w%.-]+/[\w%.-]+/_git/[\w%.-]+/pullrequest/\d+)")
 MAX_CHAIN = 5  # an event trigger never fires on a task that is already this many triggers deep
 
 
@@ -862,6 +863,8 @@ class Crew:
         if data.get("day") == today():  # the day's spend survives a restart; a new day starts at zero
             self.day, self.day_spend, self.day_hit = data["day"], float(data.get("day_spend") or 0), data.get("day_hit")
         self.tasks = data.get("tasks", [])
+        for tk in self.tasks:  # PR links in work that finished before Crew read them
+            self._note_prs(tk, tk.get("details"), tk.get("summary"))
         self.next_id = data.get("next_id", len(self.tasks) + 1)
         for t in self.tasks:  # nothing is running after a restart
             if (t.get("diff") or {}).get("pending"):
@@ -1385,6 +1388,8 @@ class Crew:
         a["cost"] += delta
         a["proc_cost"] = total
         task = self._task(a["task"]) if a["task"] else None
+        if task:
+            self._note_prs(task, d.get("result"))
         if (rt := a.pop("addressing", None)) and (tk := self._task(rt)):
             tk.pop("reviewing", None)  # the /address-review turn is over
         self._charge(task, delta)
@@ -1627,6 +1632,7 @@ class Crew:
         if self._git_busy(a["name"]):
             return False
         self._task_session(a, t)
+        self._note_prs(t, t.get("details"))
         if not self._start(a):
             return False
         a["last_task"] = t["id"]
@@ -1662,6 +1668,13 @@ class Crew:
             a["session"] = None
             self.log(a, "sys", f"fresh context for #{t['id']}")
         a["last_task"] = t["id"]
+
+    @staticmethod
+    def _note_prs(t: dict, *texts: str | None) -> None:
+        """PRs an agent opened or works on (it runs gh itself), picked out of its task text and summary."""
+        found = [m for x in texts if x for m in PR_URL.findall(x)]
+        if found:
+            t["prs"] = list(dict.fromkeys([*(t.get("prs") or []), *found]))[-5:]
 
     def _forget_sessions(self, name: str) -> None:
         """The agent's sessions are gone (cleared, fresh respawn, renamed): its tasks start fresh next time."""
@@ -2735,7 +2748,8 @@ class Crew:
                 return res
             elif action == "address_review" and t:  # UI only: the PR's agent runs /address-review in the task's session
                 w = self.agents.get(t.get("who") or "")
-                if not t.get("pr"):
+                pr = t.get("pr") or (t.get("prs") or [None])[-1]
+                if not pr:
                     return {"error": f"#{t['id']} has no PR"}
                 if not w:
                     return {"error": "the agent that opened this PR is gone"}
@@ -2746,7 +2760,7 @@ class Crew:
                 self._task_session(w, t)
                 if not self._start(w):
                     return {"error": w["error"]}
-                text = f"/address-review {t['pr']}"
+                text = f"/address-review {pr}"
                 self.log(w, "you", text)
                 if not self._send(w, text):
                     w.update(status="error", activity="")

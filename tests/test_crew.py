@@ -325,3 +325,27 @@ class Decide(TempCrewCase):
         self.assertIn("error", self.crew.act("decide", {"from": self.gate["name"], "verdict": "stop", "reason": " "}, via="mcp"))
         self.assertIn("error", self.crew.act("decide", {"from": self.next["name"], "verdict": "stop", "reason": "x"}, via="mcp"))
         self.assertIn("decide", server.MCP_ACTIONS)
+
+
+class PrLinks(TempCrewCase):
+    def test_prs_read_from_summary_and_brief(self):
+        a = next(iter(self.crew.agents.values()))
+        self.crew._start = lambda ag: True
+        self.crew._send = lambda ag, text: True
+        self.crew.act("add", {"title": "Ship it", "tag": "bug", "details": "CI on https://github.com/o/r/pull/41 is red"})
+        t = self.crew.tasks[-1]
+        self.crew._begin(a, t)
+        self.assertEqual(t["prs"], ["https://github.com/o/r/pull/41"])
+        self.crew._on_event(a, {"type": "result", "subtype": "success", "total_cost_usd": 0.01,
+                                "result": "Opened https://github.com/o/r/pull/42. Also see https://github.com/o/r/pull/41"})
+        self.assertEqual(t["prs"], ["https://github.com/o/r/pull/41", "https://github.com/o/r/pull/42"])
+        sent = []
+        self.crew._send = lambda ag, text: sent.append(text) or True
+        a["status"] = "idle"
+        self.assertNotIn("error", self.crew.act("address_review", {"task": t["id"]}))
+        self.assertEqual(sent[-1], "/address-review https://github.com/o/r/pull/42")  # the latest PR
+
+    def test_no_false_matches(self):
+        t = {}
+        server.Crew._note_prs(t, "see github.com/o/r/pull/1 and https://github.com/o/r/issues/2")
+        self.assertNotIn("prs", t)
