@@ -166,9 +166,9 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .m.subagent b{color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .m.subdone{font:11px var(--mono);color:var(--teal);opacity:.8;margin-left:12px}
 .agent .meta{display:flex;gap:10px;margin-top:8px;font:11px var(--mono);color:var(--faint)}
-.agent .tools{position:absolute;top:9px;right:40px;display:none;gap:4px}
+.agent .tools{display:flex;gap:4px;flex:none}.agent .row1 .nm{flex:1;min-width:0}
 .agent .row1 .kebab{margin:0 -4px 0 -2px}
-.agent:hover .tools{display:flex}.agent:hover .pill{visibility:hidden}
+
 .iconbtn{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;border:1px solid var(--line2);background:var(--raised);cursor:pointer;color:var(--muted);font-size:12px}
 .iconbtn:hover{color:var(--text);background:var(--hover)}.iconbtn.bin{color:var(--red)}.iconbtn.bin:hover{color:var(--red);background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 40%,transparent)}.iconbtn.danger:hover{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
 .shimmer{height:2px;margin:10px -12px -11px;border-radius:0 0 var(--r) var(--r);background:linear-gradient(90deg,transparent,var(--green),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:sh 1.5s linear infinite;opacity:.7}
@@ -1192,7 +1192,7 @@ function renderRail() {
       return `<div class="agent ${sel ? 'sel' : ''} ${a.off ? 'off' : ''}" tabindex="0" data-agent="${a.name}" data-drop-agent="${a.name}" draggable="true" title="Drag to reorder · drop a task here to hand it over">
         <div class="row1">
           ${avStat(a)}
-          <div style="min-width:0"><div class="name" title="${esc(a.name)}">${esc(a.name)}</div><div class="role">${esc(a.role)}</div></div>
+          <div class="nm"><div class="name" title="${esc(a.name)}">${esc(a.name)}</div><div class="role">${esc(a.role)}</div></div>
           ${a.off && a.status !== 'running' ? '<span class="offtag">off</span>' : ''}
           ${offSw('agent', a.name, a.off)}
           <div class="tools">
@@ -2974,11 +2974,11 @@ document.addEventListener('click', e => {
   if (d.agentTrig) return newTrigFor({agent: d.agentTrig});
 }, true);
 function ctxRow(a) {
-  const lim = 200000, used = a.ctx || 0, pct = Math.min(100, Math.round(used / lim * 100));
+  const lim = a.ctx_max || 1000000, used = a.ctx || 0, pct = Math.min(100, Math.round(used / lim * 100));
   const live = a.alive;
   return `<div class="ctxrow" title="Tokens in this agent's context window at its last model call. Compact summarises the conversation to free space; New session starts empty.">
     <span class="ct">context</span><div class="ctxbar"><i class="${pct > 80 ? 'hi' : pct > 55 ? 'mid' : ''}" style="width:${live ? pct : 0}%"></i></div>
-    <span class="ct">${live && used ? `${fmtTok(used)} · ${pct}%` : a.context === 'fresh' ? 'fresh per task' : 'empty'}</span>
+    <span class="ct" title="of a ${fmtTok(lim)}-token window">${live && used ? `${fmtTok(used)} / ${fmtTok(lim)} · ${pct}%` : a.context === 'fresh' ? 'fresh per task' : 'empty'}</span>
     <button class="ctxact" data-compact="${esc(a.name)}" title="Summarise the conversation to free context" ${!live || a.status === 'running' ? 'disabled' : ''}>Compact</button>
     <button class="ctxact" data-newsession="${esc(a.name)}" title="Forget the conversation and start empty" ${a.session ? '' : 'disabled'}>New session</button></div>`;
 }

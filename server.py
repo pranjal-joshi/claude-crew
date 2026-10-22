@@ -579,6 +579,8 @@ class Crew:
     def _on_result(self, a: dict, d: dict, st) -> None:
         """A turn ended: cost, refused tool calls, then the task moves to review (or back, on an error)."""
         a["subs"] = {}
+        if wins := [int(m.get("contextWindow") or 0) for m in (d.get("modelUsage") or {}).values() if isinstance(m, dict)]:
+            a["ctx_max"] = max(wins)  # the window Claude Code reports for this model (1M today), for the context bar
         total = float(d.get("total_cost_usd") or 0)
         delta = max(0.0, total - a["proc_cost"])
         a["cost"] += delta

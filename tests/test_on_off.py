@@ -42,5 +42,13 @@ class OnOff(TempCrewCase):
         self.assertFalse(self.crew.act("wf_run", {"id": "wz", "title": "Go"}).get("error"))
 
 
+class ContextWindow(TempCrewCase):
+    def test_window_size_comes_from_claude_code(self):
+        a = next(iter(self.crew.agents.values()))
+        with self.crew.lock:
+            self.crew._on_result(a, {"total_cost_usd": 0, "modelUsage": {"claude-opus-5-5": {"contextWindow": 1000000}}}, "success")
+        self.assertEqual(a["ctx_max"], 1000000)
+
+
 if __name__ == "__main__":
     unittest.main()
