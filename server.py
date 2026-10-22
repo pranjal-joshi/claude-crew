@@ -609,7 +609,10 @@ class Crew:
                 task["col"], task["who"] = "backlog", task.get("pinned")
                 a["task"] = None
             return
-        if task and (dec := task.get("decision")):  # a gate (crew tool decide): no review; continue or stop here
+        dec = (task or {}).get("decision")
+        if dec and dec["verdict"] == "continue" and self._step_gate(task) == "approve":
+            dec = None  # a workflow step gated ✋ still waits for you: the decision shows on the review card
+        if task and dec:  # a gate (crew tool decide): no review; continue or stop here
             tk = a["tokens"]
             task.update(tokens=tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0), col="done", finished=now(),
                         summary=(d.get("result") or "").strip() or dec["reason"])
@@ -633,6 +636,12 @@ class Crew:
         if a.get("launched") and tuple(a["launched"]) != self._launch_key(a):
             self._kill_proc(a["name"])  # session is kept; next start uses the new settings
             self.log(a, "sys", "settings changed · restarts on next task")
+
+    def _step_gate(self, t: dict) -> str | None:
+        """The gate of the workflow step this task is, if it is one: "approve" or "auto"."""
+        ref = t.get("run") or {}
+        run = self._run(ref.get("id"))
+        return run["steps"][ref["step"]].get("gate") if run and ref.get("step", -1) < len(run["steps"]) else None
 
     @staticmethod
     def _sub_label(a: dict, d: dict) -> str | None:

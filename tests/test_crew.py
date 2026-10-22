@@ -314,7 +314,14 @@ class Decide(TempCrewCase):
         self.assertEqual(len([x for x in self.crew.tasks if x.get("run")]), 1)  # step 2 never created
         self.assertEqual(self.gate["status"], "idle")
 
-    def test_continue_starts_next_step_without_review(self):
+    def test_continue_on_an_approve_step_still_waits_for_review(self):
+        self.crew.act("decide", {"from": self.gate["name"], "verdict": "continue", "reason": "ours: guardrail-svc"}, via="mcp")
+        self._end_turn("Ours. Brief: ...")
+        self.assertEqual((self.t["col"], self.t["decision"]["verdict"]), ("review", "continue"))
+        self.assertEqual(len([x for x in self.crew.tasks if x.get("run")]), 1)  # step 2 waits for the approval
+
+    def test_continue_on_an_auto_step_starts_next_step_without_review(self):
+        self.run["steps"][0]["gate"] = "auto"
         self.crew.act("decide", {"from": self.gate["name"], "verdict": "continue", "reason": "ours: guardrail-svc"}, via="mcp")
         self._end_turn("Ours. Brief: ...")
         self.assertEqual(self.t["col"], "done")

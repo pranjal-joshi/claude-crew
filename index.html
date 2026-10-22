@@ -1762,7 +1762,7 @@ async function openPr(id) {
 }
 function reviewBarHtml(t) {
   const w = t.who, a = agent(w);
-  if (t.col === 'review') return `<div class="inputwrap"><textarea id="fb" rows="1" placeholder="Feedback for ${esc(w)} if you send it back…"></textarea></div>
+  if (t.col === 'review') return `${t.decision?.verdict === 'continue' ? `<div class="rstate"><span>→ ${esc(t.decision.by)} says <b>go on</b>: ${esc(t.decision.reason)}. Approve to start the next step.</span></div>` : ''}<div class="inputwrap"><textarea id="fb" rows="1" placeholder="Feedback for ${esc(w)} if you send it back…"></textarea></div>
       <div class="acts"><button class="btn green" data-approve="${t.id}" ${t.busy ? 'disabled' : ''}>✓ Approve &amp; commit <kbd>A</kbd></button><button class="btn" data-reject="${t.id}" ${t.busy ? 'disabled' : ''}>↺ Send back</button>${prOf(t) ? prLink(t) + addrevBtn(t) : ''}<button class="btn ghost" data-fwd="${t.id}" title="Hand off to another agent" aria-label="Hand off to another agent">⋮</button></div>`;
   const me = t.merge_error, st = t.merged ? `<span>✓ <b>Merged</b> into ${esc(t.merged.into || 'the base branch')} · ${esc(t.merged.commit)}</span>`
     : prOf(t) ? `<span>PR open: <a href="${esc(prOf(t))}" target="_blank" rel="noopener">${esc(prOf(t))}</a></span>` : t.commit ? '<span><b>Not merged</b> yet</span>' : '<span>Nothing to commit: no file changes</span>';
