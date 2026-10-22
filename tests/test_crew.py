@@ -284,3 +284,44 @@ class AddressReview(TempCrewCase):
 
     def test_ui_only(self):
         self.assertNotIn("address_review", server.MCP_ACTIONS)
+
+
+class Decide(TempCrewCase):
+    def setUp(self):
+        super().setUp()
+        self.crew._start = lambda ag: True
+        self.crew._send = lambda ag, text: True
+        names = list(self.crew.agents)
+        self.gate, self.next = self.crew.agents[names[0]], self.crew.agents[names[1]]
+        w = {"id": "gate", "name": "Gate", "steps": [{"agent": self.gate["name"], "title": "Pick: {input}", "gate": "approve"},
+                                                    {"agent": self.next["name"], "title": "Do: {input}", "gate": "approve"}]}
+        self.crew.config.setdefault("workflows", []).append(w)
+        with self.crew.lock:
+            self.run = self.crew._start_run(w, "AB#1 something broke")
+        self.t = self.crew.tasks[-1]
+        self.crew._begin(self.gate, self.t)
+
+    def _end_turn(self, text="done"):
+        self.crew._on_event(self.gate, {"type": "result", "subtype": "success", "result": text, "total_cost_usd": 0.01})
+
+    def test_stop_ends_the_run(self):
+        r = self.crew.act("decide", {"from": self.gate["name"], "verdict": "stop", "reason": "not our area"}, via="mcp")
+        self.assertTrue(r["ok"])
+        self._end_turn("Billing owns this.")
+        self.assertEqual((self.t["col"], self.t["decision"]["verdict"], self.run["status"]), ("done", "stop", "stopped"))
+        self.assertEqual(len([x for x in self.crew.tasks if x.get("run")]), 1)  # step 2 never created
+        self.assertEqual(self.gate["status"], "idle")
+
+    def test_continue_starts_next_step_without_review(self):
+        self.crew.act("decide", {"from": self.gate["name"], "verdict": "continue", "reason": "ours: guardrail-svc"}, via="mcp")
+        self._end_turn("Ours. Brief: ...")
+        self.assertEqual(self.t["col"], "done")
+        nxt = self.crew.tasks[-1]
+        self.assertEqual((nxt["who"], nxt["run"]["step"], self.run["status"]), (self.next["name"], 1, "running"))
+        self.assertIn("Ours. Brief", nxt["details"])
+
+    def test_validation(self):
+        self.assertIn("error", self.crew.act("decide", {"from": self.gate["name"], "verdict": "maybe", "reason": "x"}, via="mcp"))
+        self.assertIn("error", self.crew.act("decide", {"from": self.gate["name"], "verdict": "stop", "reason": " "}, via="mcp"))
+        self.assertIn("error", self.crew.act("decide", {"from": self.next["name"], "verdict": "stop", "reason": "x"}, via="mcp"))
+        self.assertIn("decide", server.MCP_ACTIONS)

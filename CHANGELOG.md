@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Gates in workflows and hand-offs**: a new crew tool, `decide`, lets an agent rule on the task it is running. *Continue* closes it without review and starts the next workflow step with its summary; *stop* closes it marked ⏹ stopped and ends the workflow run. Cards show ⏹ stopped or → passed with the reason, and the review panel shows who decided and why. Meant for a gate agent like **Picker** as the first step of an ADO-triggered workflow.
 - **Address review** on a task whose agent opened a PR (its card and its review panel): one click has that agent run the `/address-review` skill on the PR, in the task's own session, to fetch the review comments, fix them, reply and resolve. The button shows while it works, and only for agents that have the skill.
 - **ADO tag trigger**: tag a work item on your Azure DevOps board with a tag you choose, and Crew starts a workflow run (or one agent's task) for it, once per item. It then adds `<tag>-picked`, removes the tag or leaves tags alone, and can post a comment. Uses your `az` login. A **Test** button lists matching items without starting anything. Cards and runs show an `AB#123` chip linking to the item. UI-only, like poll triggers.
 - **Light theme** built from the Book Cloth, Kraft and Manilla palette, with a **System / Dark / Light** switch in the header ⋮ menu. System follows the OS live; the choice is remembered and applied before first paint.

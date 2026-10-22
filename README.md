@@ -104,6 +104,8 @@ Nine agents, one per stage of the delivery loop. Each owns a few tags, so an una
 
 The **Workflows** tab (<kbd>W</kbd>) chains agents in a fixed order. Run one with a goal, and step 1's task is created. When a step is done, the next step's task is created with the earlier steps' summaries and an instruction to merge the previous agent's branch, so each agent builds on real work.
 
+**Gates: stop or go on.** An agent can decide whether work should go ahead with the crew tool `decide` (continue or stop, with a one-line reason). *Continue* closes its task without review and starts the next workflow step with its summary; *stop* closes it marked ⏹ stopped and ends the run, so nothing else starts. Put a gate agent such as **Picker** first in a workflow that an ADO trigger runs: it checks each new item against the ownership in its role and passes on only what is ours. Outside a workflow, a gate that continues hands the work on with `handoff` first.
+
 Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on its own when the agent finishes.
 
 | Workflow | Steps |

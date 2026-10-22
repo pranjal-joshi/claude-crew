@@ -1285,7 +1285,7 @@ function card(t) {
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Hand off: forward this task to another agent as a to-do, with this task's summary as context" aria-label="Hand off task #${t.id} to another agent" aria-haspopup="menu">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete" aria-label="More actions for task #${t.id}" aria-haspopup="menu">⋮</button></span></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
-    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado)}${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
+    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado)}${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.decision ? `<span class="holdb${t.decision.verdict === 'stop' ? ' red' : ''}" title="${esc(t.decision.by)}: ${esc(t.decision.reason)}">${t.decision.verdict === 'stop' ? '⏹ stopped' : '→ passed'}</span>` : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
   </div>`;
 }
@@ -1599,6 +1599,7 @@ function reviewBarHtml(t) {
     : t.pr ? `<span>PR open: <a href="${esc(t.pr)}" target="_blank" rel="noopener">${esc(t.pr)}</a></span>` : t.commit ? '<span><b>Not merged</b> yet</span>' : '<span>Nothing to commit: no file changes</span>';
   const conflict = me?.files?.length ? `<div class="cflict">Merging into <b>${esc(me.base)}</b> hit conflicts, so nothing was changed. Conflicting files:<br>${me.files.map(f => `<code>${esc(f)}</code>`).join(' ')}
       ${me.sent ? `<div class="faint" style="margin-top:6px">Sent back to ${esc(w)} as #${me.sent}.</div>` : `<div style="margin-top:8px"><button class="btn sm" data-rebase="${t.id}">↺ Send back to ${esc(w)} to rebase</button></div>`}</div>` : '';
+  if (t.decision) { const dc = t.decision; return `<div class="rstate"><span>${dc.verdict === 'stop' ? '⏹ <b>Stopped</b>' : '→ <b>Passed on</b>'} by ${esc(dc.by)}: ${esc(dc.reason)}</span></div>`; }
   const can = t.commit && !t.merged;
   return `<div class="rstate"><span>✓ <b>Approved</b>${t.commit ? ` · commit ${esc(t.commit)}${a?.branch ? ' on ' + esc(a.branch) : ''}` : ''}</span>${st}</div>${conflict}
       <div class="acts">${can ? `<button class="btn green" data-merge="${t.id}" ${t.busy ? 'disabled' : ''}>${t.busy === 'merge' ? 'Merging…' : 'Merge into current branch'}</button><button class="btn" data-openpr="${t.id}" ${t.pr || t.busy ? 'disabled' : ''}>${t.busy === 'open_pr' ? 'Opening…' : 'Open PR'}</button>` : ''}${t.pr && addrevOk(t) ? `<button class="btn" data-addrev="${t.id}" ${agent(t.who)?.status === 'running' ? 'disabled' : ''} title="Run /address-review on the PR">${t.reviewing && agent(t.who)?.status === 'running' ? 'Addressing review…' : '↻ Address review'}</button>` : ''}${t.commit_full && !t.merged && !t.pr ? `<button class="btn ghost" data-undo="${t.id}" style="margin-left:auto">↶ Undo approval</button>` : ''}</div>`;
@@ -1624,7 +1625,7 @@ function renderReviewDrawer(d, t) {
   $('#fb')?.addEventListener('input', autosize);
 }
 
-const FEED_COLOR = {alert:'var(--red)',handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)',blocked:'var(--amber)',budget:'var(--red)'};
+const FEED_COLOR = {decide:'var(--accent)',alert:'var(--red)',handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)',blocked:'var(--amber)',budget:'var(--red)'};
 function renderFeed() {
   const f = S.feed;
   const last = f.length ? f[f.length - 1].t : 0;

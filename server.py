@@ -1406,7 +1406,14 @@ class Crew:
                 task["col"], task["who"] = "backlog", task.get("pinned")
                 a["task"] = None
             return
-        if task:
+        if task and (dec := task.get("decision")):  # a gate (crew tool decide): no review; continue or stop here
+            tk = a["tokens"]
+            task.update(tokens=tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0), col="done", finished=now(),
+                        summary=(d.get("result") or "").strip() or dec["reason"])
+            a.update(status="idle", task=None)
+            if dec["verdict"] == "continue":
+                self._task_event(task, "done")  # the workflow's next step starts, done triggers fire
+        elif task:
             tk = a["tokens"]
             task["tokens"] = tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0)
             task["summary"] = d.get("result", "")
@@ -2667,6 +2674,25 @@ class Crew:
                 self.event("handoff", f"↪ {nt['handoff']['from']} → {who or 'auto (' + tag + ')'}: #{nt['id']} {nt['title']}", who)
                 self.touch()
                 return {"ok": True, "task": nt["id"]}
+            elif action == "decide":  # an agent gates its own running task: continue or stop the work here
+                src = self.agents.get(p.get("from") or "")
+                verdict, reason = p.get("verdict"), " ".join(str(p.get("reason") or "").split())[:300]
+                if verdict not in ("continue", "stop"):
+                    return {"error": "verdict: continue or stop"}
+                if not reason:
+                    return {"error": "say why in `reason`"}
+                tk = self._task(src["task"]) if src and src.get("task") else None
+                if not tk or tk["col"] != "doing":
+                    return {"error": "decide works on the task you are running now"}
+                tk["decision"] = {"verdict": verdict, "reason": reason, "by": src["name"], "t": now()}
+                ref = tk.get("run") or {}
+                run = self._run(ref.get("id"))
+                if verdict == "stop" and run and run["status"] == "running" and run["tasks"][ref["step"]] == tk["id"]:
+                    run.update(status="stopped", ended=now(), note=f"step {ref['step'] + 1}: {src['name']} stopped it: {reason}")
+                self.event("decide", f"{'⏹' if verdict == 'stop' else '→'} {src['name']} {'stopped' if verdict == 'stop' else 'passed'} "
+                                     f"#{tk['id']}: {reason}", src["name"])
+                self.touch()
+                return {"ok": True, "note": "applies when your turn ends: finish with a short summary"}
             elif action == "kill" and a:
                 self._kill_proc(a["name"])
                 if t := self._task(a["task"]):
@@ -2991,7 +3017,7 @@ MCP_TOKEN = secrets.token_urlsafe(24)
 GIT_ACTIONS = ("approve", "unapprove", "merge", "open_pr", "diff")  # UI only; each runs git outside the lock (_git_action)
 UI_TASK_ACTIONS = {"merge_rebase": "_merge_rebase"}
 MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add",
-               "alert", "alert_resolve"}
+               "alert", "alert_resolve", "decide"}
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 MAX_BODY = 1_000_000

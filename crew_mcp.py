@@ -43,6 +43,11 @@ TOOLS = [
          ["title", "severity"]),
     tool("resolve_alert", "Resolve an alert you raised, by the same title, once the problem has recovered. Say how in `note`.",
          {"title": S, "note": S}, ["title"]),
+    tool("decide", "Gate the task you are running: should this work go ahead? verdict 'continue': your task closes "
+         "without review and, in a workflow, the next step starts with your summary (outside a workflow, hand the work on "
+         "with the handoff tool first). verdict 'stop': your task closes marked stopped and the workflow run ends here; "
+         "nothing else starts. `reason` is one line shown on the card. Call it once, last, then end with your summary.",
+         {"verdict": {"type": "string", "enum": ["continue", "stop"]}, "reason": S}, ["verdict", "reason"]),
     tool("create_task", "Add a task to the board. Leave `agent` empty to let tags route it.",
          {"title": S, "details": S, "tag": S, "agent": S}, ["title"], boss=True),
     tool("assign_task", "Give an existing task (any column) to an agent as a to-do.", {"task": I, "agent": S}, ["task", "agent"], boss=True),
@@ -110,6 +115,8 @@ def run_tool(name, a):
         return status()
     if name == "handoff":
         r = call("/api/act/handoff", {"from": ME, "to": a.get("to"), "title": a.get("title"), "details": a.get("details", ""), "tag": a.get("tag", "")})
+    elif name == "decide":
+        r = call("/api/act/decide", {"from": ME, "verdict": a.get("verdict"), "reason": a.get("reason")})
     elif name == "raise_alert":
         r = call("/api/act/alert", {"from": ME, **{k: a.get(k) for k in ("title", "severity", "details", "link")}})
     elif name == "resolve_alert":
