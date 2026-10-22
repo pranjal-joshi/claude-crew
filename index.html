@@ -131,7 +131,6 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .agent .row1{display:flex;align-items:center;gap:10px}
 .av{position:relative;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:13px;background:var(--av);color:var(--text);flex:none;text-transform:uppercase}
 .av::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--ring,transparent)}
-.av.idle::after{--ring:var(--faint);border-style:dashed;opacity:.6}
 .av.running::after{border-color:var(--green) transparent var(--green) transparent;animation:aspin 1.4s linear infinite}
 .av.paused::after{--ring:var(--amber)}
 @keyframes aspin{to{transform:rotate(360deg)}}
