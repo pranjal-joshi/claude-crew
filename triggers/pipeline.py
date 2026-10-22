@@ -13,7 +13,9 @@ from .base import Trigger, now, register
 # ---- Pipeline trigger --------------------------------------------------------------------------
 # Azure Pipelines runs through the az CLI you are signed in with. A finished run of a named pipeline starts one task or
 # workflow run, once. "Only mine" keeps runs requested for you, or that carry a work item assigned to you: a release
-# build is requested for whoever merged, but its linked work items say whose work shipped.
+# build is requested for whoever merged, but its linked work items say whose work shipped. ADO links a build to every
+# work item since the last fully successful build, so a pipeline that keeps partly succeeding links the same old items
+# to every run: a run's own items are the ones the previous run on its branch didn't already have.
 PIPE_RESULTS = {"succeeded": ("succeeded",), "partial": ("partiallySucceeded",), "failed": ("failed",), "canceled": ("canceled",),
                 "any": ("succeeded", "failed", "partiallySucceeded", "canceled")}
 
@@ -90,10 +92,23 @@ def pipe_runs(sp: dict, ids: list[int], top: int = 40) -> list[dict]:
 
 
 def pipe_items(sp: dict, run_id: int) -> list[int]:
-    """Work items linked to a run (the PRs and commits it built)."""
+    """Work items linked to a run: every item since the pipeline's last fully successful build (ADO's own range)."""
     ids = azure.az("devops", "invoke", "--org", sp["org"], "--area", "build", "--resource", "workitems", "--route-parameters",
-             f"project={sp['project']}", f"buildId={run_id}", "--api-version", "7.1", "--query", "value[].id", "--output", "json") or []
-    return [int(x) for x in ids if str(x).isdigit()][:200]
+             f"project={sp['project']}", f"buildId={run_id}", "--query-parameters", "$top=500", "--api-version", "7.1",
+             "--query", "value[].id", "--output", "json") or []
+    return [int(x) for x in ids if str(x).isdigit()][:500]
+
+
+def pipe_new_items(sp: dict, run: dict, runs: list[dict]) -> list[int]:
+    """The work items this run brought: its linked items minus those of the previous run of the same pipeline and branch
+    (when that run is among `runs`, newest first)."""
+    items = pipe_items(sp, run["id"])
+    prev = next((r for r in runs if r["id"] != run["id"] and r["pipeline"] == run["pipeline"] and r["branch"] == run["branch"]
+                 and r["finished"] < run["finished"]), None)
+    if not prev or not items:
+        return items
+    old = set(pipe_items(sp, prev["id"]))
+    return [i for i in items if i not in old]
 
 
 def pipe_my_items(sp: dict, ids: list[int]) -> list[dict]:
@@ -141,11 +156,12 @@ class Pipeline(Trigger):
                 err, sp = pipe_spec(p.get("spec") or {})
                 if err:
                     return {"error": err}
-                runs = [r for r in pipe_runs(sp, list(pipe_ids(sp).values()), 25) if pipe_wants(sp, r["result"])]
+                every = pipe_runs(sp, list(pipe_ids(sp).values()), 40)
+                runs = [r for r in every if pipe_wants(sp, r["result"])]
                 runs = [r for r in runs if r["finished"] > now() - 7 * 86400][:10]
                 me = azure.az_me()
                 for r in runs:
-                    items = pipe_items(sp, r["id"])
+                    items = pipe_new_items(sp, r, every)
                     mine = pipe_my_items(sp, items) if sp["mine"] else []
                     r.update(items=len(items), my_items=[f"AB#{x['id']}" for x in mine], mine=r["who_id"] == me or bool(mine))
                     r.pop("who_id")
@@ -209,7 +225,7 @@ class Pipeline(Trigger):
             found = len(runs)
             me = azure.az_me() if sp["mine"] else ""
             for run in sorted(runs, key=lambda r: r["finished"])[:PIPE_MAX]:
-                items = pipe_items(sp, run["id"])
+                items = pipe_new_items(sp, run, every)
                 mine = pipe_my_items(sp, items)
                 keep = not sp["mine"] or run["who_id"] == me or bool(mine)
                 with crew.lock:

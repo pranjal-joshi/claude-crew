@@ -480,6 +480,25 @@ class PipelineTrigger(TempCrewCase):
         triggers.get("pipeline").check(self.crew, tr)  # seen: nothing fires twice
         self.assertEqual(len([t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]), 1)
 
+    def test_items_carried_over_from_the_previous_run_are_not_mine(self):
+        self.runs[1]["requestedFor"] = {"displayName": "Other", "uniqueName": "other@x.com"}
+        self.runs.append({"id": 503, "result": "partiallySucceeded", "finishTime": "2099-01-01T12:00:00Z", "sourceBranch": "refs/heads/release",
+                          "definition": {"name": "Api.Release"}, "requestedFor": {"displayName": "Other", "uniqueName": "other@x.com"}})
+        old = azure.az
+
+        def carried(*args, **kw):  # 503 still links 7 and 8 from 501, plus its own 10
+            a = " ".join(args)
+            if a.startswith("devops invoke") and "buildId=503" in a:
+                return [7, 8, 10]
+            if a.startswith("devops invoke") and "buildId=502" in a:
+                return [7, 8, 9]
+            return old(*args, **kw)
+        azure.az = carried
+        tr = self._add(mine=True, result="any")
+        triggers.get("pipeline").check(self.crew, tr)
+        made = [t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]
+        self.assertEqual([t["title"] for t in made], ["Api.Release succeeded"])  # only 501 brought AB#8
+
     def test_result_filter(self):
         tr = self._add(mine=False, result="failed")
         triggers.get("pipeline").check(self.crew, tr)
