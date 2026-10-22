@@ -320,3 +320,22 @@ class AssignedCase(AdoCase):
         with mock.patch.object(azure, "az", FakeAz([item(1)])):
             res = triggers.get("ado").form(self.crew, {"op": "test", "spec": {"match": "assigned"}})
         self.assertEqual((res["total"], res["baseline"]), (1, True))
+
+    def test_widening_the_filter_takes_a_new_baseline(self):
+        tr = self.add(match="assigned", tag="", types=["Bug"])
+        self.check(tr, FakeAz([item(1)]))
+        res = self.crew.act("trigger_update", {"id": tr["id"], "name": "board", "kind": "ado", "task": {},
+                                               "spec": self.SPEC | {"match": "assigned", "tag": "", "types": ["Bug", "Product Backlog Item"]}}, via="ui")
+        self.assertNotIn("error", res, res)
+        self.assertFalse(tr["baselined"])
+        self.check(tr, FakeAz([item(1), item(2, type="Product Backlog Item")]))  # the PBI was already assigned: baseline
+        self.assertEqual(self.crew.runs, [])
+        self.check(tr, FakeAz([item(1), item(2), item(3)]))
+        self.assertEqual([r["ado"]["id"] for r in self.crew.runs], [3])
+
+    def test_editing_only_the_interval_keeps_the_baseline(self):
+        tr = self.add(match="assigned", tag="")
+        self.check(tr, FakeAz([item(1)]))
+        self.crew.act("trigger_update", {"id": tr["id"], "name": "board", "kind": "ado", "task": {},
+                                         "spec": self.SPEC | {"match": "assigned", "tag": "", "every": 15}}, via="ui")
+        self.assertTrue(tr["baselined"])

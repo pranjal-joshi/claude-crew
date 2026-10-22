@@ -142,6 +142,16 @@ class Ado(Trigger):
     def validate(self, sp, old=None):
         return ado_spec(sp)
 
+    def clean(self, crew, p, old):
+        """Assigned to me: a new trigger, or an edit that changes what the query matches, takes a new baseline on its next
+        check, so items that were already assigned (say, PBIs when only Bugs were watched) never count as new."""
+        err, rec = super().clean(crew, p, old)
+        if not err and rec["spec"]["match"] == "assigned":
+            keys = ("match", "org", "project", "types", "existing")
+            if old is None or any((old.get("spec") or {}).get(k) != rec["spec"][k] for k in keys):
+                rec["baselined"] = False
+        return err, rec
+
     def default_name(self, spec):
         return "ADO: assigned to me" if spec.get("match") == "assigned" else f"ADO: {spec['tag']}"
 
