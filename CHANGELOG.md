@@ -8,9 +8,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - **ADO tag trigger**: tag a work item on your Azure DevOps board with a tag you choose, and Crew starts a workflow run (or one agent's task) for it, once per item. It then adds `<tag>-picked`, removes the tag or leaves tags alone, and can post a comment. Uses your `az` login. A **Test** button lists matching items without starting anything. Cards and runs show an `AB#123` chip linking to the item. UI-only, like poll triggers.
 - **Light theme** built from the Book Cloth, Kraft and Manilla palette, with a **System / Dark / Light** switch in the header ⋮ menu. System follows the OS live; the choice is remembered and applied before first paint.
 - **Next check time** on ADO and poll triggers ("next check 11:42 (in 3 min)", "checking now…", "off"), computed by the server with the same rule the scheduler uses.
+- **Resizable side panel**: drag the left edge of the agent / review panel (or focus it and use the arrow keys) to make it wider or narrower; double-click resets. The width is remembered.
 
 ### Changed
 - Deleting a trigger uses a red bin icon instead of ✕ (same confirm).
+- Switching projects shows an "Opening <project>…" overlay at once instead of looking frozen while the old crew shuts down.
 - Board card footers wrap and long agent names are shortened with an ellipsis instead of running off the card.
 
 ## [0.2.0] - 2026-10-21

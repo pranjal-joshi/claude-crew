@@ -114,7 +114,11 @@ kbd.kon,.kon{background:var(--kon-bg)!important;border-color:var(--kon-line)!imp
 kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var(--kbd);border:1px solid var(--line2);border-bottom-width:2px;color:var(--muted)}
 
 .body{display:grid;grid-template-columns:304px 1fr;min-height:0;position:relative}
-.body.drawer-open{grid-template-columns:304px 1fr 440px}
+.body.drawer-open{grid-template-columns:304px 1fr var(--dw,440px)}
+.dgrip{display:none;position:absolute;top:0;bottom:0;right:calc(var(--dw,440px) - 4px);width:8px;cursor:col-resize;z-index:16;touch-action:none}
+.dgrip::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:2px;background:transparent;transition:background .12s}
+.dgrip:hover::after,.dgrip:focus-visible::after,.body.dresize .dgrip::after{background:var(--accent)}
+.drawer-open>.dgrip{display:block}.body.dresize{cursor:col-resize;user-select:none}.body.dresize iframe{pointer-events:none}
 .body.drawer-open .board{grid-template-columns:repeat(4,minmax(180px,1fr))}
 
 /* ── agents rail ───────────────────────────────────────── */
@@ -325,6 +329,11 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .scrim{position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:none;align-items:flex-start;justify-content:center;padding-top:12vh;z-index:20}
 .scrim.on{display:flex;animation:fade .12s ease-out}
 @keyframes fade{from{opacity:0}to{opacity:1}}
+.scrim.load{align-items:center;padding:0;z-index:40;cursor:progress}
+.loadcard{display:flex;align-items:center;gap:14px;max-width:min(460px,calc(100vw - 32px));padding:18px 22px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);animation:rise .16s ease-out}
+.loadcard>div{min-width:0}.loadcard b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.loadcard .p{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spinner{flex:none;width:22px;height:22px;border-radius:50%;border:2.5px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .modal{width:min(560px,calc(100vw - 32px));background:var(--surface);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;animation:rise .16s ease-out}
 @keyframes rise{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 .modal .mh{padding:14px 16px;border-bottom:1px solid var(--line);font-weight:600;display:flex;align-items:center;justify-content:space-between}
@@ -502,8 +511,9 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .toast{display:flex;align-items:center;gap:9px;min-width:240px;max-width:380px;padding:10px 13px;border-radius:10px;background:var(--raised);box-shadow:var(--shadow);font-size:12.5px;animation:rise .18s ease-out}
 .conn{width:8px;height:8px;border-radius:50%;background:var(--faint)}.conn.ok{background:var(--green);box-shadow:0 0 10px var(--green)}
 
-@media (max-width:1100px){.body.drawer-open{grid-template-columns:260px 1fr}.drawer{position:fixed;right:0;top:56px;bottom:0;width:min(440px,100vw);z-index:15;box-shadow:var(--shadow)}}
+@media (max-width:1100px){.body.drawer-open{grid-template-columns:260px 1fr}.drawer{position:fixed;right:0;top:56px;bottom:0;width:min(var(--dw,440px),100vw);z-index:15;box-shadow:var(--shadow)}}
 @media (max-width:760px){
+  .drawer-open>.dgrip{display:none}
   .app{grid-template-rows:52px 1fr}
   .top{padding:0 16px;gap:10px;overflow:hidden}
   #palBtn,.projbtn .pb,#newBtn kbd{display:none}
@@ -710,7 +720,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .sec .sr{display:flex;align-items:center;gap:4px}
 @media (min-width:761px){
   .body.rail-min{grid-template-columns:60px 1fr}
-  .body.rail-min.drawer-open{grid-template-columns:60px 1fr 440px}
+  .body.rail-min.drawer-open{grid-template-columns:60px 1fr var(--dw,440px)}
   .rail-min .rail{padding:12px 6px;overflow-x:hidden}
   .rail-min .sec{justify-content:center;margin:2px 0 12px}
   .ravs{display:flex;flex-direction:column;align-items:center;gap:10px}
@@ -789,6 +799,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
       </div>
     </section>
     <aside class="drawer" id="drawer" hidden></aside>
+    <div class="dgrip" id="dgrip" role="separator" aria-orientation="vertical" aria-label="Resize the side panel" title="Drag to resize · double-click to reset" tabindex="0"></div>
   </div>
 </div>
 
@@ -874,6 +885,8 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
     <div class="mb" id="lanBody"></div>
   </div>
 </div>
+
+<div class="scrim load" id="projLoading" role="status" aria-live="polite"><div class="loadcard"><span class="spinner" aria-hidden="true"></span><div><b id="plName">Opening project…</b><div class="p" id="plPath"></div></div></div></div>
 
 <div class="scrim" id="projModal">
   <div class="modal pm" role="dialog" aria-label="Project">
@@ -1343,10 +1356,46 @@ async function browseTo(path) {
 }
 async function openProject(path) {
   const busy = S.agents.filter(a => a.status === 'running').map(a => a.name);
-  const go = async () => { const r = await post('/api/project', {path}); if (r.ok) { closeModals(); view.drawer = null; toast('Switched project', 'var(--accent)'); } };
+  const go = async () => {
+    const from = S.project; closeModals(); projLoading(path, from);
+    const r = await post('/api/project', {path}).catch(() => ({error: 'Crew did not answer'}));
+    if (!r.ok) return projLoading(null);
+    view.drawer = null; toast('Switched project', 'var(--accent)');
+    setTimeout(() => projLoading(null), S.project === from ? 3000 : 0);  // the stream usually brings the new board first
+  };
   if (busy.length) return askConfirm('Switch project?', `<b>${busy.map(esc).join(', ')}</b> ${busy.length > 1 ? 'are' : 'is'} working and will be stopped. Each project keeps its own board and agent sessions.`, 'Switch', go);
   return go();
 }
+// Switching shuts the old crew down and loads the new board: say so at once instead of looking frozen.
+let switchFrom = null;
+function projLoading(path, from = null) {
+  switchFrom = path ? from : null;
+  if (path) { $('#plName').textContent = 'Opening ' + (path.split(/[\\/]/).filter(Boolean).pop() || path) + '…'; $('#plPath').textContent = path; }
+  $('#projLoading').classList.toggle('on', !!path);
+}
+// side panel width: drag its left edge (or arrow keys), double-click to reset; remembered per browser
+const DW = {def: 440, min: 340, max: () => Math.max(340, Math.min(1000, innerWidth - $('#rail').getBoundingClientRect().width - 360))};
+function setDrawerW(w, save = true) {
+  w = Math.round(Math.min(DW.max(), Math.max(DW.min, w)));
+  $('#body').style.setProperty('--dw', w + 'px'); $('#dgrip').setAttribute('aria-valuenow', w);
+  if (save) try { localStorage.setItem('crew.drawerW', w === DW.def ? '' : String(w)); } catch {}
+}
+try { const w = +localStorage.getItem('crew.drawerW'); if (w) setDrawerW(w, false); } catch {}
+$('#dgrip').addEventListener('pointerdown', e => {
+  if (e.button) return;
+  const g = e.currentTarget, right = $('#body').getBoundingClientRect().right;
+  g.setPointerCapture(e.pointerId); $('#body').classList.add('dresize'); e.preventDefault();
+  const move = ev => setDrawerW(right - ev.clientX, false);
+  const up = ev => { g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); $('#body').classList.remove('dresize'); setDrawerW(right - ev.clientX); };
+  g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+});
+$('#dgrip').addEventListener('dblclick', () => setDrawerW(DW.def));
+$('#dgrip').addEventListener('keydown', e => {
+  const cur = parseInt(getComputedStyle($('#body')).getPropertyValue('--dw')) || DW.def, step = e.shiftKey ? 80 : 20;
+  if (e.key === 'ArrowLeft') setDrawerW(cur + step); else if (e.key === 'ArrowRight') setDrawerW(cur - step); else return;
+  e.preventDefault();
+});
+addEventListener('resize', () => { const cur = parseInt($('#body').style.getPropertyValue('--dw')); if (cur > DW.max()) setDrawerW(cur, false); });
 $('#projBtn').onclick = openProjectModal;
 if (LAN_CLIENT) { $('#projBtn').style.pointerEvents = 'none'; $('#projBtn').title = 'Switching projects works only on the computer running Crew'; $('#projBtn .faint').hidden = true; }
 $('#pmOpen').onclick = () => { const v = $('#pmPath').value.trim(); if (v) openProject(v); };
@@ -1715,8 +1764,8 @@ const guessTag = t => /test|spec/i.test(t) ? 'test' : /review|pr/i.test(t) 
 $('#tTitle').addEventListener('input', () => { if (view.tagTouched) return; const g = guessTag($('#tTitle').value); if (g) { view.newTag = g; $('#tTag').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.tag === g)); } });
 $('#taskModal').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey || e.target.id === 'tTitle')) { e.preventDefault(); createTask(); } });
 $('#newBtn').onclick = () => openTask();
-document.querySelectorAll('.scrim').forEach(s => s.addEventListener('mousedown', e => { if (e.target === s) closeModals(); }));
-function closeModals() { document.querySelectorAll('.scrim').forEach(s => s.classList.remove('on')); }
+document.querySelectorAll('.scrim:not(.load)').forEach(s => s.addEventListener('mousedown', e => { if (e.target === s) closeModals(); }));
+function closeModals() { document.querySelectorAll('.scrim:not(.load)').forEach(s => s.classList.remove('on')); }
 
 
 // ---- triggers ------------------------------------------------------------------
@@ -2670,7 +2719,7 @@ function connect() {
   fetch('/api/state').then(r => r.json()).then(d => { if (!S) { S = d; if (deepLink) applyDeepLink(); render(); } }).catch(() => {});  // paint before the stream's first event
   const es = new EventSource('/api/stream');
   es.onopen = () => $('#conn').classList.add('ok');
-  es.onmessage = ev => { S = JSON.parse(ev.data); if (deepLink) applyDeepLink(); render(); };
+  es.onmessage = ev => { S = JSON.parse(ev.data); if (switchFrom !== null && S.project !== switchFrom) projLoading(null); if (deepLink) applyDeepLink(); render(); };
   es.onerror = () => { $('#conn').classList.remove('ok'); };
 }
 connect();
