@@ -2025,7 +2025,7 @@ function trigWhat(tr) {
     case 'watch': return `When ${sp.glob} changes · checks every ${sp.every}s`;
     case 'poll': return `Every ${sp.every} min: ${sp.command}  →  on ${({change: 'changed output', fail: 'failure', output: 'new output'})[sp.when]}`;
     case 'webhook': return `POST ${location.origin}/api/hook/${tr.id}`;
-    case 'pipeline': return `${({succeeded: 'Successful', failed: 'Failed', any: 'Finished'})[sp.result]} runs of ${sp.pipelines.join(', ')}${sp.mine ? ' · only mine' : ''} · every ${sp.every} min`;
+    case 'pipeline': return `${({succeeded: 'Successful', partial: 'Partially successful', failed: 'Failed', any: 'Finished'})[sp.result]} runs of ${sp.pipelines.join(', ')}${sp.mine ? ' · only mine' : ''} · every ${sp.every} min`;
     case 'teams': return `${sp.mode === 'all' ? 'New messages' : '@mentions of you'} in ${sp.where}${sp.about ? ` about ${sp.about}` : ''} · every ${sp.every} min`;
     case 'ado': return `Items tagged “${sp.tag}”${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min · then ${({tag_picked: `add ${sp.tag}-picked`, remove_tag: 'remove the tag', none: 'leave tags'})[sp.after]}`;
   }
@@ -2136,7 +2136,7 @@ function drawTrigForm() {
         <datalist id="pipeNames">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>
       <div class="two" style="grid-template-columns:1fr 160px"><div><div class="label">Organization URL<span class="faint lc">from az devops configure, if set</span></div><input class="field mono" data-s="org" value="${esc(sp.org)}" placeholder="https://dev.azure.com/yourorg" spellcheck="false" autocomplete="off"></div>
       <div><div class="label">Project</div><input class="field" data-s="project" value="${esc(sp.project)}" spellcheck="false" autocomplete="off"></div></div>
-      <div class="two"><div><div class="label">Fire when a run</div>${seg('s', 'result', [['succeeded', 'succeeds'], ['failed', 'fails'], ['any', 'finishes']], sp.result)}</div>
+      <div class="two" style="grid-template-columns:1fr 120px"><div><div class="label">Fire when a run</div>${seg('s', 'result', [['succeeded', 'succeeds'], ['partial', 'partially succeeds'], ['failed', 'fails'], ['any', 'finishes']], sp.result)}</div>
       <div><div class="label">Check every (min)</div><input class="field" type="number" min="2" data-s="every" value="${sp.every}"></div></div>
       <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sc="mine" ${sp.mine ? 'checked' : ''} style="margin-top:2px"><span><b>Only runs for me</b>: requested for you, or carrying a work item assigned to you. A release build runs as whoever merged, so its linked work items tell whose work shipped.</span></label>
       <div><div class="label">Start</div><div class="seg"><button data-ado-target="agent" class="${useAgent ? 'on' : ''}">A single agent</button><button data-ado-target="workflow" class="${useAgent ? '' : 'on'}">A workflow run</button></div>

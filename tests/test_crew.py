@@ -479,6 +479,15 @@ class PipelineTrigger(TempCrewCase):
         made = [t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]
         self.assertEqual([t["title"] for t in made], ["Api.Release failed"])
 
+    def test_partially_succeeded(self):
+        self.runs.append({"id": 503, "result": "partiallySucceeded", "finishTime": "2099-01-01T12:00:00Z", "definition": {"name": "Api.Release"},
+                          "requestedFor": {"displayName": "Other", "uniqueName": "other@x.com"}})
+        tr = self._add(mine=False, result="partial")
+        triggers.get("pipeline").check(self.crew, tr)
+        made = [t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]
+        self.assertEqual([t["title"] for t in made], ["Api.Release partially succeeded"])
+        self.assertIn("finished: partially succeeded.", made[0]["details"])
+
     def test_unknown_pipeline_is_an_error(self):
         tr = self._add()
         tr["spec"]["pipelines"] = ["Nope.Release"]

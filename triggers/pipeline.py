@@ -14,7 +14,7 @@ from .base import Trigger, now, register
 # Azure Pipelines runs through the az CLI you are signed in with. A finished run of a named pipeline starts one task or
 # workflow run, once. "Only mine" keeps runs requested for you, or that carry a work item assigned to you: a release
 # build is requested for whoever merged, but its linked work items say whose work shipped.
-PIPE_RESULTS = {"succeeded": ("succeeded",), "failed": ("failed", "partiallySucceeded"),
+PIPE_RESULTS = {"succeeded": ("succeeded",), "partial": ("partiallySucceeded",), "failed": ("failed",),
                 "any": ("succeeded", "failed", "partiallySucceeded", "canceled")}
 PIPE_MAX = 10  # runs started per check
 
@@ -150,8 +150,9 @@ class Pipeline(Trigger):
         base = f"{sp['org']}/{quote(sp['project'])}/_workitems/edit/"
         first = (mine[0]["id"] if mine else items[0]) if items else None
         ado = {"id": first, "url": base + str(first)} if first else None
-        title = f"{run['pipeline']} {run['result']}"[:200]
-        lines = [f"Pipeline {run['pipeline']} finished: {run['result']}.", f"Run: {run['url']}",
+        said = "partially succeeded" if run["result"] == "partiallySucceeded" else run["result"]
+        title = f"{run['pipeline']} {said}"[:200]
+        lines = [f"Pipeline {run['pipeline']} finished: {said}." + (" Some steps failed or had warnings; check them." if said != run["result"] else ""), f"Run: {run['url']}",
                  f"Branch {run['branch'] or '?'} · commit {run['commit'] or '?'}" + (f" · {run['message']}" if run["message"] else ""),
                  f"Requested for {run['who'] or 'unknown'} ({run['reason'] or 'manual'})."]
         if mine:
