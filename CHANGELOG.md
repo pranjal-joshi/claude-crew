@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Deleting a trigger uses a red bin icon instead of ✕ (same confirm).
 - Switching projects shows an "Opening <project>…" overlay at once instead of looking frozen while the old crew shuts down.
 - The agent **Role** box (settings and Add agent) grows to fit its text and can be resized, instead of a two-line box you had to scroll.
+- Notifications no longer repeat: an identical toast already on screen is refreshed instead of stacked (an action's own toast and the server's event for it show once), at most 4 show at a time, and editing an agent's role, tags, icon or colour posts one event naming what changed instead of repeating its model line, with none when nothing changed.
 - Board card footers wrap and long agent names are shortened with an ellipsis instead of running off the card.
 
 ## [0.2.0] - 2026-10-21

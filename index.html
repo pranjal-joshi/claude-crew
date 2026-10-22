@@ -955,13 +955,24 @@ async function act(action, payload = {}) {
 }
 
 function toast(text, color = 'var(--accent)', opt = null) {  // opt: {label, fn, ms} adds one action button
+  // the same message twice (a click's own toast and the server's event for it, or a burst of identical events)
+  // shows once: the visible toast just stays up longer instead of stacking copies
+  const key = String(text).trim().toLowerCase(), box = $('#toasts');
+  const dup = [...box.children].find(t => t.dataset.key === key && !t.dataset.gone);
+  if (dup) {
+    if (opt && !dup.querySelector('button')) return dup.remove(), toast(text, color, opt);  // keep the Undo button
+    clearTimeout(dup._t); dup._t = setTimeout(() => fadeToast(dup), opt?.ms || 3800);
+    return;
+  }
   const el = document.createElement('div');
-  el.className = 'toast';
+  el.className = 'toast'; el.dataset.key = key;
   el.innerHTML = `<span class="dot" style="background:${color}"></span><span>${esc(text)}</span>${opt ? `<button class="btn sm">${esc(opt.label)}</button>` : ''}`;
   if (opt) el.querySelector('button').onclick = () => { el.remove(); opt.fn(); };
-  $('#toasts').append(el);
-  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = 0; setTimeout(() => el.remove(), 300); }, opt?.ms || 3800);
+  box.append(el);
+  while (box.children.length > 4) box.firstElementChild.remove();  // never a wall of toasts
+  el._t = setTimeout(() => fadeToast(el), opt?.ms || 3800);
 }
+function fadeToast(el) { el.dataset.gone = '1'; el.style.transition = 'opacity .3s'; el.style.opacity = 0; setTimeout(() => el.remove(), 300); }
 
 const agent = n => S.agents.find(a => a.name === n);
 const task = id => S.tasks.find(t => t.id === id);

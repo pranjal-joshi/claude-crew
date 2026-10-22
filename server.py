@@ -128,6 +128,18 @@ def clean_tags(tags) -> list[str]:
     return out[:8]
 
 
+CONFIG_KEYS = ("model", "effort", "context", "role", "tags", "icon", "color")
+
+
+def config_change(key: str, value) -> str:
+    """How a configure event names one changed setting."""
+    if key in ("role", "tags", "icon", "color"):
+        return f"{key} updated"
+    if key == "effort":
+        return f"{value or 'default'} effort"
+    return f"{key} {value or 'default'}" if key == "context" else (value or "default model")
+
+
 def now() -> float:
     return time.time()
 
@@ -2297,6 +2309,7 @@ class Crew:
                         self._kill_proc(ag["name"])
                 self.event("mode", f"permission mode → {p['mode']}")
             elif action == "configure" and a:
+                before = {k: a.get(k) for k in CONFIG_KEYS}
                 if "model" in p:
                     if p["model"] and p["model"] not in MODELS:
                         return {"error": f"unknown model {p['model']}"}
@@ -2322,7 +2335,9 @@ class Crew:
                 self._save_config()
                 if a["status"] != "running" and self._alive(a["name"]) and tuple(a.get("launched") or ()) != self._launch_key(a):
                     self._kill_proc(a["name"])  # restarts with the new settings on its next task (session kept)
-                self.event("config", f"{a['name']} · {a['model'] or 'default'} · {a['effort'] or 'default'} effort", a["name"])
+                changed = [k for k in CONFIG_KEYS if a.get(k) != before[k]]
+                if changed:  # one event per real change, naming what changed (no repeat of the model line on every edit)
+                    self.event("config", f"{a['name']} · " + ", ".join(config_change(k, a.get(k)) for k in changed), a["name"])
             elif action == "add_agent":
                 name = (p.get("name") or "").strip()
                 if not NAME_RE.fullmatch(name):

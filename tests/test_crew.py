@@ -98,6 +98,17 @@ class Actions(TempCrewCase):
         self.crew.act("configure", {"agent": a, "icon": "", "color": ""})
         self.assertNotIn("icon", json.loads(self.cfg_path.read_text(encoding="utf-8"))["agents"][0])
 
+    def test_configure_event_names_the_change_and_skips_no_ops(self):
+        a = next(iter(self.crew.agents))
+        configs = lambda: [e["text"] for e in self.crew.feed if e["kind"] == "config"]
+        self.crew.act("configure", {"agent": a, "role": "Reviews diffs."})
+        self.assertEqual(configs()[-1], f"{a} · role updated")
+        n = len(configs())
+        self.crew.act("configure", {"agent": a, "role": "Reviews diffs."})  # nothing changed: no event, so no toast
+        self.assertEqual(len(configs()), n)
+        self.crew.act("configure", {"agent": a, "model": "haiku", "effort": "low"})
+        self.assertEqual(configs()[-1], f"{a} · haiku, low effort")
+
     def test_busy_tracks_running_work(self):
         self.assertFalse(self.crew.busy())
         next(iter(self.crew.agents.values()))["status"] = "running"
