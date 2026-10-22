@@ -264,7 +264,7 @@ class Crew:
             self.boss.update({k: b[k] for k in ("session", "cost", "log", "tokens", "ctx") if k in b})
         for name, saved in data.get("agents", {}).items():
             if name in self.agents:
-                self.agents[name].update({k: saved[k] for k in ("session", "cost", "log", "tokens", "mcp", "skills", "skill_names", "plugins", "commands") if k in saved})
+                self.agents[name].update({k: saved[k] for k in ("session", "kept", "cost", "log", "tokens", "mcp", "skills", "skill_names", "plugins", "commands") if k in saved})
                 if self.agents[name]["status"] != "idle":
                     self.agents[name]["status"] = "idle"
 
@@ -274,7 +274,7 @@ class Crew:
                 "runs": self.runs[-50:], "next_run": self.next_run,
                 "alerts": self.alerts[-200:], "next_alert": self.next_alert,
                 "day": self.day, "day_spend": round(self.day_spend, 6), "day_hit": self.day_hit,
-                "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
+                "agents": {n: {"session": a["session"], **({"kept": a["kept"]} if "kept" in a else {}), "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
                            "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", []), "commands": a.get("commands", [])}
                        for n, a in self.agents.items()},
                 "boss": {k: self.boss[k] for k in ("session", "cost", "tokens", "ctx")} | {"log": self.boss["log"][-200:]}}

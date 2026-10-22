@@ -267,18 +267,29 @@ def once_rules(crew, a: dict) -> list[str]:
 
 
 def task_session(crew, a: dict, t: dict) -> None:
-    """Pick the Claude session for work on task t (context "fresh"): the one this agent already had for t, so a
-    reply, send-back or re-run continues that conversation; a new one for a task it hasn't worked on (a new task
-    from you, the boss or a trigger). "keep" agents stay in their one running session."""
-    if a["context"] != "fresh":
+    """Pick the Claude session for work on task t: the one this agent already had for t, so a reply, send-back or
+    re-run continues that conversation; a new one for a task it hasn't worked on (a new task from you, the boss or a
+    trigger). "keep" agents stay in their one running session, except for workflow steps: every step starts on a
+    fresh session, so no run inherits another's context, and the agent goes back to its own session afterwards."""
+    step = bool(t.get("run"))
+    if a["context"] != "fresh" and not step:
+        if "kept" in a:  # back from a workflow step: its own long-running session again
+            kept = a.pop("kept")
+            if kept != a["session"]:
+                crew._kill_proc(a["name"])
+                a["session"] = kept
+                crew.log(a, "sys", "back in its own session")
+        a["last_task"] = t["id"]
         return
+    if a["context"] != "fresh" and "kept" not in a:
+        a["kept"] = a["session"]
     sid = (t.get("sessions") or {}).get(a["name"])
     if sid:
         if sid != a["session"]:
             crew._kill_proc(a["name"])
             a["session"] = sid
             crew.log(a, "sys", f"back in #{t['id']}'s session")
-    elif a.get("last_task") not in (None, t["id"]) and (a["session"] or crew._alive(a["name"])):
+    elif (step or a.get("last_task") not in (None, t["id"])) and (a["session"] or crew._alive(a["name"])):
         crew._kill_proc(a["name"])  # new task, new session: no paying to re-read old work
         a["session"] = None
         crew.log(a, "sys", f"fresh context for #{t['id']}")

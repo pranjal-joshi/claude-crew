@@ -25,10 +25,16 @@ def find_run(crew, rid) -> dict | None:
     return next((r for r in crew.runs if r["id"] == rid), None)
 
 
+# What a step passes on. The previous step's summary goes to the next one in full: it often carries blocks the next
+# agent must copy verbatim (ADO comments, tables), so a cut there loses work. Earlier steps get a shorter excerpt.
+SUMMARY_MAX = 20000
+EARLIER_MAX = 4000
+
+
 def start_run(crew, w: dict, title: str, details: str = "", source: dict | None = None) -> dict:
     n = len(w["steps"])
     run = {"id": f"r{crew.next_run}", "wf": w["id"], "name": w["name"], "title": title[:200],
-           "details": (details or "").strip()[:4000], "steps": json.loads(json.dumps(w["steps"])),
+           "details": (details or "").strip()[:SUMMARY_MAX], "steps": json.loads(json.dumps(w["steps"])),
            "status": "running", "step": 0, "tasks": [None] * n, "results": [None] * n, "started": now(), "note": "",
            "source": source, "ado": (source or {}).get("ado")}
     crew.next_run += 1
@@ -57,7 +63,7 @@ def start_step(crew, run: dict, i: int) -> None:
         if not r:
             continue
         where = f" on {r['branch']} (commit {r['commit']})" if r.get("commit") else ""
-        text = r["summary"] if k == i - 1 else r["summary"][:400]
+        text = r["summary"] if k == i - 1 else r["summary"][:EARLIER_MAX]
         brief.append(f"Step {k + 1} by {r['who']}{where}:\n{text}")
     if prev and prev.get("commit") and prev.get("branch"):
         brief.append(f"Run `git merge {prev['branch']}` in your worktree first so you build on that work.")
@@ -84,7 +90,7 @@ def on_task_event(crew, t: dict, col: str, summary: str | None) -> None:
         crew._jobs.append(("approve", t["id"], "workflow"))  # committed outside the lock; "done" then advances the run
     elif col == "done":
         w = crew.agents.get(t.get("who") or "")
-        run["results"][i] = {"who": t.get("who") or "", "summary": (t.get("summary") or "")[:3000],
+        run["results"][i] = {"who": t.get("who") or "", "summary": (t.get("summary") or "")[:SUMMARY_MAX],
                              "branch": w["branch"] if w and w.get("branch") else "", "commit": t.get("commit") or ""}
         run["note"] = ""
         if i + 1 < len(run["steps"]):
@@ -144,7 +150,7 @@ def output(crew, run: dict) -> None:
                 return
             last = next((r for r in reversed(run["results"]) if r), None)
             nr = start_run(crew, nxt, run["title"], ((run["details"] + "\n\n") if run["details"] else "")
-                                 + (f"From {run['name']}: {last['summary'][:2000]}" if last else ""), {"workflow": run["id"]})
+                                 + (f"From {run['name']}: {last['summary'][:SUMMARY_MAX]}" if last else ""), {"workflow": run["id"]})
             nr["depth"] = run.get("depth", 0) + 1
             run["output"] = f"started {nxt['name']}"
     except OSError as e:
