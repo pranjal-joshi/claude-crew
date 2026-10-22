@@ -220,7 +220,7 @@ class TellReopens(TempCrewCase):
         t.update(col="review", who=a["name"])
         a.update(status="review", task=t["id"])
         self.crew._start = lambda ag: True
-        self.crew._send = lambda ag, text: True
+        self.crew._send = lambda ag, text, images=None: True
         return a, t
 
     def test_message_moves_review_task_back_to_in_progress(self):
@@ -241,7 +241,7 @@ class TaskSessions(TempCrewCase):
         self.a = next(iter(self.crew.agents.values()))
         self.a["context"] = "fresh"
         self.crew._start = lambda ag: True
-        self.crew._send = lambda ag, text: True
+        self.crew._send = lambda ag, text, images=None: True
         self.crew._kill_proc = lambda name: None
 
     def _run(self, title):
@@ -272,7 +272,7 @@ class AddressReview(TempCrewCase):
         a = next(iter(self.crew.agents.values()))
         sent = []
         self.crew._start = lambda ag: True
-        self.crew._send = lambda ag, text: sent.append(text) or True
+        self.crew._send = lambda ag, text, images=None: sent.append(text) or True
         self.crew.act("add", {"title": "Ship it", "tag": "bug"})
         t = self.crew.tasks[-1]
         self.assertIn("error", self.crew.act("address_review", {"task": t["id"]}))  # no PR yet
@@ -292,7 +292,7 @@ class Decide(TempCrewCase):
     def setUp(self):
         super().setUp()
         self.crew._start = lambda ag: True
-        self.crew._send = lambda ag, text: True
+        self.crew._send = lambda ag, text, images=None: True
         names = list(self.crew.agents)
         self.gate, self.next = self.crew.agents[names[0]], self.crew.agents[names[1]]
         w = {"id": "gate", "name": "Gate", "steps": [{"agent": self.gate["name"], "title": "Pick: {input}", "gate": "approve"},
@@ -340,7 +340,7 @@ class PrLinks(TempCrewCase):
     def test_prs_read_from_summary_and_brief(self):
         a = next(iter(self.crew.agents.values()))
         self.crew._start = lambda ag: True
-        self.crew._send = lambda ag, text: True
+        self.crew._send = lambda ag, text, images=None: True
         self.crew.act("add", {"title": "Ship it", "tag": "bug", "details": "CI on https://github.com/o/r/pull/41 is red"})
         t = self.crew.tasks[-1]
         self.crew._begin(a, t)
@@ -349,7 +349,7 @@ class PrLinks(TempCrewCase):
                                 "result": "Opened https://github.com/o/r/pull/42. Also see https://github.com/o/r/pull/41"})
         self.assertEqual(t["prs"], ["https://github.com/o/r/pull/41", "https://github.com/o/r/pull/42"])
         sent = []
-        self.crew._send = lambda ag, text: sent.append(text) or True
+        self.crew._send = lambda ag, text, images=None: sent.append(text) or True
         a["status"] = "idle"
         self.assertNotIn("error", self.crew.act("address_review", {"task": t["id"]}))
         self.assertEqual(sent[-1], "/address-review https://github.com/o/r/pull/42")  # the latest PR

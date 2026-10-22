@@ -120,7 +120,26 @@ def start(crew, a: dict) -> bool:
     return True
 
 
-def send(crew, a: dict, text: str) -> bool:
+IMAGE_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp")
+IMAGES_MAX = 4
+IMAGE_B64_MAX = 7_000_000  # about 5 MB of image: the API's limit per image
+
+
+def clean_images(raw) -> tuple[str | None, list[dict]]:
+    """Screenshots pasted into a chat: [{media_type, data (base64)}], checked before they reach claude."""
+    out = []
+    for im in (raw or [])[:IMAGES_MAX + 1]:
+        if not isinstance(im, dict) or im.get("media_type") not in IMAGE_TYPES or not isinstance(im.get("data"), str):
+            return "images must be PNG, JPEG, GIF or WebP", []
+        if len(im["data"]) > IMAGE_B64_MAX:
+            return "an image is over 5 MB: crop or shrink it", []
+        out.append({"type": "image", "source": {"type": "base64", "media_type": im["media_type"], "data": im["data"]}})
+    if len(out) > IMAGES_MAX:
+        return f"at most {IMAGES_MAX} images per message", []
+    return None, out
+
+
+def send(crew, a: dict, text: str, images: list[dict] | None = None) -> bool:
     """Queue a user message for the agent's process. The write happens on the process's own writer thread, so
     this never blocks. False when the process is gone, its pipe broke, or it has not read for procs.STDIN_LIMIT seconds."""
     w = crew.writers.get(a["name"])
@@ -132,7 +151,8 @@ def send(crew, a: dict, text: str) -> bool:
         a["error"] = f"could not send to claude: {why}"
         crew.log(a, "error", a["error"])
         return False
-    w.put(json.dumps({"type": "user", "message": {"role": "user", "content": text}}) + "\n")
+    content = [{"type": "text", "text": text}, *images] if images else text
+    w.put(json.dumps({"type": "user", "message": {"role": "user", "content": content}}) + "\n")
     return True
 
 

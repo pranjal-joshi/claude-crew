@@ -233,6 +233,24 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .colh{display:flex;align-items:center;gap:8px;padding:12px 13px 10px;font-weight:600;font-size:12.5px}
 .colh .n{color:var(--faint);font-weight:500;font-variant-numeric:tabular-nums}
 .cards{padding:2px 9px 10px;overflow:auto;flex:1}
+/* a workflow run: one frame in the column of its current step, the other steps as rows */
+.rgrp{border:1px solid var(--line2);border-radius:calc(var(--r) + 2px);background:linear-gradient(180deg,color-mix(in srgb,var(--amber) 6%,transparent),transparent 70%);padding:7px;margin-bottom:9px}
+.rgrp .gh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 2px 6px}
+.rgrp .gh .gi{color:var(--amber);font:600 11px var(--mono)}.rgrp .gh b{font-size:12.5px;color:var(--text)}
+.rgrp .gh .gg{order:3;flex-basis:100%;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rgrp .gh .gs{margin-left:auto;font-size:11px;color:var(--faint)}
+.rgrp .fold{border:0;background:none;color:var(--faint);cursor:pointer;font-size:11px;padding:1px 5px;border-radius:5px}.rgrp .fold:hover{color:var(--text);background:var(--hover)}
+.rgsteps{display:flex;align-items:center;margin:0 2px 6px}
+.rgsteps .rst{display:flex;align-items:center;flex:1}.rgsteps .rst:last-child{flex:none}
+.rgsteps i{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font:700 9px var(--sans);font-style:normal;background:var(--raised);color:var(--faint);border:1px solid var(--line2);flex:none}
+.rgsteps .done i{background:var(--green);color:#0d2117;border-color:var(--green)}.rgsteps .review i{background:var(--blue);color:#0c1730;border-color:var(--blue)}
+.rgsteps .doing i,.rgsteps .backlog i{background:var(--amber);color:#2a1d05;border-color:var(--amber)}.rgsteps .stopped i{background:var(--red);color:#fff;border-color:var(--red)}
+.rgsteps .rst:not(:last-child)::after{content:"";flex:1;height:2px;background:var(--line2);margin:0 3px}.rgsteps .rst.done:not(:last-child)::after{background:var(--green)}
+.rrow{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:8px;font-size:12px;color:var(--muted);cursor:pointer}
+.rrow:hover{background:var(--hover)}.rrow .rt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rrow.wait{cursor:default;opacity:.7}.rrow.wait:hover{background:none}
+.rrow .ok{color:var(--green)}.rrow .rs{font-size:10.5px;color:var(--faint);border:1px solid var(--line2);border-radius:999px;padding:0 6px;white-space:nowrap}
+.rgrp>.card{margin:4px 0}.rgrp>.card.review{border-color:color-mix(in srgb,var(--blue) 40%,transparent)}.rgrp>.card.doing{border-color:color-mix(in srgb,var(--amber) 40%,transparent)}
+.rgrp>.card .wfl{display:none}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 11px;margin-bottom:8px;cursor:grab;transition:border-color .15s,transform .12s,box-shadow .15s}
 .card:hover{border-color:var(--line2);box-shadow:0 4px 18px var(--sh-card)}
 .card.dragging{opacity:.35}
@@ -631,6 +649,13 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .chatto .mini{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-ink2);font:700 11px var(--sans)}
 .chatto.boss .mini{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:var(--mark-ink)}
 .bossdot{width:7px;height:7px;border-radius:50%;background:var(--faint)}.bossdot.on{background:var(--green);animation:pulse 1.4s infinite}
+.chatatt{border:0;background:none;color:var(--faint);cursor:pointer;width:30px;height:36px;display:grid;place-items:center;border-radius:8px;flex:none}.chatatt:hover{color:var(--text);background:var(--hover)}
+.chatimgs{display:flex;gap:8px;flex-wrap:wrap;padding:8px 18px 0}
+.chatimgs .ci{position:relative;width:64px;height:48px;border-radius:8px;overflow:hidden;border:1px solid var(--line2);background:var(--bg)}
+.chatimgs .ci img{width:100%;height:100%;object-fit:cover;display:block}
+.chatimgs .ci button{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;font-size:11px;cursor:pointer;line-height:18px;padding:0}
+.chatbar.drop{outline:2px dashed var(--accent);outline-offset:-4px}
+.m.you .imgn{display:block;margin-top:4px;font-size:11.5px;opacity:.75}
 .chathead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);position:sticky;top:-12px;z-index:2;margin:-12px -18px 0;padding:10px 18px 8px;background:var(--bg2);border-bottom:1px solid var(--line)}
 /* auto workflow builder */
 /* mobile app shell */
@@ -912,8 +937,11 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
       <div class="chatbar" id="chatbar">
         <div class="chatlog" id="chatlog" hidden></div>
         <div class="chatpeek" id="chatPeek" hidden role="button" tabindex="0"></div>
+        <div class="chatimgs" id="chatImgs" hidden></div>
         <div class="chatin">
           <button class="chatto boss" id="chatTo" aria-haspopup="menu"></button>
+          <button class="chatatt" id="chatAtt" title="Attach a screenshot (or paste one, or drop it here)" aria-label="Attach a screenshot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></button>
+          <input type="file" id="chatFile" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
           <textarea id="chatIn" rows="1" placeholder="Ask the boss to plan, delegate or run a workflow…"></textarea>
           <button class="btn primary sm" id="chatSend" style="height:36px">Send</button>
         </div>
@@ -1277,14 +1305,54 @@ function renderBoard() {
   if (document.querySelector('.menu')) return; // keep an open menu anchored
   const show = () => true;
   if (!S.tasks.length) { $('#board').innerHTML = firstRunHtml(); return; }
+  const groups = runGroups();
   $('#board').innerHTML = COLS.map(([k, label, c]) => {
-    const items = S.tasks.filter(t => t.col === k && show(t)).sort((a, b) => k === 'done' ? b.id - a.id : a.id - b.id);
+    const items = S.tasks.filter(t => t.col === k && show(t) && !groups.hidden.has(t.id))
+      .sort((a, b) => k === 'done' ? b.id - a.id : a.id - b.id);
+    const html = items.map(t => groups.at.has(t.id) ? runGroup(groups.at.get(t.id), t) : card(t));
     return `<div class="col" data-col="${k}">
       <div class="colh"><span class="dot" style="background:${c}"></span>${label}${k === 'backlog' ? '<button class="btn sm primary addt" data-new-task title="New task (N)">＋ New</button>' : ''}<span class="n">${items.length}</span></div>
-      <div class="cards">${items.length ? items.map(card).join('') : `<div class="empty">${k === 'backlog' ? 'No tasks yet. Press <kbd>N</kbd> to add one.' : 'Nothing here'}</div>`}</div>
+      <div class="cards">${html.length ? html.join('') : `<div class="empty">${k === 'backlog' ? 'No tasks yet. Press <kbd>N</kbd> to add one.' : 'Nothing here'}</div>`}</div>
     </div>`;
   }).join('');
 }
+// Workflow runs on the board: one frame per run, in the column of its current step (the task it is on, or its last
+// task once it ended). The run's other tasks leave their columns and show as rows inside the frame.
+function runGroups() {
+  const at = new Map(), hidden = new Set();
+  for (const r of S.runs || []) {
+    const ids = (r.tasks || []).filter(id => id != null && task(id));
+    if (!ids.length) continue;
+    const head = task(r.tasks[r.step]) ? r.tasks[r.step] : ids[ids.length - 1];
+    at.set(head, r);
+    ids.forEach(id => id !== head && hidden.add(id));
+  }
+  return {at, hidden};
+}
+function runGroup(r, head) {
+  const n = r.steps.length, folded = view.runFold?.has(r.id);
+  const state = i => { const t = task(r.tasks[i]); return t ? (t.decision?.verdict === 'stop' ? 'stopped' : t.col) : 'wait'; };
+  const steps = r.steps.map((st, i) => { const s = state(i);
+    return `<span class="rst ${s}" title="Step ${i + 1}: ${esc(st.agent)} · ${s === 'wait' ? (r.status === 'running' ? 'not started' : 'not run') : s}"><i>${s === 'done' ? '✓' : s === 'stopped' ? '■' : i + 1}</i></span>`; }).join('');
+  const rows = folded ? '' : r.steps.map((st, i) => {
+    const t = task(r.tasks[i]);
+    if (t && t.id === head.id) return card(t);
+    const s = state(i), title = t ? t.title : (st.title || '{input}').replace('{input}', r.title);
+    const mark = s === 'done' ? '<span class="ok">✓</span>' : s === 'stopped' ? '<span style="color:var(--red)">■</span>' : '<span class="faint">○</span>';
+    return `<div class="rrow ${t ? '' : 'wait'}" ${t ? `data-card="${t.id}" title="#${t.id} ${esc(t.title)} · open ${esc(st.agent)}"` : ''}>${mark}<span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 10)}</span><span class="rt">${i + 1}. ${esc(title)}</span>${t ? `<span class="faint">#${t.id}</span>` : `<span class="rs">${r.status === 'running' ? 'not started' : 'not run'}</span>`}</div>`;
+  }).join('');
+  const done = r.steps.filter((_, i) => state(i) === 'done').length;
+  return `<div class="rgrp" data-run-group="${esc(r.id)}">
+    <div class="gh"><span class="gi">⛓</span><b>${esc(r.name)}</b><span class="gs">${r.status === 'running' ? `step ${Math.min(r.step + 1, n)} of ${n}` : `${esc(r.status)} · ${done}/${n}`}</span>
+      <button class="fold" data-run-fold="${esc(r.id)}" title="${folded ? 'Show the steps' : 'Collapse to the header'}" aria-expanded="${!folded}">${folded ? '▸' : '▾'}</button>
+      <span class="gg" title="${esc(r.title)}">${esc(r.title)}</span></div>
+    <div class="rgsteps">${steps}</div>${rows}</div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-run-fold]'); if (!b) return;
+  e.stopPropagation(); view.runFold = view.runFold || new Set();
+  const id = b.dataset.runFold; view.runFold.has(id) ? view.runFold.delete(id) : view.runFold.add(id); renderBoard();
+}, true);
 
 const FIRST_TASK = {title: 'Add rate limiting to the login endpoint', tag: 'feature', details: 'Limit login attempts per IP, return 429 with a Retry-After header, and add a test.'};
 function firstRunHtml() {
@@ -1705,7 +1773,7 @@ function msgBody(m) {
   switch (m.kind) {
     case 'subagent': return `<div class="m subagent"><span class="sd"></span>${SUBI}subagent <b>${esc(m.text)}</b>${m.detail ? `<span class="faint">${esc(m.detail)}</span>` : ''}</div>`;
     case 'subdone': return `<div class="m subdone">${SUBI} ${esc(m.text)} finished · ${esc(m.detail || '')}</div>`;
-    case 'you': return `<div class="m you">${esc(m.text)}</div>`;
+    case 'you': return `<div class="m you">${esc(m.text)}${m.images ? `<span class="imgn">📎 ${m.images} screenshot${m.images > 1 ? 's' : ''}</span>` : ''}</div>`;
     case 'text': return `<div class="m text md">${mdHtml(m.text)}</div>`;
     case 'tool': return `<div class="m tool"><span>${toolIcon(m.text)}</span><span class="tn">${esc(m.text)}</span><span class="td">${esc(m.detail || '')}</span></div>`;
     case 'toolerr': return `<div class="m toolerr">${esc(m.text)}</div>`;
@@ -2156,7 +2224,7 @@ function trigWhat(tr) {
     case 'poll': return `Every ${sp.every} min: ${sp.command}  →  on ${({change: 'changed output', fail: 'failure', output: 'new output'})[sp.when]}`;
     case 'webhook': return `POST ${location.origin}/api/hook/${tr.id}`;
     case 'pipeline': return `${({succeeded: 'Successful', partial: 'Partially successful', failed: 'Failed', any: 'Finished'})[sp.result]} runs of ${sp.pipelines.join(', ')}${sp.mine ? ' · only mine' : ''} · every ${sp.every} min`;
-    case 'teams': return `${sp.mode === 'all' ? 'New messages' : '@mentions of you'} in ${sp.where}${sp.about ? ` about ${sp.about}` : ''} · every ${sp.every} min`;
+    case 'teams': return `${sp.mode === 'all' ? 'New messages' : '@mentions of you'} in ${sp.name || (sp.thread ? 'the linked conversation' : sp.where)}${sp.about ? ` about ${sp.about}` : ''} · every ${sp.every} min`;
     case 'ado': return `Items tagged “${sp.tag}”${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min · then ${({tag_picked: `add ${sp.tag}-picked`, remove_tag: 'remove the tag', none: 'leave tags'})[sp.after]}`;
   }
 }
@@ -2280,8 +2348,10 @@ function drawTrigForm() {
   }
   if (k === 'teams') {
     const out = tv.teamsOut;
-    spec = `<div><div class="label">Channel or chat<span class="faint lc">required, as you'd name it to a person</span></div>
-        <input class="field" data-s="where" value="${esc(sp.where)}" placeholder="Platform team > Incidents channel" maxlength="200" autocomplete="off"></div>
+    spec = `<div><div class="label">Channel or chat<span class="faint lc">required: paste a link to it, or to any message in it</span></div>
+        <input class="field" data-s="where" value="${esc(sp.where)}" placeholder="https://teams.microsoft.com/l/message/19%3a…%40thread.skype/…" maxlength="600" autocomplete="off">
+        <div class="faint" style="font-size:11.5px;margin-top:4px">In Teams, hover a message in the channel → ⋯ → <i>Copy link</i>. A plain name works only where your organization lets the connector list teams.</div></div>
+      <div><div class="label">Name it<span class="faint lc">optional, shown on the trigger</span></div><input class="field" data-s="name" value="${esc(sp.name || '')}" placeholder="AI Studio feedback channel" maxlength="100" autocomplete="off"></div>
       <div class="two"><div><div class="label">Fire on</div>${seg('s', 'mode', [['mention', '@mentions of me'], ['all', 'every new message']], sp.mode)}</div>
       <div><div class="label">Check every (min)</div><input class="field" type="number" min="5" data-s="every" value="${sp.every}"></div></div>
       <div><div class="label">Only about<span class="faint lc">optional</span></div><input class="field" data-s="about" value="${esc(sp.about)}" placeholder="e.g. deployments, outages or bugs in checkout" maxlength="200" autocomplete="off"></div>
@@ -3054,11 +3124,45 @@ async function bossSays(text, open = true) {
   render();
 }
 async function sendChat() {
-  const el = $('#chatIn'), text = el.value.trim(); if (!text) return;
-  if (crewCmd(text, chatWho())) { el.value = ''; autosize({target: el}); return; }
-  const r = await act('tell', {agent: chatTarget().name, text});
-  if (r.ok) { el.value = ''; autosize({target: el}); view.chatOpen = true; $('#chatlog').dataset.jump = '1'; render(); }
+  const el = $('#chatIn'), text = el.value.trim(), imgs = view.chatImgs || [];
+  if (!text && !imgs.length) return;
+  if (!imgs.length && crewCmd(text, chatWho())) { el.value = ''; autosize({target: el}); return; }
+  const r = await act('tell', {agent: chatTarget().name, text, ...(imgs.length ? {images: imgs.map(({media_type, data}) => ({media_type, data}))} : {})});
+  if (r.ok) { el.value = ''; autosize({target: el}); view.chatImgs = []; renderChatImgs(); view.chatOpen = true; $('#chatlog').dataset.jump = '1'; render(); }
 }
+// Screenshots for the chat: paste, drop or pick; up to 4 per message, sent with the text to whoever you talk to.
+const IMG_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+function addChatImgs(files) {
+  view.chatImgs = view.chatImgs || [];
+  for (const f of files) {
+    if (!IMG_TYPES.includes(f.type)) { toast('Only PNG, JPEG, GIF or WebP images', 'var(--red)'); continue; }
+    if (f.size > 5_000_000) { toast(`${f.name || 'That image'} is over 5 MB`, 'var(--red)'); continue; }
+    if (view.chatImgs.length >= 4) { toast('At most 4 screenshots per message', 'var(--amber)'); break; }
+    const r = new FileReader();
+    r.onload = () => { const url = String(r.result); view.chatImgs.push({media_type: f.type, data: url.slice(url.indexOf(',') + 1), url}); renderChatImgs(); };
+    r.readAsDataURL(f);
+  }
+}
+function renderChatImgs() {
+  const box = $('#chatImgs'), imgs = view.chatImgs || [];
+  box.hidden = !imgs.length;
+  box.innerHTML = imgs.map((im, i) => `<div class="ci"><img src="${im.url}" alt="Screenshot ${i + 1}"><button data-img-x="${i}" title="Remove" aria-label="Remove screenshot ${i + 1}">✕</button></div>`).join('');
+}
+$('#chatImgs').addEventListener('click', e => { const b = e.target.closest('[data-img-x]'); if (b) { view.chatImgs.splice(+b.dataset.imgX, 1); renderChatImgs(); } });
+$('#chatAtt').onclick = () => $('#chatFile').click();
+$('#chatFile').onchange = e => { addChatImgs([...e.target.files]); e.target.value = ''; };
+$('#chatIn').addEventListener('paste', e => {
+  const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+  if (files.length) { e.preventDefault(); addChatImgs(files); }
+});
+const chatbarEl = $('#chatbar');
+chatbarEl.addEventListener('dragover', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); chatbarEl.classList.add('drop'); } });
+chatbarEl.addEventListener('dragleave', e => { if (!chatbarEl.contains(e.relatedTarget)) chatbarEl.classList.remove('drop'); });
+chatbarEl.addEventListener('drop', e => {
+  chatbarEl.classList.remove('drop');
+  const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/'));
+  if (files.length) { e.preventDefault(); addChatImgs(files); }
+});
 $('#chatSend').onclick = sendChat;
 $('#chatIn').addEventListener('input', autosize);
 $('#chatIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });

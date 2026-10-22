@@ -7,6 +7,7 @@ import re
 import subprocess
 import time
 from pathlib import Path
+from urllib.parse import unquote
 
 from .base import Trigger, now, register, short_title
 
@@ -18,6 +19,15 @@ TEAMS_TOOLS = "mcp__claude_ai_Microsoft_365"
 TEAMS_MODES = ("mention", "all")
 TEAMS_MAX = 10  # messages that start work per check
 TEAMS_SEEN_MAX = 500
+# A Teams link (to a channel, a chat, or any message in one) names its conversation by thread id. Searching messages
+# and keeping that thread id needs only the message-read permissions most tenants grant; looking a channel up by name
+# needs Team.ReadBasic.All, which many organizations don't grant the connector.
+THREAD_RE = re.compile(r"19(?::|%3[Aa])[A-Za-z0-9_.\-]+(?:@|%40)thread\.(?:skype|tacv2|v2)")
+
+
+def thread_id(where: str) -> str:
+    m = THREAD_RE.search(where or "")
+    return m.group(0).replace("%3A", ":").replace("%3a", ":").replace("%40", "@") if m else ""
 
 class TeamsError(Exception):
     pass
@@ -31,18 +41,34 @@ def teams_spec(sp: dict) -> tuple[str | None, dict]:
         every = max(5, int(sp.get("every") or 10))
     except (TypeError, ValueError):
         return "numbers only for intervals", {}
-    return None, {"where": where[:200], "mode": sp.get("mode") if sp.get("mode") in TEAMS_MODES else "mention",
+    name = " ".join(str(sp.get("name") or "").split())[:100]
+    if not name and (m := re.search(r"[?&]channelName=([^&]+)", where)):  # a channel link names its channel
+        name = unquote(m.group(1).replace("+", " "))[:100]
+    return None, {"where": where[:600], "thread": thread_id(where), "name": name,
+                  "mode": sp.get("mode") if sp.get("mode") in TEAMS_MODES else "mention",
                   "about": " ".join(str(sp.get("about") or "").split())[:200], "every": every}
 
 
 def teams_prompt(sp: dict, since_iso: str) -> str:
     which = ("only messages that @mention me (the signed-in user), or reply to me in a thread" if sp["mode"] == "mention"
              else "every new message and reply")
+    if sp.get("thread"):
+        where = (f"Where: the Teams conversation with thread id {sp['thread']}"
+                 + (f" ({sp['name']})" if sp.get("name") else "") + ". Find its messages with the message search tool "
+                 f"(chat_message_search, query '*', afterDateTime {since_iso}, every page) and keep only results whose "
+                 f"chatId is {sp['thread']}. Don't list teams or channels: that permission is not granted.")
+    else:
+        where = (f"Where: {sp['where']} (a team and channel, or a chat). Find it with the message search tool "
+                 "(chat_message_search) and the chat list; don't list teams or channels, that permission is usually "
+                 "not granted. If you can't tell which conversation it is, reply {\"error\": \"paste a Teams link to "
+                 "the channel or to any message in it\"}.")
     return (
         "You check Microsoft Teams for Crew, which turns messages into work for an AI team. Use only the Microsoft 365 "
         "tools, read-only: never send, post or react.\n"
-        f"Where: {sp['where']} (a team and channel, or a chat).\n"
-        f"Which messages: {which}, posted after {since_iso} (UTC). Skip messages I sent myself."
+        f"{where}\n"
+        f"Which messages: {which}, posted after {since_iso} (UTC). Skip messages I sent myself. An @mention shows as my "
+        "name in the message text; call get_me for my name. Use read_resource on a message for its full text when the "
+        "search summary is cut short; if that fails, use the summary."
         + (f"\nOnly messages about: {sp['about']}." if sp.get("about") else "")
         + "\nReply with JSON only, no prose, in this shape:\n"
         '{"messages": [{"id": "the message id", "from": "sender name", "time": "ISO time", "text": "the message, up to 1500 '

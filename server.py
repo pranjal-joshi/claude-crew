@@ -454,8 +454,8 @@ class Crew:
     def _start(self, a: dict) -> bool:
         return agents.launch.start(self, a)
 
-    def _send(self, a: dict, text: str) -> bool:
-        return agents.launch.send(self, a, text)
+    def _send(self, a: dict, text: str, images: list[dict] | None = None) -> bool:
+        return agents.launch.send(self, a, text, images)
 
     def _check_writers(self) -> bool:
         return agents.launch.check_writers(self)
@@ -1383,15 +1383,18 @@ class Crew:
                 if (run := self._run((t.get("run") or {}).get("id"))) and run["status"] == "running":
                     run.update(status="stopped", ended=now(), note=f"step {t['run']['step'] + 1}'s task was deleted")
             elif action == "tell" and a:
-                text = (p.get("text") or "").strip()
+                err, images = agents.launch.clean_images(p.get("images")) if via == "ui" else (None, [])
+                if err:
+                    return {"error": err}
+                text = (p.get("text") or "").strip() or ("See the attached screenshot." if images else "")
                 if not text:
                     return {"error": "empty message"}
                 if a["status"] == "killed":
                     return {"error": "agent is killed"}
                 if not self._start(a):
                     return {"error": a["error"]}
-                self.log(a, "you", text, **({"by": p["from"]} if p.get("from") else {}))
-                if not self._send(a, text):
+                self.log(a, "you", text, **({"by": p["from"]} if p.get("from") else {}), **({"images": len(images)} if images else {}))
+                if not self._send(a, text, images):
                     a.update(status="error", activity="")
                     return {"error": a["error"]}
                 if a["status"] in ("idle", "error", "paused", "review"):
@@ -1718,6 +1721,7 @@ MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent"
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 MAX_BODY = 1_000_000
+CHAT_BODY = 30_000_000  # a chat message from the UI may carry screenshots
 
 
 def lan_ips() -> list[str]:
@@ -1789,16 +1793,16 @@ class Handler(BaseHTTPRequestHandler):
             return "ui"
         return "mcp" if hmac.compare_digest(tok, MCP_TOKEN.encode()) else None
 
-    def _read_body(self, required: bool = False) -> bytes | None:
-        """The request body, or None after answering 400 (bad Content-Length) or 413 (over MAX_BODY)."""
+    def _read_body(self, required: bool = False, limit: int = MAX_BODY) -> bytes | None:
+        """The request body, or None after answering 400 (bad Content-Length) or 413 (over the limit)."""
         raw = self.headers.get("Content-Length")
         if raw is None and not required:
             return b""
         if raw is None or not raw.isdigit():
             self._json({"error": "bad or missing Content-Length"}, 400)
             return None
-        if int(raw) > MAX_BODY:
-            self._json({"error": f"body too large (max {MAX_BODY} bytes)"}, 413)
+        if int(raw) > limit:
+            self._json({"error": f"body too large (max {limit} bytes)"}, 413)
             return None
         return self.rfile.read(int(raw))
 
@@ -1916,7 +1920,7 @@ class Handler(BaseHTTPRequestHandler):
         if not tier:
             self._drain()
             return self._json({"error": "missing or bad X-Crew-Auth token: reload the page"}, 403)
-        if (raw := self._read_body()) is None:
+        if (raw := self._read_body(limit=CHAT_BODY if tier == "ui" and self.path == "/api/act/tell" else MAX_BODY)) is None:
             return
         try:
             payload = json.loads(raw or b"{}")
