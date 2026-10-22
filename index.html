@@ -1453,7 +1453,7 @@ function renderSettings(a) {
   const box = $('#dset'); if (!box) return;
   box.hidden = !view.showSettings;
   if (!view.showSettings) return;
-  const sig = JSON.stringify([agentKv(a), a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags, a.context, a.icon, a.color, (S.triggers || []).filter(t => t.task.agent === a.name)]);
+  const sig = JSON.stringify([agentKv(a), a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags, a.context, a.icon, a.color, (S.triggers || []).filter(t => trigAgent(t) === a.name)]);
   if (sig === view.setSig || box.contains(document.activeElement)) return;
   view.setSig = sig;
   const busy = a.status === 'running';
@@ -2202,8 +2202,11 @@ const TEAMS_TASK = {title: '{title}', details: 'Teams message from {from} in {wh
 function setTrigKind(kind) {
   const f = tv.f, was = f.kind;
   if (['ado', 'pipeline'].includes(kind) || ['ado', 'pipeline'].includes(was)) { f.spec.tag = ''; f.spec.agent = ''; }  // event triggers use these names too
+  if (['ado', 'pipeline'].includes(kind) && !f.spec.workflow && !f.spec.agent) {  // opened from a workflow or agent: keep that target
+    if (f.task.workflow) f.spec.workflow = f.task.workflow; else if (f.task.agent && kind === 'pipeline') f.spec.agent = f.task.agent;
+  }
   if (kind === 'ado' && !f.spec.workflow) f.spec.workflow = S.workflows?.[0]?.id || '';
-  if (kind === 'pipeline' && !f.spec.workflow) f.spec.agent = (S.agents.find(a => /qa|verif/i.test(a.name)) || S.agents[0])?.name || '';
+  if (kind === 'pipeline' && !f.spec.workflow && !f.spec.agent) f.spec.agent = (S.agents.find(a => /qa|verif/i.test(a.name)) || S.agents[0])?.name || '';
   if (was === 'teams' && f.task.title === TEAMS_TASK.title && f.task.details === TEAMS_TASK.details) Object.assign(f.task, {title: '', details: ''});
   if (kind === 'teams' && !f.task.title) Object.assign(f.task, TEAMS_TASK);
   f.kind = kind; f.spec.every = kind === 'poll' || kind === 'ado' || kind === 'pipeline' ? 5 : kind === 'watch' || kind === 'teams' ? 10 : f.spec.every;
@@ -2431,7 +2434,7 @@ function wfEdge(a, b, L) {
 function wfNodeHtml(id, i) {
   const sel = wfSel === id ? 'sel' : '';
   if (id === 'trigger') {
-    const trs = wfe.id ? (S.triggers || []).filter(t => t.task.workflow === wfe.id) : [];
+    const trs = wfe.id ? (S.triggers || []).filter(t => trigWf(t) === wfe.id) : [];
     return `<div class="wfn trig ${sel}" data-n="trigger"><div class="ic">⚡</div><div class="tx"><b>When</b><span>${trs.length ? `${trs.length} trigger${trs.length > 1 ? 's' : ''} · or ▶ Run` : '▶ Run by hand'}</span></div><i class="ho"></i></div>`;
   }
   if (id === 'output') {
@@ -2485,9 +2488,9 @@ function drawWfIns() {
       <div style="display:flex;gap:6px"><button class="btn sm" data-smv="-1" ${i === 0 ? 'disabled' : ''}>← Earlier</button><button class="btn sm" data-smv="1" ${i === wfe.steps.length - 1 ? 'disabled' : ''}>Later →</button><button class="btn sm danger" data-srm style="margin-left:auto" ${wfe.steps.length === 1 ? 'disabled' : ''}>Delete</button></div>
       <div class="thint">Placeholders: <code>{input}</code> <code>{details}</code> the run's goal · <code>{prev_summary}</code> <code>{prev_who}</code> <code>{prev_branch}</code> <code>{prev_commit}</code> · <code>{step}</code> <code>{steps}</code></div>`;
   } else if (wfSel === 'trigger') {
-    const trs = wfe.id ? (S.triggers || []).filter(t => t.task.workflow === wfe.id) : [];
+    const trs = wfe.id ? (S.triggers || []).filter(t => trigWf(t) === wfe.id) : [];
     box.innerHTML = `<h4>Start</h4>
-      <div class="role" style="-webkit-line-clamp:unset">A run starts by hand with ▶ Run, or by a trigger: a schedule, a finished task, a file change, a poll or a webhook. The trigger's task title becomes the run's goal (<code>{input}</code>).</div>
+      <div class="role" style="-webkit-line-clamp:unset">A run starts by hand with ▶ Run, or by any number of triggers: a schedule, a finished task, a file change, a poll, a webhook, an ADO tag, a Teams message or a finished pipeline run. The trigger's task title becomes the run's goal (<code>{input}</code>).</div>
       ${trs.map(t => `<div class="wftr"><span>${TRIG_KIND[t.kind].ic}</span><b style="font-weight:600;white-space:nowrap">${esc(t.name)}</b><span class="faint">${esc(trigWhat(t))}</span>${t.enabled ? '' : '<span class="faint">off</span>'}</div>`).join('') || '<div class="faint" style="font-size:12px">No triggers yet.</div>'}
       <div style="display:flex;gap:6px"><button class="btn sm" data-wf-addtrig>⚡ Add trigger</button><button class="btn sm primary" data-wf-runnow>▶ Run now</button></div>
       ${wfe.id ? '' : '<div class="faint" style="font-size:11.5px">Both save the workflow first.</div>'}`;
@@ -2861,13 +2864,17 @@ $('#clearBtn').onclick = e => {
 
 // ---- triggers per agent / workflow ------------------------------------------------------
 function agentTriggers(a) {
-  const mine = (S.triggers || []).filter(t => t.task.agent === a.name);
+  const mine = (S.triggers || []).filter(t => trigAgent(t) === a.name);
   return `<div class="atrig" style="flex:1;min-width:0">${mine.map(t => `<div class="tr1"><span>${TRIG_KIND[t.kind].ic}</span><b style="font-weight:600">${esc(t.name)}</b><span class="faint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(trigWhat(t))}</span>${t.enabled ? '' : '<span class="faint">off</span>'}</div>`).join('')}
     <div><button class="btn sm" data-agent-trig="${esc(a.name)}">⚡ Add trigger</button></div></div>`;
 }
+// ADO and pipeline triggers keep their target in spec (task fields are built from the item or run)
+function ownTarget(t) { return ['ado', 'pipeline'].includes(t.kind); }
+function trigWf(t) { return (ownTarget(t) ? t.spec?.workflow : t.task?.workflow) || ''; }
+function trigAgent(t) { return ownTarget(t) ? (t.spec?.workflow ? '' : t.spec?.agent || '') : t.task?.workflow ? '' : t.task?.agent || ''; }
 function wfTrigChip(w) {
-  const n = (S.triggers || []).filter(t => t.task.workflow === w.id).length;
-  return `<button class="btn sm ghost" data-wf-trig="${w.id}" title="${n ? n + ' trigger' + (n > 1 ? 's' : '') + ' start this workflow · add another' : 'Start this workflow on a schedule, event, file change, poll or webhook'}">⚡${n ? ' ' + n : ''}</button>`;
+  const n = (S.triggers || []).filter(t => trigWf(t) === w.id).length;
+  return `<button class="btn sm ghost" data-wf-trig="${w.id}" title="${n ? n + ' trigger' + (n > 1 ? 's' : '') + ' start this workflow · add another' : 'Start this workflow on a schedule, event, file change, poll, webhook, ADO tag, Teams message or pipeline run'}">⚡${n ? ' ' + n : ''}</button>`;
 }
 function newTrigFor({agent = '', workflow = ''}) {
   closeModals();
