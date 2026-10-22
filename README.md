@@ -215,10 +215,10 @@ At most 10 items start per check, and closed, done and removed items are skipped
 | 🚫 **Blocked inbox** | Tool calls the permission mode refused are listed: Allow & retry, Allow once, or Dismiss. |
 | 💲 **Budgets** | Cost on every card, plus a per-task and a per-day budget that stops runs. |
 | ↪️ **Hand-offs** | Drag any card, in any column, onto another agent. The earlier summary, branch and commit go along as context. |
-| ✦ **Boss chat** | A chat bar that runs the crew: tasks, workflows, agents and triggers, from plain requests. Replies render Markdown, and you can paste screenshots into it. |
+| ✦ **Boss chat** | A chat bar that runs the crew: tasks, workflows, agents and triggers, from plain requests. Replies render Markdown and Mermaid diagrams, and you can paste screenshots into it. |
 | ⌨ **Slash picker** | Type `/` in any chat box for Crew commands plus the agent's Claude Code commands and skills. **Clear chat** wipes a chat and its context. |
 | 💬 **Talk mid-run** | Message any agent while it works. The message lands in the running session. |
-| ☕ **Keep-awake** | `--awake` stops idle sleep while agents work, so runs and schedules aren't paused. |
+| ☕ **Keep-awake** | On by default: the computer doesn't idle-sleep while Crew runs, so runs, schedules and triggers aren't paused. `--awake busy` holds it only while agents work. |
 | 📱 **Phone app feel** | `--lan` plus a QR code. On a phone: bottom navigation, swipeable columns, bottom sheets, Android back closes sheets. |
 | 🌗 **Light and dark** | Header **⋮** menu: System, Dark or Light. System follows your OS. |
 | ■ **Stop, kill, clear** | Stop a run (session kept, task on hold), stop everything at once, or clear the board. Agent ⋮ menus rename, recolour and kill. |
@@ -298,7 +298,7 @@ flowchart LR
 | `--config PATH` | `crew.json` | Next to `server.py` from a clone, in the current folder when installed. |
 | `--version` | | Print the version and exit. |
 | `--demo` | off | Simulated agents and sample tasks. |
-| `--awake` | `busy` | Keep the computer from sleeping while agents work (`busy`), `always` (so schedules fire overnight), or `off`. Locking the screen never pauses Crew; sleep does. A ☕ in the header shows when it's holding the machine awake. A closed laptop lid still sleeps. |
+| `--awake` | `always` | Keep the computer from sleeping the whole time Crew runs (`always`, so schedules fire overnight), only while agents work (`busy`), or `off`. Locking the screen never pauses Crew; sleep does. A ☕ in the header shows when it's holding the machine awake. A closed laptop lid still sleeps. |
 
 `CREW_CLAUDE` overrides the command used to start agents.
 

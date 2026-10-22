@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- **Mermaid diagrams:** a ```` ```mermaid ```` block in a chat reply, an agent log or a review summary is drawn as a diagram, in the current theme. The Mermaid library loads from jsDelivr the first time a diagram appears; if it can't load, or the diagram is invalid, the source stays visible.
+
+### Fixed
+- **Review summaries render Markdown:** the agent summary in the approval panel showed raw Markdown; it now renders like the chat (headings, lists, tables, code, links).
+- **☕ disappeared after switching projects** although the computer was still being kept awake; the new project's crew now picks up the keep-awake state.
+
+### Changed
+- **Keep-awake is on by default:** `--awake` now defaults to `always`, so the computer doesn't idle-sleep while Crew runs and scheduled triggers fire on time, with ☕ in the header the whole time. `--awake busy` brings back the old behavior (only while agents work); `--awake off` turns it off.
+
 ## [0.3.0] - 2026-10-22
 
 ### Added

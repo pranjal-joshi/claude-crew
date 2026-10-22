@@ -360,6 +360,9 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .hint{margin-top:7px;font-size:11px;color:var(--faint);display:flex;gap:12px}
 
 /* review */
+.summary.md{white-space:normal}.summary.md>:last-child{margin-bottom:0}
+.md pre.mmd{white-space:pre;color:var(--muted)}.md pre.mmd[data-mmd=busy]{opacity:.6}.md pre.mmd[data-mmd=fail]{border-color:color-mix(in srgb,var(--amber) 45%,transparent)}
+.md .mmdsvg{margin:0 0 8px;padding:10px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;overflow:auto;text-align:center}.md .mmdsvg svg{max-width:100%;height:auto}
 .summary{white-space:pre-wrap;font-size:13px;line-height:1.55;color:var(--text3);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:11px 12px}
 .diff{font:12px/1.55 var(--mono);border:1px solid var(--line);border-radius:var(--r);overflow:auto;background:var(--code-bg)}
 .diff div{padding:0 12px;white-space:pre}
@@ -1219,7 +1222,12 @@ function restoreFocus(k) {
   if (k.s != null) try { el.setSelectionRange(k.s, k.e); } catch {}
 }
 
-function renderAwake() { const el = $('#awake'); if (el) el.hidden = !S.awake; }
+function renderAwake() {
+  const el = $('#awake'); if (!el) return;
+  el.hidden = !S.awake;
+  el.title = (S.awake_mode === 'busy' ? 'Keeping this computer awake while agents work.' : 'Keeping this computer awake while Crew runs, so schedules and triggers fire on time.')
+    + ' Locking the screen is fine; closing a laptop lid still sleeps. Start Crew with --awake busy or --awake off to change this.';
+}
 function renderRail() {
   const mini = view.railMin && !matchMedia('(max-width:760px)').matches;
   $('#body').classList.toggle('rail-min', mini);
@@ -1806,7 +1814,7 @@ function mdHtml(src) {
     if ((m = l.match(/^\s*(```|~~~)\s*([\w+-]*)/))) {  // fenced code
       const body = []; i++;
       while (i < lines.length && !lines[i].trim().startsWith(m[1])) body.push(lines[i++]);
-      i++; out.push(`<pre><code>${body.join('\n')}</code></pre>`); continue;
+      i++; out.push(m[2].toLowerCase() === 'mermaid' ? `<pre class="mmd">${body.join('\n')}</pre>` : `<pre><code>${body.join('\n')}</code></pre>`); continue;
     }
     if (!l.trim()) { i++; continue; }
     if ((m = l.match(/^\s*(#{1,6})\s+(.*?)\s*#*\s*$/))) { const n = Math.min(m[1].length + 1, 4); out.push(`<h${n}>${mdInline(m[2])}</h${n}>`); i++; continue; }
@@ -1840,6 +1848,46 @@ function mdHtml(src) {
   }
   return out.join('');
 }
+// Mermaid diagrams: a ```mermaid block renders as a diagram wherever Markdown is shown (chat, logs, review summaries).
+// The library loads from a CDN the first time one appears; each diagram is drawn once and reused across redraws, and
+// the source stays visible if it can't be drawn.
+const MMD_URL = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js', mmdCache = new Map();
+let mmdLib = null, mmdSeq = 0;
+function mmdLoad() {
+  return mmdLib ||= new Promise((ok, bad) => {
+    const s = document.createElement('script'); s.src = MMD_URL; s.async = true;
+    s.onload = () => ok(window.mermaid); s.onerror = () => { mmdLib = null; bad(new Error('could not load Mermaid')); };
+    document.head.append(s);
+  });
+}
+const mmdLight = () => document.documentElement.dataset.theme === 'light';
+async function drawMermaid(root = document) {
+  const pres = [...root.querySelectorAll('pre.mmd:not([data-mmd])')];
+  if (!pres.length) return;
+  const key = p => (mmdLight() ? 'l:' : 'd:') + p.textContent;
+  for (const p of pres) { const svg = mmdCache.get(key(p)); if (svg) { p.dataset.mmd = 'ok'; p.outerHTML = `<div class="mmdsvg">${svg}</div>`; } }
+  const todo = pres.filter(p => p.isConnected && !p.dataset.mmd);
+  if (!todo.length) return;
+  todo.forEach(p => p.dataset.mmd = 'busy');
+  let lib;
+  try { lib = await mmdLoad(); } catch { todo.forEach(p => { p.dataset.mmd = 'fail'; p.title = 'Mermaid could not be loaded: showing the source'; }); return; }
+  lib.initialize({startOnLoad: false, securityLevel: 'strict', theme: mmdLight() ? 'default' : 'dark', fontFamily: 'inherit'});
+  for (const p of todo) {
+    const k = key(p);
+    try {
+      const {svg} = await lib.render(`mmd${++mmdSeq}`, p.textContent);
+      mmdCache.set(k, svg);
+      if (p.isConnected) p.outerHTML = `<div class="mmdsvg">${svg}</div>`;
+    } catch (e) {
+      p.dataset.mmd = 'fail'; p.title = 'Not a valid Mermaid diagram: ' + (e?.message || e);
+      document.querySelectorAll('body > [id^="dmmd"]').forEach(x => x.remove());  // Mermaid's leftover error box
+    }
+  }
+}
+let mmdTimer = 0;
+new MutationObserver(() => {
+  if (document.querySelector('pre.mmd:not([data-mmd])')) { clearTimeout(mmdTimer); mmdTimer = setTimeout(() => drawMermaid(), 60); }
+}).observe(document.body, {childList: true, subtree: true});
 function renderLog(log) {
   let out = '', run = [];
   const flush = () => { if (run.length) out += `<div class="msub"><span class="sublbl">↳ ${esc(run[0].sub)}</span>${run.map(msgBody).join('')}</div>`; run = []; };
@@ -1935,7 +1983,7 @@ function renderReviewDrawer(d, t) {
       <div class="kv"><span>by ${esc(t.who)}</span>${t.tokens ? `<span class="tok">${fmtTok(t.tokens)} tokens</span>` : ''}${t.finished && t.started ? `<span>took ${dur(t.finished - t.started)}</span>` : ''}${agent(t.who)?.branch ? `<span>⎇ ${esc(agent(t.who).branch)}</span>` : ''}</div></div>
     <div class="stream">
       <div class="label">Agent summary</div>
-      <div class="summary">${esc(t.summary || '(no summary)')}</div>
+      <div class="summary md">${t.summary ? mdHtml(t.summary) : '<span class="faint">(no summary)</span>'}</div>
       <div class="label" style="display:flex;align-items:center">Changes <button class="btn sm ghost" data-refresh-diff="${t.id}" style="margin-left:auto">↻ refresh</button></div>
       ${diff.note ? `<div class="empty">${esc(diff.note)}</div>` : files.length ? `<div class="diff">${renderDiff(files)}</div>` : '<div class="empty">No file changes in the worktree.</div>'}
     </div>

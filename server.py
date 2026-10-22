@@ -419,7 +419,7 @@ class Crew:
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(), "ado_base": self._ado_base(),
                     "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []),
                     "runs": self.runs[-30:], "contexts": CONTEXTS, "alerts": self._public_alerts(),
-                    "awake": getattr(self, "awake", False), "demo": self.demo,
+                    "awake": getattr(self, "awake", False), "awake_mode": getattr(self, "awake_mode", ""), "demo": self.demo,
                     "scratch": self.project.parent.resolve() == WORK_ROOT.resolve()}
 
     # ---- worktrees -----------------------------------------------------------
@@ -2032,8 +2032,8 @@ def main() -> None:
     ap.add_argument("--config", help="crew config (default: crew.json next to server.py, or in the current folder when installed)")
     ap.add_argument("--demo", action="store_true", help="simulated agents with sample tasks: no Claude CLI, no tokens")
     ap.add_argument("--lan", action="store_true", help="also serve other devices on your network (phone, tablet), behind a key")
-    ap.add_argument("--awake", choices=("busy", "always", "off"), default="busy",
-                    help="keep the computer from sleeping: while agents work (default), always (so schedules fire), or off")
+    ap.add_argument("--awake", choices=("always", "busy", "off"), default="always",
+                    help="keep the computer from sleeping: always while Crew runs (default, so schedules fire), only while agents work (busy), or off")
     ap.add_argument("--version", action="version", version=f"crew {__version__}")
     args = ap.parse_args()
 
@@ -2096,8 +2096,10 @@ def main() -> None:
                 busy = args.awake == "always" or CREW.busy()
                 if busy != awake.on:
                     awake.set(busy)
-                    CREW.awake = awake.on
-                    CREW.touch()
+                crew = CREW  # a project switch makes a new crew: it learns the keep-awake state here too
+                if getattr(crew, "awake", None) != awake.on or getattr(crew, "awake_mode", None) != args.awake:
+                    crew.awake, crew.awake_mode = awake.on, args.awake
+                    crew.touch()
             except Exception as e:  # keep the dispatcher alive
                 print("dispatch error:", e, file=sys.stderr)
             time.sleep(1)
