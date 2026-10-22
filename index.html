@@ -301,7 +301,20 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 
 .stream{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 .m{max-width:100%;font-size:13px}
-.m.text{white-space:pre-wrap;word-wrap:break-word;line-height:1.55;color:var(--text2)}
+.m.text{word-wrap:break-word;line-height:1.55;color:var(--text2)}
+.md>:first-child{margin-top:0}.md>:last-child{margin-bottom:0}
+.md p,.md ul,.md ol,.md pre,.md blockquote,.md table,.md details{margin:0 0 8px}
+.md ul,.md ol{padding-left:20px}.md li{margin:2px 0}.md li>ul,.md li>ol{margin:2px 0}
+.md h1,.md h2,.md h3,.md h4{color:var(--text);line-height:1.3;margin:12px 0 6px}.md h1{font-size:16px}.md h2{font-size:15px}.md h3,.md h4{font-size:13.5px}
+.md strong,.md b{color:var(--text)}.md a{color:var(--accent)}
+.md code{font:12px var(--mono);background:var(--inset);border-radius:4px;padding:1px 5px}
+.md pre{font:12px/1.5 var(--mono);background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;overflow:auto;white-space:pre}
+.md pre code{background:none;padding:0}
+.md blockquote{border-left:3px solid var(--line);padding:2px 0 2px 10px;color:var(--muted)}
+.md hr{border:0;border-top:1px solid var(--line);margin:10px 0}
+.md .tw{overflow:auto;margin:0 0 8px}.md table{border-collapse:collapse;font-size:12.5px}
+.md th,.md td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}.md th{background:var(--bg2);color:var(--text)}
+.md input[type=checkbox]{margin:0 6px 0 0;vertical-align:-1px}
 .m.you{align-self:flex-end;max-width:88%;background:var(--accent-soft);border:1px solid var(--accent-line);padding:8px 11px;border-radius:12px 12px 4px 12px;white-space:pre-wrap;color:var(--accent-ink4)}
 .m.tool{display:flex;align-items:center;gap:8px;font:12px var(--mono);color:var(--muted);padding:6px 9px;border-radius:8px;background:var(--surface);border:1px solid var(--line);min-width:0}
 .m.tool .tn{color:var(--text);font-weight:500;flex:none}
@@ -1614,6 +1627,65 @@ $('#pmOpen').onclick = () => { const v = $('#pmPath').value.trim(); if (v) openP
 $('#pmPath').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#pmOpen').click(); } };
 
 // consecutive lines from the same subagent share one indented, labelled block
+// Markdown for agent replies, with a small set of plain HTML tags let through. Everything is escaped
+// first, so no attribute, script or style from an agent can reach the page; links must be http(s).
+const MD_TAGS = 'b|strong|i|em|u|s|del|code|kbd|sub|sup|mark|small|br|hr|p|ul|ol|li|h[1-6]|blockquote|pre|table|thead|tbody|tr|th|td|details|summary';
+function mdInline(t) {  // t is already escaped
+  const codes = [];
+  t = t.replace(/`([^`\n]+)`/g, (_, c) => `\x00${codes.push(c) - 1}\x00`);
+  t = t.replace(new RegExp(`&lt;(/?)(${MD_TAGS})\s*/?&gt;`, 'gi'), '<$1$2>')
+    .replace(/!?\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:!?'"])/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>')
+    .replace(/\*\*(?=\S)(.+?)\*\*/g, '<strong>$1</strong>').replace(/__(?=\S)(.+?)__/g, '<strong>$1</strong>')
+    .replace(/(^|[^*\w])\*(?=\S)([^*\n]+?)\*(?!\w)/g, '$1<em>$2</em>').replace(/(^|[^_\w])_(?=\S)([^_\n]+?)_(?!\w)/g, '$1<em>$2</em>')
+    .replace(/~~(?=\S)(.+?)~~/g, '<del>$1</del>');
+  return t.replace(/\x00(\d+)\x00/g, (_, i) => `<code>${codes[i]}</code>`);
+}
+function mdHtml(src) {
+  const lines = esc(src).replace(/\r/g, '').split('\n'), out = [];
+  const isTableSep = l => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
+  const cells = l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => mdInline(c.trim()));
+  const listRe = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+  for (let i = 0; i < lines.length;) {
+    const l = lines[i];
+    let m;
+    if ((m = l.match(/^\s*(```|~~~)\s*([\w+-]*)/))) {  // fenced code
+      const body = []; i++;
+      while (i < lines.length && !lines[i].trim().startsWith(m[1])) body.push(lines[i++]);
+      i++; out.push(`<pre><code>${body.join('\n')}</code></pre>`); continue;
+    }
+    if (!l.trim()) { i++; continue; }
+    if ((m = l.match(/^\s*(#{1,6})\s+(.*?)\s*#*\s*$/))) { const n = Math.min(m[1].length + 1, 4); out.push(`<h${n}>${mdInline(m[2])}</h${n}>`); i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push('<hr>'); i++; continue; }
+    if (l.includes('|') && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      const head = cells(l); i += 2; const rows = [];
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim()) rows.push(cells(lines[i++]));
+      out.push(`<div class="tw"><table><thead><tr>${head.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    if (/^\s*&gt;/.test(l)) {
+      const q = []; while (i < lines.length && /^\s*&gt;/.test(lines[i])) q.push(lines[i++].replace(/^\s*&gt;\s?/, ''));
+      out.push(`<blockquote>${mdHtml(q.join('\n').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&'))}</blockquote>`); continue;
+    }
+    if (listRe.test(l)) {  // nested lists by indent
+      const stack = [];
+      while (i < lines.length && (m = lines[i].match(listRe))) {
+        const ind = m[1].length, tag = /\d/.test(m[2]) ? 'ol' : 'ul';
+        while (stack.length && ind < stack[stack.length - 1].ind) out.push(`</li></${stack.pop().tag}>`);
+        if (!stack.length || ind > stack[stack.length - 1].ind) { stack.push({ind, tag}); out.push(`<${tag}><li>`); } else out.push('</li><li>');
+        out.push(mdInline(m[3].replace(/^\[( |x)\]\s+/i, (_, x) => `<input type="checkbox" disabled ${x.trim() ? 'checked' : ''}>`)));
+        i++;
+        while (i < lines.length && lines[i].trim() && !listRe.test(lines[i]) && /^\s+/.test(lines[i])) out.push(' ' + mdInline(lines[i++].trim()));
+      }
+      while (stack.length) out.push(`</li></${stack.pop().tag}>`);
+      continue;
+    }
+    const para = [];
+    while (i < lines.length && lines[i].trim() && !/^\s*(```|~~~|#{1,6}\s|&gt;)/.test(lines[i]) && !listRe.test(lines[i]) && !(lines[i].includes('|') && i + 1 < lines.length && isTableSep(lines[i + 1]))) para.push(mdInline(lines[i++]));
+    out.push(`<p>${para.join('<br>')}</p>`);
+  }
+  return out.join('');
+}
 function renderLog(log) {
   let out = '', run = [];
   const flush = () => { if (run.length) out += `<div class="msub"><span class="sublbl">↳ ${esc(run[0].sub)}</span>${run.map(msgBody).join('')}</div>`; run = []; };
@@ -1629,7 +1701,7 @@ function msgBody(m) {
     case 'subagent': return `<div class="m subagent"><span class="sd"></span>${SUBI}subagent <b>${esc(m.text)}</b>${m.detail ? `<span class="faint">${esc(m.detail)}</span>` : ''}</div>`;
     case 'subdone': return `<div class="m subdone">${SUBI} ${esc(m.text)} finished · ${esc(m.detail || '')}</div>`;
     case 'you': return `<div class="m you">${esc(m.text)}</div>`;
-    case 'text': return `<div class="m text">${esc(m.text)}</div>`;
+    case 'text': return `<div class="m text md">${mdHtml(m.text)}</div>`;
     case 'tool': return `<div class="m tool"><span>${toolIcon(m.text)}</span><span class="tn">${esc(m.text)}</span><span class="td">${esc(m.detail || '')}</span></div>`;
     case 'toolerr': return `<div class="m toolerr">${esc(m.text)}</div>`;
     case 'error': return `<div class="m error">${esc(m.text)}</div>`;

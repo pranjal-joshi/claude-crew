@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Formatted replies:** the boss chat and agent logs render Markdown (headings, lists, tables, code blocks, links) plus a few plain HTML tags. Anything else, such as scripts or attributes, stays as text.
 - **Agent status at a glance**: every agent avatar carries a status ring (none when idle, a spinning arc while running, blue to review, amber paused, red on error) and a small time tag: how long it has been running, or since it was last active. The agent panel's header is one row: avatar, name, a status line ("To review · #14 is done, needs you", "waiting for work · last active 4 min ago"), Stop/Resume/Respawn when they apply, an Edit | delete toolbar, ⋮ and close.
 - **Many triggers, one workflow**: a workflow's ⚡ button, its editor and agent cards now list ADO tag and Pipeline triggers too, and a trigger opened from a workflow keeps it as the target when you switch to ADO or Pipeline. Several triggers (for example one per pipeline) can start the same workflow.
 - **Pipeline trigger**: when an Azure Pipelines run of the named pipelines finishes (succeeds, partially succeeds, fails, or any of them), Crew starts an agent or a workflow, once per run. The task carries the run link, branch, commit, who it ran for and its linked work items, with yours first. **Only runs for me** keeps runs requested for you or carrying a work item assigned to you. Uses your az sign-in, read-only; **Test** lists recent matching runs.
