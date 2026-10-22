@@ -356,8 +356,27 @@ class PrLinks(TempCrewCase):
 
     def test_no_false_matches(self):
         t = {}
-        server.Crew._note_prs(t, "see github.com/o/r/pull/1 and https://github.com/o/r/issues/2")
+        self.crew._prb = ""
+        self.crew._note_prs(t, "see github.com/o/r/pull/1 and https://github.com/o/r/issues/2")
         self.assertNotIn("prs", t)
+
+    def test_pr_named_by_number_links_through_the_remote(self):
+        t = {}
+        self.crew._prb = "https://github.com/o/r/pull/"
+        self.crew._note_prs(t, "Pushed as draft PR #123, then pull request #7 and issue #9")
+        self.assertEqual(t["prs"], ["https://github.com/o/r/pull/123", "https://github.com/o/r/pull/7"])
+        t2 = {}
+        self.crew._prb = ""  # no GitHub or Azure Repos remote: a bare number can't be linked
+        self.crew._note_prs(t2, "PR #12")
+        self.assertNotIn("prs", t2)
+
+    def test_pr_base_from_remotes(self):
+        self.assertEqual(server.pr_base("https://github.com/acme/app.git\n"), "https://github.com/acme/app/pull/")
+        self.assertEqual(server.pr_base("git@github.com:acme/app.git"), "https://github.com/acme/app/pull/")
+        self.assertEqual(server.pr_base("https://acme@dev.azure.com/acme/Proj/_git/app"),
+                         "https://dev.azure.com/acme/Proj/_git/app/pullrequest/")
+        self.assertEqual(server.pr_base("git@ssh.dev.azure.com:v3/acme/Proj/app"), "https://dev.azure.com/acme/Proj/_git/app/pullrequest/")
+        self.assertEqual(server.pr_base("https://gitlab.com/acme/app.git"), "")
 
 
 class AdoBase(TempCrewCase):

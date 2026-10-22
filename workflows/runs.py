@@ -67,6 +67,8 @@ def start_step(crew, run: dict, i: int) -> None:
         brief.append(f"Step {k + 1} by {r['who']}{where}:\n{text}")
     if prev and prev.get("commit") and prev.get("branch"):
         brief.append(f"Run `git merge {prev['branch']}` in your worktree first so you build on that work.")
+    if step.get("gate") == "until":
+        brief.append(until_brief(step))
     t = {"id": crew.next_id, "title": title, "details": ((body + "\n\n---\n") if body else "") + "\n\n".join(brief),
          "tag": (a["tags"] or ["feature"])[0], "col": "backlog", "who": a["name"], "pinned": a["name"], "created": now(),
          "run": {"id": run["id"], "step": i, "name": run["name"], "n": n}}
@@ -76,6 +78,24 @@ def start_step(crew, run: dict, i: int) -> None:
     crew.tasks.append(t)
     run["step"], run["tasks"][i] = i, t["id"]
     crew.event("workflow", f"⛓ {run['name']} {i + 1}/{n} → {a['name']}: {title}", a["name"])
+
+
+def until_brief(step: dict) -> str:
+    return (f"This step lasts until its goal is reached, which can take hours or days (a PR merging, a deployment landing). "
+            f"Do what you can now. When the goal is reached, call the crew tool `decide` with verdict continue; if it can "
+            f"never be reached, call it with verdict stop. Otherwise end your turn with a short status: Crew asks you to "
+            f"check again in {step.get('every', 30)} minutes, in this same session, up to {step.get('checks', 96)} times, "
+            f"then hands it to a person.")
+
+
+def recheck_body(t: dict, step: dict) -> str:
+    """What an "until" step's agent gets when Crew asks it to look again."""
+    w = t.get("wait") or {}
+    last = " ".join((w.get("last") or "").split())[:400]
+    return (f"Task #{t['id']}: check again ({w.get('checks', 0) + 1} of {step.get('checks', 96)}): {t['title']}\n\n"
+            + (f"Last time you reported: {last}\n\n" if last else "")
+            + "Look at the current state. Goal reached: call `decide` with continue and summarize. Can never be reached: "
+              f"`decide` stop. Still waiting: end with one or two lines of status, and Crew asks again in {step.get('every', 30)} min.")
 
 
 def on_task_event(crew, t: dict, col: str, summary: str | None) -> None:

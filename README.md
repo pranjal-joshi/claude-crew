@@ -107,7 +107,7 @@ The **Workflows** tab (<kbd>W</kbd>) chains agents in a fixed order. Run one wit
 
 **Gates: stop or go on.** An agent can decide whether work should go ahead with the crew tool `decide` (continue or stop, with a one-line reason). *Continue* closes its task without review and starts the next workflow step with its summary, unless that step's link is ✋: then it waits for your approval as usual, with the agent's verdict on the review card; *stop* closes it marked ⏹ stopped and ends the run, so nothing else starts. Put a gate agent such as **Picker** first in a workflow that an ADO trigger runs: it checks each new item against the ownership in its role and passes on only what is ours. Outside a workflow, a gate that continues hands the work on with `handoff` first.
 
-Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on its own when the agent finishes.
+Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on its own when the agent finishes, and ⟳ **checks until done**: for a goal that takes hours or days, such as a PR merging or a deployment landing. A ⟳ step's agent does what it can, then Crew asks it to check again every so often (30 minutes by default) in the same session, with a short "check again" message instead of the whole brief. The step passes when the agent calls `decide` with continue, ends the run on stop, and goes to Review for you after the set number of checks. A waiting card shows ⟳ with its next check.
 
 | Workflow | Steps |
 | --- | --- |
@@ -201,7 +201,7 @@ At most 10 items start per check, and closed, done and removed items are skipped
 | | |
 | --- | --- |
 | 🧑‍🤝‍🧑 **An SDLC crew** | Planner, researcher, designer, builder, tester, reviewer, evaluator, ops, ticketer and scribe by default. Add, remove and re-role agents from the UI. |
-| ⛓ **Workflows** | Chain agents in order (plan → build → test → review → write-up) on an n8n-style canvas, with an approval or auto gate per step and a choice of output: board, report file, webhook or next workflow. |
+| ⛓ **Workflows** | Chain agents in order (plan → build → test → review → write-up) on an n8n-style canvas, with an approval, auto or check-until-done gate per step and a choice of output: board, report file, webhook or next workflow. |
 | ⚡ **Triggers** | Schedules, task events, file watches, command polls, webhooks, Azure DevOps tags, pipeline runs and Teams messages start work on their own, from their own tab. Presets included. Each shows in the Backlog as a *scheduled* card: drag it to In progress to run it now. |
 | 📦 **Export and import** | Agents, workflows and triggers as JSON files, to back up or share. Imported triggers arrive off, without secrets. |
 | 🗂 **Runs grouped on the board** | Each workflow run is one frame with a stepper, in the column of its current step. |

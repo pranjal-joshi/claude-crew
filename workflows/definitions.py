@@ -7,6 +7,12 @@ from pathlib import Path
 from .runs import find, start_run
 
 
+# A step's gate: "approve" waits for you, "auto" goes on by itself, "until" keeps asking its agent to check again (every
+# `every` minutes, at most `checks` times) until it calls decide: for a PR to merge, a deployment to land, CI to finish.
+GATES = ("approve", "auto", "until")
+UNTIL_EVERY, UNTIL_CHECKS = 30, 96
+
+
 def clean(crew, p: dict, allow_missing_agents: bool = False) -> tuple[str | None, dict]:
     """Validate a workflow. An import may name agents this crew lacks (allow_missing_agents): flagged, not refused."""
     name = str(p.get("name") or "").strip()[:60]
@@ -17,8 +23,15 @@ def clean(crew, p: dict, allow_missing_agents: bool = False) -> tuple[str | None
         agent = st.get("agent") if isinstance(st, dict) else None
         if not isinstance(agent, str) or not agent.strip() or (agent not in crew.agents and not allow_missing_agents):
             return f"step {k + 1}: pick an agent", {}
-        steps.append({"agent": agent, "title": str(st.get("title") or "").strip()[:200],
-                      "details": str(st.get("details") or "")[:3000], "gate": "auto" if st.get("gate") == "auto" else "approve"})
+        gate = st.get("gate") if st.get("gate") in GATES else "approve"
+        step = {"agent": agent, "title": str(st.get("title") or "").strip()[:200], "details": str(st.get("details") or "")[:3000], "gate": gate}
+        if gate == "until":  # ask again every `every` minutes until the agent decides, at most `checks` times
+            try:
+                step["every"] = min(1440, max(5, int(st.get("every") or UNTIL_EVERY)))
+                step["checks"] = min(500, max(1, int(st.get("checks") or UNTIL_CHECKS)))
+            except (TypeError, ValueError):
+                return f"step {k + 1}: numbers only for how often and how many times to check", {}
+        steps.append(step)
     if not steps:
         return "add at least one step", {}
     o = p.get("output") or {}
@@ -85,7 +98,7 @@ def export_file(crew, ids) -> dict:
         if out.get("kind") == "workflow":
             out["workflow"] = (find(crew, out.get("workflow")) or {}).get("name") or ""
         items.append({"name": w["name"], "description": w.get("description", ""), "off": bool(w.get("off")),
-                      "steps": [{k: st.get(k, "") for k in ("agent", "title", "details", "gate")} for st in w["steps"]],
+                      "steps": [{k: st[k] for k in ("agent", "title", "details", "gate", "every", "checks") if k in st} for st in w["steps"]],
                       "output": out})
     return {"ok": True, "file": {"crew": "workflows", "version": FILE_VERSION, "items": items}}
 

@@ -85,6 +85,20 @@ def load_json_file(path: Path) -> dict:
 # ---- triggers: cron, templates ---------------------------------------------------
 TRIGGER_KINDS = triggers.kinds()  # one module per kind in triggers/: see triggers/README.md
 PR_URL = re.compile(r"https://(?:github\.com/[\w.-]+/[\w.-]+/pull/\d+|dev\.azure\.com/[\w%.-]+/[\w%.-]+/_git/[\w%.-]+/pullrequest/\d+)")
+# "PR #123", "draft PR #123", "pull request #123": a PR named by number only, linked through the project's origin remote
+PR_REF = re.compile(r"\b(?:PR|pull request)\s*#(\d{1,7})\b", re.I)
+
+
+def pr_base(remote: str) -> str:
+    """Where PR numbers of this remote link: 'https://github.com/o/r/pull/' or an Azure Repos '.../pullrequest/'; '' otherwise."""
+    r = (remote or "").strip().removesuffix(".git")
+    if m := re.match(r"(?:https://(?:[^@/]+@)?github\.com/|git@github\.com:|ssh://git@github\.com/)([\w.-]+/[\w.-]+)$", r):
+        return f"https://github.com/{m.group(1)}/pull/"
+    if m := re.match(r"https://(?:[^@/]+@)?dev\.azure\.com/([\w%.-]+)/([\w%.-]+)/_git/([\w%.-]+)$", r):
+        return f"https://dev.azure.com/{m.group(1)}/{m.group(2)}/_git/{m.group(3)}/pullrequest/"
+    if m := re.match(r"git@ssh\.dev\.azure\.com:v3/([\w%.-]+)/([\w%.-]+)/([\w%.-]+)$", r):
+        return f"https://dev.azure.com/{m.group(1)}/{m.group(2)}/_git/{m.group(3)}/pullrequest/"
+    return ""
 MAX_CHAIN = triggers.MAX_CHAIN
 
 
@@ -619,10 +633,21 @@ class Crew:
             a.update(status="idle", task=None)
             if dec["verdict"] == "continue":
                 self._task_event(task, "done")  # the workflow's next step starts, done triggers fire
+        elif task and (step := self._until_step(task)) and (task.get("wait") or {}).get("checks", 0) + 1 < step["checks"]:
+            tk = a["tokens"]
+            w = task.setdefault("wait", {"checks": 0})
+            w.update(checks=w.get("checks", 0) + 1, last=(d.get("result") or "").strip()[:2000], next=now() + step["every"] * 60)
+            task.update(tokens=tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0), summary=d.get("result", ""), col="backlog",
+                        who=a["name"], finished=now())
+            a.update(status="idle", task=None)
+            self.event("wait", f"⟳ {a['name']} waits on #{task['id']} · check {w['checks']} of {step['checks']}, next in "
+                               f"{step['every']} min", a["name"])
         elif task:
             tk = a["tokens"]
             task["tokens"] = tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0)
             task["summary"] = d.get("result", "")
+            if self._until_step(task):
+                task.setdefault("wait", {})["over"] = True  # out of checks: a person looks at it
             task["col"] = "review"
             self._queue_diff(task)
             task["finished"] = now()
@@ -636,6 +661,14 @@ class Crew:
         if a.get("launched") and tuple(a["launched"]) != self._launch_key(a):
             self._kill_proc(a["name"])  # session is kept; next start uses the new settings
             self.log(a, "sys", "settings changed · restarts on next task")
+
+    def _until_step(self, t: dict) -> dict | None:
+        """The workflow step this task is, when its gate is "until" (keep checking until the agent decides)."""
+        if self._step_gate(t) != "until":
+            return None
+        run = self._run(t["run"]["id"])
+        return run["steps"][t["run"]["step"]] | {"every": run["steps"][t["run"]["step"]].get("every", 30),
+                                                 "checks": run["steps"][t["run"]["step"]].get("checks", 96)}
 
     def _step_gate(self, t: dict) -> str | None:
         """The gate of the workflow step this task is, if it is one: "approve" or "auto"."""
@@ -847,9 +880,12 @@ class Crew:
         tk = a["tokens"]
         t.update(col="doing", who=a["name"], started=now(), tok0=tk["in"] + tk["cache"] + tk["out"] - t.get("tokens", 0))
         a.update(status="running", task=t["id"], since=now(), activity="starting…")
-        body = f"Task #{t['id']}: {t['title']}"
-        if t.get("details"):
-            body += "\n\n" + t["details"]
+        if (t.get("wait") or {}).get("checks") and (step := self._until_step(t)):
+            body = workflows.runs.recheck_body(t, step)
+        else:
+            body = f"Task #{t['id']}: {t['title']}"
+            if t.get("details"):
+                body += "\n\n" + t["details"]
         self.log(a, "you", body)
         if not self._send(a, body):
             t.update(col="backlog", who=t.get("pinned"))
@@ -861,10 +897,22 @@ class Crew:
     def _task_session(self, a: dict, t: dict) -> None:
         agents.launch.task_session(self, a, t)
 
-    @staticmethod
-    def _note_prs(t: dict, *texts: str | None) -> None:
-        """PRs an agent opened or works on (it runs gh itself), picked out of its task text and summary."""
-        found = [m for x in texts if x for m in PR_URL.findall(x)]
+    _prb: str | None = None  # the project's PR link prefix, from its origin remote; read once
+
+    def _pr_base(self) -> str:
+        if self._prb is None:
+            try:
+                out = agents.util.git(Path(self.project), "remote", "get-url", "origin").stdout
+            except OSError:
+                out = ""
+            self._prb = pr_base(out or "")
+        return self._prb
+
+    def _note_prs(self, t: dict, *texts: str | None) -> None:
+        """PRs an agent opened or works on (it runs gh itself), picked out of its task text and summary: full links, or
+        "PR #123" linked through the project's origin remote."""
+        base = self._pr_base() if any(x and PR_REF.search(x) for x in texts) else ""
+        found = [m for x in texts if x for m in [*PR_URL.findall(x), *(base + n for n in PR_REF.findall(x) if base)]]
         if found:
             t["prs"] = list(dict.fromkeys([*(t.get("prs") or []), *found]))[-5:]
 
@@ -907,6 +955,7 @@ class Crew:
                     if a["status"] != "idle" or a.get("off") or self._git_busy(a["name"]):
                         continue
                     t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and not self._over_task(t) and
+                              (t.get("wait") or {}).get("next", 0) <= now() and
                               (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"]))), None)
                     if t:
                         self._begin(a, t)

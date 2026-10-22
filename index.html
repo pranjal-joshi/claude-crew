@@ -102,6 +102,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 .btn:hover{background:var(--hover);border-color:var(--line3)}.btn:active{transform:translateY(1px)}
 .btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent)}.btn.primary:hover{background:var(--accent-hover)}
 .btn.green{background:var(--green);border-color:transparent;color:var(--on-green)}.btn.green:hover{filter:brightness(1.08)}
+.card .cta:has(.approvec){flex-wrap:wrap}.card .cta .approvec{flex:1 1 100%;justify-content:center}.card .cta .btn{white-space:nowrap}
+.btn.approvec{background:var(--green);border-color:transparent;color:var(--on-green);font-weight:650}.btn.approvec:hover{filter:brightness(1.08)}.btn.approvec:disabled{opacity:.5}
 .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}.btn.ghost:hover{background:var(--hover);color:var(--text)}
 .btn.danger{color:var(--red)}.btn.danger:hover{background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 35%,transparent)}
 .btn.sm{height:26px;padding:0 9px;font-size:12px;border-radius:7px}
@@ -621,7 +623,7 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .banner{display:none;align-items:center;gap:10px;margin:12px 18px 0;padding:10px 13px;border-radius:10px;border:1px solid color-mix(in srgb,var(--amber) 35%,transparent);background:var(--amber-soft);color:var(--amber-ink);font-size:12.5px}
 .banner.on{display:flex}
 .banner code{font-family:var(--mono);background:var(--inset2);padding:2px 6px;border-radius:5px;color:var(--banner-code-ink)}
-.toasts{position:fixed;right:16px;top:68px;display:flex;flex-direction:column;gap:8px;z-index:30}
+.toasts{position:fixed;right:18px;bottom:calc(var(--chath, 64px) + 14px);display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:30}
 .toast{display:flex;align-items:center;gap:9px;min-width:240px;max-width:380px;padding:10px 13px;border-radius:10px;background:var(--raised);box-shadow:var(--shadow);font-size:12.5px;animation:rise .18s ease-out}
 .conn{width:8px;height:8px;border-radius:50%;background:var(--faint)}.conn.ok{background:var(--green);box-shadow:0 0 10px var(--green)}
 
@@ -808,7 +810,9 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .wfseg{display:flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
 .wfseg button{flex:1;border:0;background:transparent;color:var(--muted);padding:8px 6px;font:500 12px var(--sans);cursor:pointer}
 .wfseg button+button{border-left:1px solid var(--line2)}
-.wfseg button.on.approve{background:var(--amber-soft);color:var(--amber)}.wfseg button.on.auto{background:var(--teal-soft);color:var(--teal)}
+.wfseg button.on.approve{background:var(--amber-soft);color:var(--amber)}.wfseg button.on.auto{background:var(--teal-soft);color:var(--teal)}.wfseg button.on.until{background:var(--violet-soft);color:var(--violet)}
+.wfbadge .g.until{color:var(--violet);border-color:color-mix(in srgb,var(--violet) 45%,transparent)}.link.until{color:var(--violet)}
+.waitb{color:var(--violet);border:1px solid color-mix(in srgb,var(--violet) 40%,transparent);border-radius:999px;padding:0 6px;font-size:10.5px;white-space:nowrap}
 .okind{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .okind button{text-align:left;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);cursor:pointer;color:var(--text);font:500 12.5px var(--sans);display:flex;flex-direction:column;gap:3px}
 .okind button span{font-size:11px;color:var(--faint);font-weight:400;line-height:1.35}
@@ -1139,6 +1143,9 @@ async function act(action, payload = {}) {
   return j;
 }
 
+// Toasts sit just above the chat bar, whatever its height (it grows with the message and screenshots).
+new ResizeObserver(() => { const b = $('#chatbar'); document.documentElement.style.setProperty('--chath', `${b?.offsetParent ? b.offsetHeight : 0}px`); })
+  .observe($('#chatbar'));
 function toast(text, color = 'var(--accent)', opt = null) {  // opt: {label, fn, ms} adds one action button
   // the same message twice (a click's own toast and the server's event for it, or a burst of identical events)
   // shows once: the visible toast just stays up longer instead of stacking copies
@@ -1519,7 +1526,7 @@ function cardCost(t) {
 function card(t) {
   const who = t.who ? `<span class="who" title="${esc(t.who)}"><span class="mini" ${avPaint(t.who)}>${avFace(t.who, 11)}</span><span class="et">${esc(t.who)}</span></span>` : `<span class="who faint">anyone</span>`;
   let cta = '';
-  if (t.col === 'review') cta = `<div class="cta"><button class="btn sm" data-review="${t.id}" style="border-color:color-mix(in srgb,var(--blue) 35%,transparent);color:var(--blue)">Review changes</button></div>`;
+  if (t.col === 'review') cta = `<div class="cta"><button class="btn sm approvec" data-approve="${t.id}" ${t.busy ? 'disabled' : ''} title="Approve${t.run ? ' and let the workflow go on' : ''} (undo for a few seconds)">✓ Approve</button><button class="btn sm" data-review="${t.id}" style="border-color:color-mix(in srgb,var(--blue) 35%,transparent);color:var(--blue)">Review changes</button></div>`;
   const mst = t.merged ? `<span class="mst ok" title="Merged into ${esc(t.merged.into || 'the base branch')} · ${esc(t.merged.commit)}">✓ Merged</span>`
     : t.pr ? `<a class="mst ok" href="${esc(t.pr)}" target="_blank" rel="noopener" title="Pull request">PR open</a>`
     : t.merge_error?.files?.length ? `<span class="mst warn" title="Merge conflicts: ${esc(t.merge_error.files.join(', '))}">Conflict</span>` : t.commit ? '<span class="mst" title="Approved and committed on its branch, not merged yet">Not merged</span>' : '';
@@ -1537,7 +1544,7 @@ function card(t) {
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Hand off: forward this task to another agent as a to-do, with this task's summary as context" aria-label="Hand off task #${t.id} to another agent" aria-haspopup="menu">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete" aria-label="More actions for task #${t.id}" aria-haspopup="menu">⋮</button></span></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
-    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado || adoRef(t))}${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.decision ? `<span class="holdb${t.decision.verdict === 'stop' ? ' red' : ''}" title="${esc(t.decision.by)}: ${esc(t.decision.reason)}">${t.decision.verdict === 'stop' ? '⏹ stopped' : '→ passed'}</span>` : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
+    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado || adoRef(t))}${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.wait?.next && t.col === 'backlog' ? `<span class="waitb" title="Waiting for its goal. Last check: ${esc((t.wait.last || '').slice(0, 300))}">⟳ ${t.wait.checks} · next <span data-until="${t.wait.next}">${untilTxt(t.wait.next)}</span></span>` : ''}${t.wait?.over && t.col === 'review' ? '<span class="waitb" title="Checked as many times as the step allows without reaching its goal: over to you">⟳ out of checks</span>' : ''}${t.decision ? `<span class="holdb${t.decision.verdict === 'stop' ? ' red' : ''}" title="${esc(t.decision.by)}: ${esc(t.decision.reason)}">${t.decision.verdict === 'stop' ? '⏹ stopped' : '→ passed'}</span>` : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
   </div>`;
 }
@@ -2644,7 +2651,7 @@ function chainHtml(steps, run = null) {
     const state = run ? STEP_STATE(run, i) : '';
     const a = S.agents.find(x => x.name === st.agent);
     const node = `<span class="node ${state} ${a ? '' : 'off'}" ${run && run.tasks[i] != null ? `data-open-task="${run.tasks[i]}"` : ''} title="${esc(st.title || '{input}')}${run && run.tasks[i] != null ? ' · click to open' : ''}" style="${run && run.tasks[i] != null ? 'cursor:pointer' : ''}"><span class="mini">${state === 'done' ? '✓' : avFace(st.agent, 11)}</span><span class="et">${esc(st.agent)}</span></span>`;
-    const link = i < steps.length - 1 ? `<span class="link ${st.gate === 'auto' ? 'auto' : 'gate'}" title="${st.gate === 'auto' ? 'Continues automatically when this step finishes' : 'Waits for your approval before the next step'}"><span class="g" aria-hidden="true">${st.gate === 'auto' ? '⚡' : '✋'}</span>→</span>` : '';
+    const link = i < steps.length - 1 ? `<span class="link ${st.gate === 'auto' ? 'auto' : st.gate === 'until' ? 'until' : 'gate'}" title="${gateOf(st).tip}"><span class="g" aria-hidden="true">${gateOf(st).ic}</span>→</span>` : '';
     return node + link;
   }).join('');
 }
@@ -2694,7 +2701,7 @@ function runDetail(r) {
     const summary = res?.summary || (t?.col === 'done' || t?.col === 'review' ? t.summary : '');
     return `<li class="rs ${state}"><div class="rsh"><span class="num">${state === 'done' ? '✓' : i + 1}</span>
         <span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 11)}</span><span class="who">${esc(st.agent)}</span>
-        <span class="stt" title="${esc(title)}">${esc(title)}</span><span class="sst">${st.gate === 'auto' ? '⚡' : '✋'} ${what}</span>
+        <span class="stt" title="${esc(title)}">${esc(title)}</span><span class="sst">${gateOf(st).ic} ${what}</span>
         ${tid && t ? `<button class="btn sm ghost" data-open-task="${tid}">#${tid}</button>` : ''}</div>
       ${t?.decision ? `<div class="act">${t.decision.verdict === 'stop' ? '⏹ Stopped' : '→ Passed on'} by ${esc(t.decision.by)}: ${esc(t.decision.reason)}</div>` : ''}
       ${state === 'current' && a?.status === 'running' && a.activity ? `<div class="act">${esc(a.activity)}</div>` : ''}
@@ -2813,8 +2820,8 @@ function wfPlace(skip = null) {
   let paths = '', badges = '';
   for (let i = 0; i < ids.length - 1; i++) {
     const e = wfEdge(L.pos[i], L.pos[i + 1], L), step = i >= 1 ? wfe.steps[i - 1] : null;
-    paths += `<path d="${e.d}" class="${step && step.gate === 'auto' ? 'auto' : ''}"/>`;
-    badges += `<div class="wfbadge" data-edge="${i}" style="left:${e.mx}px;top:${e.my}px">${step ? `<button class="g ${step.gate === 'auto' ? 'auto' : 'approve'}" data-g="${step._k}" aria-label="${step.gate === 'auto' ? 'Continues automatically' : 'Waits for your approval'}: change" title="${step.gate === 'auto' ? 'Continues automatically when step ' + i + ' is done · click to wait for your approval instead' : 'Waits for your approval of step ' + i + ' · click to continue automatically instead'}">${step.gate === 'auto' ? '⚡' : '✋'}</button>` : ''}<button class="plus" data-ins="${i}" title="Add a step here" aria-label="Add a step here">＋</button></div>`;
+    paths += `<path d="${e.d}" class="${step && step.gate !== 'approve' ? step.gate : ''}"/>`;
+    badges += `<div class="wfbadge" data-edge="${i}" style="left:${e.mx}px;top:${e.my}px">${step ? `<button class="g ${gateOf(step).cls}" data-g="${step._k}" aria-label="${gateOf(step).tip}: change" title="Step ${i}: ${gateOf(step).tip} · click to switch (✋ wait for you, ⚡ continue, ⟳ check until done)">${gateOf(step).ic}</button>` : ''}<button class="plus" data-ins="${i}" title="Add a step here" aria-label="Add a step here">＋</button></div>`;
   }
   svg.innerHTML = paths; st.querySelector('#wfBadges').innerHTML = badges;
 }
@@ -2827,6 +2834,11 @@ function wfRemove(k) {
   if (wfe.steps.length === 1) return toast('A workflow needs at least one step', 'var(--red)');
   wfe.steps.splice(wfStepNode(k), 1); wfSel = null; drawWfStage(); drawWfIns();
 }
+// A step's gate: ✋ waits for you, ⚡ continues, ⟳ asks its agent to check again until it decides (a merge, a deployment).
+const GATE = {approve: {ic: '✋', cls: 'approve', tip: 'Waits for your approval before the next step'},
+              auto: {ic: '⚡', cls: 'auto', tip: 'Continues automatically when this step finishes'},
+              until: {ic: '⟳', cls: 'until', tip: 'Keeps checking until its agent says the goal is reached, then continues'}};
+const gateOf = st => GATE[st?.gate] || GATE.approve;
 function wfField(label, inner) { return `<label class="lab">${label}${inner}</label>`; }
 function drawWfIns() {
   const box = $('#wfIns');
@@ -2839,7 +2851,10 @@ function drawWfIns() {
       ${a ? `<div class="role">${esc(a.role)}</div>` : '<div class="role" style="color:var(--red)">This agent is not in the crew any more.</div>'}
       ${wfField('Task title', `<input class="field" data-s="title" value="${esc(st.title)}" placeholder="Build: {input}" autocomplete="off">`)}
       ${wfField('Instructions', `<textarea class="field" data-s="details" rows="5" placeholder="Optional. Earlier steps' summaries are added automatically.">${esc(st.details)}</textarea>`)}
-      ${wfField('When this step is done', `<div class="wfseg"><button class="approve ${st.gate !== 'auto' ? 'on' : ''}" data-sg="approve">✋ Wait for me</button><button class="auto ${st.gate === 'auto' ? 'on' : ''}" data-sg="auto">⚡ Continue</button></div>`)}
+      ${wfField('When this step is done', `<div class="wfseg"><button class="approve ${!['auto', 'until'].includes(st.gate) ? 'on' : ''}" data-sg="approve">✋ Wait for me</button><button class="auto ${st.gate === 'auto' ? 'on' : ''}" data-sg="auto">⚡ Continue</button><button class="until ${st.gate === 'until' ? 'on' : ''}" data-sg="until" title="For a goal that takes time: a PR merging, a deployment landing">⟳ Check until done</button></div>`)}
+      ${st.gate === 'until' ? `<div class="thint" style="margin-top:-4px">The agent works, then is asked to check again until it calls <code>decide</code>: continue when the goal is reached, stop if it never will. Each check is a short turn in the same session.</div>
+      <div style="display:flex;gap:8px">${wfField('Check every (min)', `<input class="field" type="number" min="5" max="1440" data-s="every" value="${st.every || 30}">`)}${wfField('At most (checks)', `<input class="field" type="number" min="1" max="500" data-s="checks" value="${st.checks || 96}">`)}</div>
+      <div class="thint">${Math.round((st.every || 30) * (st.checks || 96) / 60)} h at most, then it goes to Review for you.</div>` : ''}
       <div style="display:flex;gap:6px"><button class="btn sm" data-smv="-1" ${i === 0 ? 'disabled' : ''}>← Earlier</button><button class="btn sm" data-smv="1" ${i === wfe.steps.length - 1 ? 'disabled' : ''}>Later →</button><button class="btn sm danger" data-srm style="margin-left:auto" ${wfe.steps.length === 1 ? 'disabled' : ''}>Delete</button></div>
       <div class="thint">Placeholders: <code>{input}</code> <code>{details}</code> the run's goal · <code>{prev_summary}</code> <code>{prev_who}</code> <code>{prev_branch}</code> <code>{prev_commit}</code> · <code>{step}</code> <code>{steps}</code></div>`;
   } else if (wfSel === 'trigger') {
@@ -2879,7 +2894,7 @@ $('#wfModal').addEventListener('click', async e => {
   const d = b.dataset;
   if (d.n) { if (wfDrag?.moved) return; wfSel = d.n; $('#wfStage').querySelectorAll('.wfn').forEach(n => n.classList.toggle('sel', n.dataset.n === wfSel)); return drawWfIns(); }
   if (d.chip) return wfInsert(wfe.steps.length, d.chip);
-  if (d.g) { const st = wfe.steps[wfStepNode(+d.g)]; st.gate = st.gate === 'auto' ? 'approve' : 'auto'; wfPlace(); return drawWfIns(); }
+  if (d.g) { const st = wfe.steps[wfStepNode(+d.g)]; st.gate = {approve: 'auto', auto: 'until', until: 'approve'}[st.gate] || 'auto'; wfPlace(); return drawWfIns(); }
   if (d.ins != null) {
     MENU_ACTIONS = [];
     showMenu(b, '<div class="mh">Add a step here</div>' + S.agents.map(a => item(`${esc(a.name)}<span class="faint"> · ${esc(a.tags.join(', '))}</span>`, () => wfInsert(+d.ins, a.name))).join(''));

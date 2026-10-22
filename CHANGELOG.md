@@ -5,6 +5,9 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **⟳ Check-until-done gate for workflow steps:** for goals that take hours or days (a PR merging, a deployment landing). The step's agent works, then Crew asks it to check again every N minutes (30 by default) in the same session, with a short message instead of the whole brief, until it calls `decide`: continue passes the step, stop ends the run. After the set number of checks (96 by default) it goes to Review. Set it on a step in the workflow editor (the gate badge now cycles ✋ → ⚡ → ⟳), from the boss's `save_workflow`, or in an exported file. A waiting card shows ⟳ with its next check.
+- **PRs named by number become links:** "PR #123" in an agent's brief or summary links to the project's GitHub or Azure Repos PR (read from the `origin` remote), so the card gets its PR and ↻ Address review buttons even when the agent never pasted a URL.
+- **Approve from the board:** a review card has a solid ✓ Approve button (with undo) above Review changes.
 - **Mermaid diagrams:** a ```` ```mermaid ```` block in a chat reply, an agent log or a review summary is drawn as a diagram, in the current theme. The Mermaid library loads from jsDelivr the first time a diagram appears; if it can't load, or the diagram is invalid, the source stays visible.
 
 ### Fixed
@@ -12,6 +15,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **☕ disappeared after switching projects** although the computer was still being kept awake; the new project's crew now picks up the keep-awake state.
 
 ### Changed
+- **Toasts sit at the bottom right**, just above the chat bar's Send button, instead of under the header.
 - **Keep-awake is on by default:** `--awake` now defaults to `always`, so the computer doesn't idle-sleep while Crew runs and scheduled triggers fire on time, with ☕ in the header the whole time. `--awake busy` brings back the old behavior (only while agents work); `--awake off` turns it off.
 
 ## [0.3.0] - 2026-10-22
