@@ -231,3 +231,56 @@ class TellReopens(TempCrewCase):
         t["commit"] = "abc1234"
         self.crew.act("tell", {"agent": a["name"], "text": "thanks"})
         self.assertEqual(t["col"], "review")
+
+
+class TaskSessions(TempCrewCase):
+    def setUp(self):
+        super().setUp()
+        self.a = next(iter(self.crew.agents.values()))
+        self.a["context"] = "fresh"
+        self.crew._start = lambda ag: True
+        self.crew._send = lambda ag, text: True
+        self.crew._kill_proc = lambda name: None
+
+    def _run(self, title):
+        self.crew.act("add", {"title": title, "tag": "bug", "agent": self.a["name"]})
+        t = self.crew.tasks[-1]
+        self.crew._begin(self.a, t)
+        self.crew._on_event(self.a, {"type": "system", "subtype": "init", "session_id": f"s-{t['id']}"})
+        t.update(col="review")
+        self.a.update(status="review")
+        return t
+
+    def test_new_task_fresh_old_task_resumes_its_session(self):
+        t1 = self._run("first")
+        t2 = self._run("second")
+        self.assertEqual(t2["sessions"][self.a["name"]], f"s-{t2['id']}")  # a new task did not inherit t1's session
+        self.crew.act("reject", {"task": t1["id"], "text": "one more thing"})
+        self.assertEqual((self.a["session"], t1["col"]), (f"s-{t1['id']}", "doing"))  # back in t1's conversation
+
+    def test_fresh_respawn_forgets_task_sessions(self):
+        t1 = self._run("first")
+        self.a["status"] = "idle"
+        self.crew.act("respawn", {"agent": self.a["name"], "fresh": True})
+        self.assertNotIn(self.a["name"], t1.get("sessions", {}))
+
+
+class AddressReview(TempCrewCase):
+    def test_runs_skill_in_task_session_and_clears_when_done(self):
+        a = next(iter(self.crew.agents.values()))
+        sent = []
+        self.crew._start = lambda ag: True
+        self.crew._send = lambda ag, text: sent.append(text) or True
+        self.crew.act("add", {"title": "Ship it", "tag": "bug"})
+        t = self.crew.tasks[-1]
+        self.assertIn("error", self.crew.act("address_review", {"task": t["id"]}))  # no PR yet
+        t.update(col="done", who=a["name"], pr="https://github.com/o/r/pull/7", sessions={a["name"]: "s-7"})
+        self.assertNotIn("error", self.crew.act("address_review", {"task": t["id"]}))
+        self.assertEqual((sent[-1], a["session"], a["status"], t["col"]), ("/address-review https://github.com/o/r/pull/7", "s-7", "running", "done"))
+        self.assertIn("error", self.crew.act("address_review", {"task": t["id"]}))  # busy
+        self.crew._on_event(a, {"type": "result", "subtype": "success", "result": "fixed 2 comments", "total_cost_usd": 0.1})
+        self.assertNotIn("reviewing", t)
+        self.assertEqual(a["status"], "idle")
+
+    def test_ui_only(self):
+        self.assertNotIn("address_review", server.MCP_ACTIONS)

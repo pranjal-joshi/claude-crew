@@ -1316,6 +1316,8 @@ class Crew:
         t, st = d.get("type"), d.get("subtype")
         if d.get("session_id"):
             a["session"] = d["session_id"]
+            if (tid := a["task"] or a.get("addressing")) and (tk := self._task(tid)):  # going back to this task resumes this conversation
+                tk.setdefault("sessions", {})[a["name"]] = a["session"]
         if t == "system" and st == "compact_boundary":
             meta = d.get("compact_metadata") or {}
             self.log(a, "sys", f"context compacted ({meta.get('trigger', 'manual')}, was {int(meta.get('pre_tokens') or a['ctx']) // 1000}k tokens)")
@@ -1383,6 +1385,8 @@ class Crew:
         a["cost"] += delta
         a["proc_cost"] = total
         task = self._task(a["task"]) if a["task"] else None
+        if (rt := a.pop("addressing", None)) and (tk := self._task(rt)):
+            tk.pop("reviewing", None)  # the /address-review turn is over
         self._charge(task, delta)
         self._note_denials(a, d.get("permission_denials"), a["task"])
         if a.get("compacting"):  # a /compact turn: no task changes
@@ -1615,10 +1619,7 @@ class Crew:
             return False
         if self._git_busy(a["name"]):
             return False
-        if a["context"] == "fresh" and a.get("last_task") not in (None, t["id"]) and (a["session"] or self._alive(a["name"])):
-            self._kill_proc(a["name"])  # new task, new session: no paying to re-read old work
-            a["session"] = None
-            self.log(a, "sys", f"fresh context for #{t['id']}")
+        self._task_session(a, t)
         if not self._start(a):
             return False
         a["last_task"] = t["id"]
@@ -1636,6 +1637,29 @@ class Crew:
             return False
         self.event("start", f"{a['name']} picked #{t['id']} · {t['title']}", a["name"])
         return True
+
+    def _task_session(self, a: dict, t: dict) -> None:
+        """Pick the Claude session for work on task t (context "fresh"): the one this agent already had for t, so a
+        reply, send-back or re-run continues that conversation; a new one for a task it hasn't worked on (a new task
+        from you, the boss or a trigger). "keep" agents stay in their one running session."""
+        if a["context"] != "fresh":
+            return
+        sid = (t.get("sessions") or {}).get(a["name"])
+        if sid:
+            if sid != a["session"]:
+                self._kill_proc(a["name"])
+                a["session"] = sid
+                self.log(a, "sys", f"back in #{t['id']}'s session")
+        elif a.get("last_task") not in (None, t["id"]) and (a["session"] or self._alive(a["name"])):
+            self._kill_proc(a["name"])  # new task, new session: no paying to re-read old work
+            a["session"] = None
+            self.log(a, "sys", f"fresh context for #{t['id']}")
+        a["last_task"] = t["id"]
+
+    def _forget_sessions(self, name: str) -> None:
+        """The agent's sessions are gone (cleared, fresh respawn, renamed): its tasks start fresh next time."""
+        for tk in self.tasks:
+            (tk.get("sessions") or {}).pop(name, None)
 
     def dispatch(self) -> None:
         with self.lock:
@@ -2507,6 +2531,7 @@ class Crew:
                             a["branch"] = hop
                 a["name"] = new
                 a["session"] = None  # sessions are filed by folder; the next message starts fresh
+                self._forget_sessions(old)
                 renamed = [(new if n == old else n, ag) for n, ag in self.agents.items()]
                 self.agents.clear()
                 self.agents.update(renamed)
@@ -2659,6 +2684,7 @@ class Crew:
                 if a["status"] == "running":
                     return {"error": f"{a['name']} is working: stop it first"}
                 self._kill_proc(a["name"])
+                self._forget_sessions(a["name"])
                 a.update(session=None, log=[], ctx=0, activity="", error=None,
                          status="idle" if a["status"] in ("idle", "paused", "review", "error") else a["status"])
                 self.log(a, "sys", "chat cleared · the next message starts a fresh session")
@@ -2673,6 +2699,7 @@ class Crew:
                 self._kill_proc(a["name"])
                 if p.get("fresh"):
                     a["session"] = None
+                    self._forget_sessions(a["name"])
                 a.update(status="idle", error=None, activity="")
                 self.log(a, "sys", "respawned" + (" with a fresh session" if p.get("fresh") else ", session kept"))
                 self.event("respawn", f"{a['name']} respawned", a["name"])
@@ -2680,11 +2707,34 @@ class Crew:
                 res = getattr(self, UI_TASK_ACTIONS[action])(t)
                 self.touch()
                 return res
+            elif action == "address_review" and t:  # UI only: the PR's agent runs /address-review in the task's session
+                w = self.agents.get(t.get("who") or "")
+                if not t.get("pr"):
+                    return {"error": f"#{t['id']} has no PR"}
+                if not w:
+                    return {"error": "the agent that opened this PR is gone"}
+                if w["status"] == "running":
+                    return {"error": f"{w['name']} is working: try again when it's done"}
+                if w["status"] == "killed":
+                    return {"error": f"{w['name']} is killed; respawn it first"}
+                self._task_session(w, t)
+                if not self._start(w):
+                    return {"error": w["error"]}
+                text = f"/address-review {t['pr']}"
+                self.log(w, "you", text)
+                if not self._send(w, text):
+                    w.update(status="error", activity="")
+                    return {"error": w["error"]}
+                w.update(status="running", since=now(), activity="addressing PR review…", error=None, addressing=t["id"])
+                t["reviewing"] = now()
+                self.event("tell", f"→ {w['name']}: /address-review on #{t['id']}", w["name"])
             elif action == "reject" and t and t["col"] == "review":
                 w = self.agents.get(t["who"])
                 fb = (p.get("text") or "Please revise.").strip()
                 if self._over_task(t):
                     return {"error": f"#{t['id']} reached its budget (${t.get('cost') or 0:.2f} of ${self._budget('budget_task_usd'):.2f}): raise the task budget to send it back"}
+                if w and w["status"] != "killed":
+                    self._task_session(w, t)
                 if not w or w["status"] == "killed" or not self._start(w):
                     t["col"] = "backlog"
                     return {"error": "agent unavailable; task returned to backlog"}

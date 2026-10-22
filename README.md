@@ -148,7 +148,7 @@ Give each agent an icon (two dozen dev line icons) and a colour in its settings;
 
 ## Context per task
 
-Each agent starts a **fresh Claude session for every new task** by default. Old tasks aren't re-read on every turn, so tokens stay low and context doesn't fill up. What should carry over already travels with the task: the hand-off summary, the previous step's branch, the workflow brief. Send back still resumes the same session, so the agent revises its own work. Switch any agent to **Keep across tasks** in ⚙ Model & role. Each agent's drawer shows how full its context is, with **Compact** (Claude Code's `/compact`) and **New session**.
+Each agent starts a **fresh Claude session for every new task** by default. Old tasks aren't re-read on every turn, so tokens stay low and context doesn't fill up. What should carry over already travels with the task: the hand-off summary, the previous step's branch, the workflow brief. Going back to a task resumes that task's own session, even if the agent did other tasks since: replies, Send back and re-running it continue the same conversation, so the agent revises its own work. Only new tasks (from you, the boss or a trigger) start fresh. Switch any agent to **Keep across tasks** in ⚙ Model & role. Each agent's drawer shows how full its context is, with **Compact** (Claude Code's `/compact`) and **New session**.
 
 ## Triggers
 
