@@ -98,6 +98,7 @@ Nine agents, one per stage of the delivery loop. Each owns a few tags, so an una
 | Review | **reviewer** | `review` `security` | Opus · xhigh | Correctness, security and domain review; fixes only clear defects, ranks the rest. |
 | Evaluate | **evaluator** | `eval` `data` `ml` | Opus · high | Model and prompt evals, A/B and shadow checks, with sample sizes, not anecdotes. |
 | Ship & observe | **ops** | `ops` `deploy` `incident` `chore` | Sonnet · high | CI/CD, deployments, telemetry, cost, incidents and repo hygiene. Diagnoses before it changes anything. |
+| File | **ticketer** | `intake` `ticket` | Sonnet · medium | Turns a request from anywhere (a Teams message, an alert, a failed pipeline) into a Bug or PBI, or links an open duplicate, and shares the link back where it came from. |
 | Report | **scribe** | `docs` `report` | Sonnet · low | Standups, PR descriptions, release notes and docs. Short and linked. |
 
 ## Workflows
@@ -115,6 +116,7 @@ Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on it
 | Spike to plan | researcher ✋ → planner |
 | Model change | evaluator (baseline) ⚡ → builder ✋ → evaluator (re-eval) |
 | Incident | ops (diagnose) ✋ → builder ✋ → tester ⚡ → scribe (post-mortem) |
+| Request to ticket | ticketer (file it, share the link) ⚡ → planner |
 
 Edit workflows on a **canvas**, n8n-style: a **When** block (▶ Run by hand, or any trigger), one block per agent step, and an **Output** block. Drag blocks to reorder, drag an agent from the left onto the canvas (or press ＋ on a line) to add a step, and click ✋ / ⚡ on a line to switch its gate. Click a block to edit its instruction (`{input}`, `{prev_summary}`, `{prev_branch}` and more). Runs show live progress per step, and click through to each step's task.
 
@@ -194,7 +196,7 @@ At most 10 items start per check, and closed, done and removed items are skipped
 
 | | |
 | --- | --- |
-| 🧑‍🤝‍🧑 **An SDLC crew** | Planner, researcher, designer, builder, tester, reviewer, evaluator, ops and scribe by default. Add, remove and re-role agents from the UI. |
+| 🧑‍🤝‍🧑 **An SDLC crew** | Planner, researcher, designer, builder, tester, reviewer, evaluator, ops, ticketer and scribe by default. Add, remove and re-role agents from the UI. |
 | ⛓ **Workflows** | Chain agents in order (plan → build → test → review → write-up) on an n8n-style canvas, with an approval or auto gate per step and a choice of output: board, report file, webhook or next workflow. |
 | ⚡ **Triggers** | Schedules, task events, file watches, command polls and webhooks start work on their own. Presets included. |
 | 🧹 **Fresh context per task** | A new session per task keeps tokens down; send-back still resumes. Per-agent switch. |

@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Ticketer agent and Request to ticket workflow:** a new built-in agent turns a request from anywhere (a Teams message or mention, an alert, a failed pipeline, a webhook, an earlier step) into a Bug or PBI, or links an open duplicate, then shares the link where the request came from. Point a Teams trigger at it, or use it as a step in any workflow.
 - **Formatted replies:** the boss chat and agent logs render Markdown (headings, lists, tables, code blocks, links) plus a few plain HTML tags. Anything else, such as scripts or attributes, stays as text.
 - **Agent status at a glance**: every agent avatar carries a status ring (none when idle, a spinning arc while running, blue to review, amber paused, red on error) and a small time tag: how long it has been running, or since it was last active. The agent panel's header is one row: avatar, name, a status line ("To review · #14 is done, needs you", "waiting for work · last active 4 min ago"), Stop/Resume/Respawn when they apply, an Edit | delete toolbar, ⋮ and close.
 - **Many triggers, one workflow**: a workflow's ⚡ button, its editor and agent cards now list ADO tag and Pipeline triggers too, and a trigger opened from a workflow keeps it as the target when you switch to ADO or Pipeline. Several triggers (for example one per pipeline) can start the same workflow.

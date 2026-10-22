@@ -25,7 +25,7 @@ class Presets(unittest.TestCase):
     def test_templates_use_preset_agents_and_unique_ids(self):
         names = {x["name"] for x in agents.presets.load()}
         ts = workflows.templates.load()
-        self.assertEqual([w["id"] for w in ts], ["w1", "w2", "w3", "w4", "w5"])
+        self.assertEqual([w["id"] for w in ts], ["w1", "w2", "w3", "w4", "w5", "w6"])
         for w in ts:
             self.assertTrue({s["agent"] for s in w["steps"]} <= names, w["name"])
         self.assertEqual(server.DEFAULT_WORKFLOWS, ts)
