@@ -2158,8 +2158,14 @@ function openTaskMenu(id, anchor) {
   h += item('Backlog · anyone with a matching role', () => moveTo(id, 'backlog'), {disabled: t.col === 'backlog' && !t.who});
   h += item('Mark done', () => moveTo(id, 'done'), {disabled: t.col === 'done'});
   h += item('Continue in Claude Code…', () => openCC({task: id}), {sub: 'resume it in your terminal, or copy a brief'});
-  h += item('Delete', () => askConfirm('Delete task', `Delete <b>#${t.id} ${esc(t.title)}</b>?${t.col === 'doing' ? ' Its agent will be stopped first.' : ''}`, 'Delete',
-    async () => { if (task(id)?.col === 'doing') await act('move', {task: id, col: 'backlog'}); act('delete', {task: id}); }, true), {cls: 'danger'});
+  const run = t.run && (S.runs || []).find(r => r.id === t.run.id), mates = run ? S.tasks.filter(x => x.run?.id === run.id) : [];
+  if (mates.length > 1) {  // a stacked workflow card: one delete takes the whole run
+    const live = mates.some(x => x.col === 'doing');
+    h += item(`Delete the whole run · ${mates.length} cards`, () => askConfirm('Delete run', `Delete <b>⛓ ${esc(run.name)}: ${esc(run.title)}</b> and all ${mates.length} of its step cards?${live ? ' Its running agent will be stopped first.' : ''}`, 'Delete all',
+      () => act('run_delete', {id: run.id, tasks: true}), true), {cls: 'danger'});
+  }
+  h += item(mates.length > 1 ? 'Delete just this step' : 'Delete', () => askConfirm('Delete task', `Delete <b>#${t.id} ${esc(t.title)}</b>?${t.col === 'doing' ? ' Its agent will be stopped first.' : ''}${mates.length > 1 ? ' The run stops; its other cards stay.' : ''}`, 'Delete',
+    async () => { if (task(id)?.col === 'doing') await act('move', {task: id, col: 'backlog'}); act('delete', {task: id}); }, true), {cls: mates.length > 1 ? '' : 'danger'});
   showMenu(anchor, h);
 }
 // On/off switches for agents and workflows. Off: an agent takes no new work (a running task finishes, queued tasks

@@ -1647,7 +1647,13 @@ class Crew:
                     return res
             elif action == "run_stop" and (run := self._run(p.get("id"))) and run["status"] == "running":
                 workflows.runs.stop(self, run)
-            elif action == "run_delete" and (run := self._run(p.get("id"))) and run["status"] != "running":
+            elif action == "run_delete" and (run := self._run(p.get("id"))) and (p.get("tasks") or run["status"] != "running"):
+                if p.get("tasks"):  # from the board's stacked card: every step's task goes with the run, running ones stopped
+                    for tk in [x for x in self.tasks if (x.get("run") or {}).get("id") == run["id"]]:
+                        self._release(tk)
+                        self.tasks.remove(tk)
+                    if run["status"] == "running":
+                        run.update(status="stopped", ended=now())
                 workflows.runs.delete(self, run)
             elif action == "resume" and t and t.get("hold"):
                 t.pop("hold")

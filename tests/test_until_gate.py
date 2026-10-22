@@ -64,6 +64,15 @@ class UntilGate(TempCrewCase):
         self.assertTrue(self.t["wait"]["over"])
         self.assertEqual(len([x for x in self.crew.tasks if x.get("run")]), 1)
 
+    def test_deleting_the_run_from_the_board_takes_all_its_cards(self):
+        self._end_turn("PR open.")
+        self._due()
+        self.crew.act("decide", {"from": self.ci["name"], "verdict": "continue", "reason": "merged"}, via="mcp")
+        self._end_turn("Merged.")
+        self.assertEqual(len([x for x in self.crew.tasks if x.get("run")]), 2)
+        self.crew.act("run_delete", {"id": self.run["id"], "tasks": True})
+        self.assertEqual(([x for x in self.crew.tasks if x.get("run")], self.crew._run(self.run["id"])), ([], None))
+
     def test_bad_numbers_are_refused(self):
         r = self.crew.act("wf_save", {"name": "Bad", "steps": [{"agent": self.ci["name"], "gate": "until", "every": "soon"}]})
         self.assertIn("error", r)
