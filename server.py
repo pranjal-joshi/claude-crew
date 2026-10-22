@@ -645,7 +645,7 @@ class Crew:
                         who=a["name"], finished=now())
             a.update(status="idle", task=None)
             self.event("wait", f"⟳ {a['name']} waits on #{task['id']} · check {w['checks']} of {step['checks']}, "
-                               + (f"watching every {step['every']} min" if w.get("probe") else f"next in {step['every']} min"), a["name"])
+                               + (f"watching every {workflows.probe.WATCH_EVERY} min" if w.get("probe") else f"next in {step['every']} min"), a["name"])
         elif task:
             tk = a["tokens"]
             task["tokens"] = tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0)

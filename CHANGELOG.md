@@ -5,9 +5,11 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Watches fix failed CI:** the crew tool `watch` takes a `fail` regex (e.g. `FAILED|CHANGES_REQUESTED`). When the output matches with a new failure, Crew wakes the same agent with the output (the failed checks and their pipeline links) and asks it to fix the cause on the same branch, push and re-run what failed. The same failure doesn't wake it twice. With `fail` set, progress alone wakes nobody. The ⟳ step brief shows a `gh pr view` command that lists failed checks with their links.
 - **⏹ Stop workflow on board cards:** a workflow card in In progress or Review has a Stop workflow button. It ends the run and its open step: a working agent is stopped, a waiting ⟳ or 👁 step stops checking, and the card moves to Done marked ⏹ stopped. It also ends the step of a run that was already stopped but still checking.
 
 ### Changed
+- **Watches run every 2 minutes**, on their own clock instead of the step's interval (30 min by default, which still applies to an agent rechecking without a watch). Watch runs no longer count as the step's checks; a watch lasts as long as the step's checks would (checks × interval), then the agent gets a last look.
 - **Waiting steps show in In progress:** a ⟳ step waiting for its next check, or a 👁 step watching a command, is shown in In progress instead of Backlog.
 
 ### Fixed

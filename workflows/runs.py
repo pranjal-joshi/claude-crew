@@ -7,6 +7,8 @@ import re
 import threading
 import time
 
+from . import probe
+
 
 def now() -> float:
     return time.time()
@@ -80,17 +82,19 @@ def start_step(crew, run: dict, i: int) -> None:
     crew.event("workflow", f"⛓ {run['name']} {i + 1}/{n} → {a['name']}: {title}", a["name"])
 
 
+WATCH_EXAMPLE = 'gh pr view 123 --json state,reviewDecision,statusCheckRollup --jq \'[.state,.reviewDecision,[.statusCheckRollup[]|select(.conclusion=="FAILURE")|"FAILED \\(.name) \\(.detailsUrl)"]]\''
+
+
 def until_brief(step: dict) -> str:
     return (f"This step lasts until its goal is reached, which can take hours or days (a PR merging, a deployment landing). "
             f"Do what you can now. When the goal is reached, call the crew tool `decide` with verdict continue; if it can "
             f"never be reached, call it with verdict stop. Otherwise, before you end your turn with a short status, call the "
-            f"crew tool `watch` with one read-only gh, az or git command whose output changes only when something you must "
-            f"act on happens (e.g. `gh pr view 123 --json state,reviewDecision,statusCheckRollup --jq "
-            f"'[.state,.reviewDecision,[.statusCheckRollup[].conclusion]]'`; no timestamps or counters that change "
-            f"every run), and `done` as a regex for the goal (e.g. MERGED). Crew runs it every {step.get('every', 30)} "
-            f"minutes at no cost and wakes you, in this same session, only when its output changes or matches done. "
-            f"Without a watch Crew wakes you every {step.get('every', 30)} minutes. Up to {step.get('checks', 96)} checks, "
-            f"then a person takes over.")
+            f"crew tool `watch` with one read-only gh, az or git command that prints the state and the link of every failed "
+            f"check (e.g. `{WATCH_EXAMPLE}`; no timestamps or counters that change every run), `done` as a regex for the "
+            f"goal (e.g. MERGED) and `fail` as a regex for what you must act on (e.g. FAILED|CHANGES_REQUESTED). Crew runs it "
+            f"every {probe.WATCH_EVERY} minutes at no cost and wakes you, in this same session, when it matches done, or "
+            f"matches fail with a new failure: then fix that failure yourself. Without a watch Crew wakes you every "
+            f"{step.get('every', 30)} minutes. Up to {step.get('checks', 96)} checks, then a person takes over.")
 
 
 def recheck_body(t: dict, step: dict) -> str:
@@ -100,6 +104,11 @@ def recheck_body(t: dict, step: dict) -> str:
     pr = w.get("probe") or {}
     seen = (f"Your watch `{pr['cmd']}` woke you ({w.get('wake')}). It now prints:\n{pr.get('out') or '(nothing)'}\n\n"
             if pr and w.get("wake") else "")
+    if pr and w.get("wake") in ("failed", "output changed"):
+        seen += ("If a CI check or pipeline failed: open its run (the link above, or `gh pr checks <number>` for the links), "
+                 "find the cause in its log, fix it on this same branch and push, then re-run what failed if the push does "
+                 "not re-run it (`gh run rerun <id> --failed`, or queue the Azure pipeline again). If review asked for "
+                 "changes, make them. Then end your turn with a short status: your watch keeps running.\n\n")
     return (f"Task #{t['id']}: check again ({w.get('checks', 0) + 1} of {step.get('checks', 96)}): {t['title']}\n\n"
             + seen + (f"Last time you reported: {last}\n\n" if last else "")
             + "Look at the current state. Goal reached: call `decide` with continue and summarize. Can never be reached: "

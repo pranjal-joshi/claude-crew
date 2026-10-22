@@ -1,6 +1,8 @@
-"""A ⟳ step's watch: a cheap read-only command the step's agent sets (crew tool `watch`) and Crew runs on the step's
-schedule instead of waking the agent. The agent wakes only when the output changes or matches `done`, so a PR that takes
-two days to merge costs a few turns, not one every half hour."""
+"""A ⟳ step's watch: a cheap read-only command the step's agent sets (crew tool `watch`) and Crew runs every
+WATCH_EVERY minutes instead of waking the agent. The agent wakes only when the output matches `done` (the goal) or
+`fail` (something to fix, such as a failed CI run), or, with no `fail` set, when the output changes. A PR that takes two
+days to merge costs a few turns, not one every half hour. Watch runs don't count as the step's checks; the watch lasts
+as long as those checks would (checks × every minutes), then the agent gets a last look."""
 from __future__ import annotations
 
 import hashlib
@@ -23,6 +25,7 @@ WRITE_FLAGS = {"-X", "--method", "-f", "-F", "--field", "--raw-field", "--input"
 AZ_UNSAFE = re.compile(r'[%^&|<>"!`\x00-\x1f]')  # az is a .cmd file on Windows: cmd.exe would read these
 SHELL = re.compile(r"[;&|<>`\n\r]|\$\(")
 OUT_MAX, TIMEOUT = 1500, 60
+WATCH_EVERY = 2  # minutes between watch runs: cheap, no model, so CI results arrive quickly
 
 
 def parse(cmd: str) -> tuple[str | None, list[str]]:
@@ -78,19 +81,25 @@ def set_watch(crew, p: dict) -> dict:
         w.pop("probe", None)
         return {"ok": True, "note": "watch removed: Crew wakes you on the step's schedule again"}
     err, argv = parse(p["command"])
-    done = str(p.get("done") or "").strip()[:200]
-    if not err and done:
-        try:
-            re.compile(done)
-        except re.error as e:
-            err = f"done: not a regular expression ({e})"
+    done, fail = (str(p.get(k) or "").strip()[:200] for k in ("done", "fail"))
+    for k, rx in (("done", done), ("fail", fail)):
+        if not err and rx:
+            try:
+                re.compile(rx)
+            except re.error as e:
+                err = f"{k}: not a regular expression ({e})"
     if err:
         return {"error": err}
-    w["probe"] = {"cmd": shlex.join(argv), "done": done}
+    old = w.get("probe") or {}
+    w["probe"] = {"cmd": shlex.join(argv), "done": done, "fail": fail, "since": old.get("since") or time.time()}
+    if old.get("failed"):
+        w["probe"]["failed"] = old["failed"]  # the failure the agent already saw does not wake it again
     crew.event("wait", f"👁 {src['name']} watches #{t['id']}: {w['probe']['cmd'][:120]}", src["name"])
     crew.touch()
-    return {"ok": True, "note": "Crew runs it on the step's schedule and wakes you only when its output changes"
-                                + (" or matches done" if done else "") + ". End your turn with a short status."}
+    wakes = [x for x in ("matches done" if done else "", "matches fail with a new failure" if fail else "",
+                         "" if fail else "changes") if x]
+    return {"ok": True, "note": f"Crew runs it every {WATCH_EVERY} min and wakes you only when its output "
+                                + " or ".join(wakes) + ". End your turn with a short status."}
 
 
 def tick(crew) -> None:
@@ -118,12 +127,18 @@ def _probe(crew, t: dict) -> None:
             return
         h, first = digest(out), "seen" not in pr
         hit = bool(pr["done"] and re.search(pr["done"], out))
-        changed = not first and h != pr["seen"]
+        failed = bool(pr.get("fail") and re.search(pr["fail"], out)) and h != pr.get("failed")
+        changed = not first and h != pr["seen"] and not pr.get("fail")  # with a fail pattern, progress alone wakes nobody
+        over = time.time() - pr.setdefault("since", time.time()) >= step["checks"] * step["every"] * 60
         pr.update(seen=h, ran=time.time(), out=out[:OUT_MAX])
-        w["checks"] = w.get("checks", 0) + 1
-        if hit or changed or w["checks"] + 1 >= step["checks"]:
-            w.update(wake=("done matched" if hit else "output changed" if changed else "last check"), next=0)
+        w["watched"] = w.get("watched", 0) + 1
+        if failed:
+            pr["failed"] = h
+        if hit or failed or changed or over:
+            w.update(wake=("done matched" if hit else "failed" if failed else "output changed" if changed else "last check"), next=0)
+            if over and not hit:
+                w["checks"] = max(w.get("checks", 0), step["checks"] - 1)  # this look is the last one, then a person takes over
             crew.event("wait", f"👁 #{t['id']}: {w['wake']} · waking {t.get('who') or 'its agent'}", t.get("who"))
         else:
-            w["next"] = time.time() + step["every"] * 60
+            w["next"] = time.time() + WATCH_EVERY * 60
     crew.touch()

@@ -72,7 +72,8 @@ class Watch(TempCrewCase):
         for _ in range(3):
             self._poll()
         self.assertEqual((self.t["col"], len(self.sent)), ("backlog", 1))
-        self.assertEqual(self.t["wait"]["checks"], 4)  # 1 turn + 3 watch runs
+        self.assertEqual((self.t["wait"]["checks"], self.t["wait"]["watched"]), (1, 3))  # watch runs aren't checks
+        self.assertLessEqual(self.t["wait"]["next"] - server.now(), probe.WATCH_EVERY * 60 + 1)  # every 2 min, not the step's 10
 
     def test_changed_output_wakes_it_with_what_changed(self):
         self._watch()
@@ -96,6 +97,38 @@ class Watch(TempCrewCase):
         self._poll()
         self.assertEqual(self.t["col"], "doing")
         self.assertIn("done matched", self.sent[-1])
+
+    def test_a_new_failure_wakes_it_to_fix_and_the_same_one_does_not_again(self):
+        self._watch(done="MERGED", fail="FAILED")
+        self._end_turn()
+        self._poll()
+        self.out[0] = "OPEN · in progress"
+        self._poll()  # progress alone wakes nobody when fail is set
+        self.assertEqual(self.t["col"], "backlog")
+        self.out[0] = "OPEN FAILED build https://dev.azure.com/acme/Proj/_build/results?buildId=7"
+        self._poll()
+        self.assertEqual(self.t["col"], "doing")
+        self.assertIn("failed", self.sent[-1])
+        self.assertIn("buildId=7", self.sent[-1])
+        self.assertIn("fix it on this same branch", self.sent[-1])
+        self._end_turn("pushed a fix")  # CI hasn't re-run yet: the same failure must not wake it again
+        self._poll()
+        self._poll()
+        self.assertEqual(self.t["col"], "backlog")
+        self.out[0] = "OPEN FAILED build https://dev.azure.com/acme/Proj/_build/results?buildId=8"
+        self._poll()
+        self.assertEqual(self.t["col"], "doing")
+
+    def test_the_watch_ends_after_the_steps_time_budget(self):
+        self._watch(fail="FAILED")
+        self._end_turn()
+        self._poll()
+        self.t["wait"]["probe"]["since"] -= 50 * 10 * 60  # checks × every minutes have passed
+        self._poll()
+        self.assertEqual(self.t["col"], "doing")
+        self.assertIn("last check", self.sent[-1])
+        self._end_turn("still open")
+        self.assertEqual(self.t["col"], "review")
 
     def test_empty_command_removes_the_watch(self):
         self._watch()
