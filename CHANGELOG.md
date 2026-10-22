@@ -4,7 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-22
+
 ### Added
+- **ADO trigger: assigned to me.** The ADO trigger can pick up items newly assigned to your `az` user instead of tagged ones (*Pick up items: assigned to me*). Items already assigned when it starts are a baseline and skipped, unless you choose *start them too*. No tags are written; the comment is optional as before.
 - **Delete a whole workflow run from the board:** a stacked run card's menu has *Delete the whole run · N cards*, which stops a running step and removes every step's card at once; *Delete just this step* keeps the old behaviour.
 - **Watches on ⟳ steps:** the step's agent gives Crew one read-only command (crew tool `watch`: `gh pr view/checks`, `gh run`, `gh api` GET, `az pipelines runs/build`, `az repos pr`, `az boards work-item show`, `git log/ls-remote/rev-parse/merge-base`) and an optional `done` regex. Crew runs it on the step's schedule without the model and wakes the agent, with the new output, only when it changes or matches. A long wait costs a few turns instead of one per interval. No shell: pipes, redirects and `gh api` writes are refused.
 - **⟳ Check-until-done gate for workflow steps:** for goals that take hours or days (a PR merging, a deployment landing). The step's agent works, then Crew asks it to check again every N minutes (30 by default) in the same session, with a short message instead of the whole brief, until it calls `decide`: continue passes the step, stop ends the run. After the set number of checks (96 by default) it goes to Review. Set it on a step in the workflow editor (the gate badge now cycles ✋ → ⚡ → ⟳), from the boss's `save_workflow`, or in an exported file. A waiting card shows ⟳ with its next check.
@@ -141,3 +144,4 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 [0.1.0]: https://github.com/pranjal-joshi/claude-crew/releases/tag/v0.1.0
 [0.2.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.1.0...v0.2.0
 [0.3.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.2.0...v0.3.0
+[0.4.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.3.0...v0.4.0

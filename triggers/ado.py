@@ -1,4 +1,5 @@
-"""ADO tag trigger: Azure DevOps through the `az` CLI. A work item carrying your tag starts one task or workflow run, once."""
+"""ADO trigger: Azure DevOps through the `az` CLI. A work item carrying your tag, or newly assigned to you, starts one task or
+workflow run, once."""
 from __future__ import annotations
 
 import html
@@ -11,14 +12,17 @@ from .base import Trigger, now, register, short_title
 
 # ---- ADO tag trigger: Azure DevOps through the `az` CLI ----------------------------------
 ADO_AFTER = ["tag_picked", "remove_tag", "none"]
+ADO_MATCH = ["tag", "assigned"]   # items carrying a tag, or items assigned to the signed-in az user
+ADO_EXISTING = ["skip", "start"]  # assigned: what to do with items already assigned when the trigger starts
 ADO_MAX = 10      # items started per check; the rest wait for the next one
 ADO_SEEN_MAX = 500
 ADO_CLOSED = ("Closed", "Done", "Removed")
 
 def ado_spec(sp: dict) -> tuple[str | None, dict]:
-    """The parts of an ADO spec the query needs: tag, org, project, types, every, after, comment."""
-    tag = " ".join(str(sp.get("tag") or "").split())
-    if not tag:
+    """The parts of an ADO spec the query needs: match, tag, org, project, types, every, after, comment, existing."""
+    match = sp.get("match") if sp.get("match") in ADO_MATCH else "tag"
+    tag = " ".join(str(sp.get("tag") or "").split()) if match == "tag" else ""
+    if match == "tag" and not tag:
         return "which tag will you put on items? Enter it", {}
     if len(tag) > 50 or AZ_UNSAFE.search(tag) or ";" in tag or "," in tag:
         return "the tag is too long or has a character Azure DevOps tags can't use", {}
@@ -35,9 +39,11 @@ def ado_spec(sp: dict) -> tuple[str | None, dict]:
         every = max(1, int(sp.get("every") or 5))
     except (TypeError, ValueError):
         return "numbers only for intervals", {}
-    return None, {"tag": tag, "org": org, "project": project, "types": types, "every": every,
-                  "after": sp.get("after") if sp.get("after") in ADO_AFTER else "tag_picked",
-                  "comment": bool(sp.get("comment", True))}
+    after = sp.get("after") if sp.get("after") in ADO_AFTER else "tag_picked"
+    return None, {"match": match, "tag": tag, "org": org, "project": project, "types": types, "every": every,
+                  "after": after if match == "tag" else "none",  # no tag to mark: `seen` alone keeps an item from starting twice
+                  "comment": bool(sp.get("comment", True)),
+                  "existing": sp.get("existing") if sp.get("existing") in ADO_EXISTING else "skip"}
 
 
 def wiql_quote(s: str) -> str:
@@ -45,8 +51,11 @@ def wiql_quote(s: str) -> str:
 
 
 def ado_wiql(sp: dict) -> str:
-    cond = [f"[System.Tags] CONTAINS {wiql_quote(sp['tag'])}"]
-    if sp.get("after", "tag_picked") == "tag_picked":
+    if sp.get("match") == "assigned":
+        cond = ["[System.AssignedTo] = @Me"]
+    else:
+        cond = [f"[System.Tags] CONTAINS {wiql_quote(sp['tag'])}"]
+    if sp.get("match") != "assigned" and sp.get("after", "tag_picked") == "tag_picked":
         cond.append(f"[System.Tags] NOT CONTAINS {wiql_quote(sp['tag'] + '-picked')}")
     cond.append("[System.State] NOT IN (" + ", ".join(wiql_quote(x) for x in ADO_CLOSED) + ")")
     if sp.get("types"):
@@ -134,7 +143,7 @@ class Ado(Trigger):
         return ado_spec(sp)
 
     def default_name(self, spec):
-        return f"ADO: {spec['tag']}"
+        return "ADO: assigned to me" if spec.get("match") == "assigned" else f"ADO: {spec['tag']}"
 
     def task(self, spec):
         return {"title": "AB#{id} {title}", "details": "", "tag": "", "agent": spec["agent"], "workflow": spec["workflow"]}
@@ -152,7 +161,8 @@ class Ado(Trigger):
                 if err:
                     return {"error": err}
                 items = ado_query(sp)
-                return {"ok": True, "total": len(items), "items": items[:25], "wiql": ado_wiql(sp)}
+                res = {"ok": True, "total": len(items), "items": items[:25], "wiql": ado_wiql(sp)}
+                return res | ({"baseline": True} if sp["match"] == "assigned" and sp["existing"] == "skip" else {})
         except AzError as e:
             return {"error": str(e)}
         return {"error": "unknown op"}
@@ -195,6 +205,13 @@ class Ado(Trigger):
         try:
             items = ado_query(sp)
             found = len(items)
+            if sp.get("match") == "assigned" and sp.get("existing") == "skip" and not tr.get("baselined"):
+                with crew.lock:  # first check: what is assigned already is the baseline, only items assigned after it start
+                    if tr in crew.triggers:
+                        ids = [i for i in tr.get("seen") or [] if i not in {x["id"] for x in items}] + [x["id"] for x in items]
+                        tr["seen"], tr["baselined"], tr["note"] = ids[-ADO_SEEN_MAX:], True, f"baseline: {found} already assigned"
+                self.finish(crew, tr, None, {"found": found, "picked": 0})
+                return
             with crew.lock:
                 skip = set(tr.get("seen") or []) | self.live(crew)
             for it in [i for i in items if i["id"] not in skip][:ADO_MAX]:

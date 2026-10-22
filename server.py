@@ -36,7 +36,7 @@ except ImportError:
     import workflows
     from triggers import azure
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the

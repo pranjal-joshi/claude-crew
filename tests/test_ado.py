@@ -284,3 +284,39 @@ class AdoHelpersCase(AdoCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AssignedCase(AdoCase):
+    """match "assigned": items assigned to the az user; no tag, no tag write-back; existing ones are a baseline by default."""
+
+    def test_query_and_spec(self):
+        err, sp = ado.ado_spec({"match": "assigned", "tag": "ignored", "after": "tag_picked"})
+        self.assertIsNone(err)
+        self.assertEqual((sp["tag"], sp["after"], sp["existing"]), ("", "none", "skip"))
+        q = ado.ado_wiql(sp | {"project": "Proj", "types": ["Bug"]})
+        self.assertIn("[System.AssignedTo] = @Me", q)
+        self.assertNotIn("System.Tags] CONTAINS", q)
+        self.assertIn("[System.WorkItemType] IN ('Bug')", q)
+
+    def test_existing_items_are_the_baseline_then_new_ones_start(self):
+        tr = self.add(match="assigned", tag="")
+        self.assertEqual(tr["name"], "board")
+        self.check(tr, FakeAz([item(1), item(2)]))
+        self.assertEqual((self.crew.runs, sorted(tr["seen"]), tr["baselined"]), ([], [1, 2], True))
+        fake = self.check(tr, FakeAz([item(1), item(2), item(3)]))
+        self.assertEqual([r["ado"]["id"] for r in self.crew.runs], [3])
+        ups = fake.updates()  # a comment only: tags are left alone
+        self.assertEqual(len(ups), 1)
+        self.assertNotIn("--fields", ups[0])
+
+    def test_start_existing(self):
+        tr = self.add(match="assigned", tag="", existing="start")
+        self.check(tr, FakeAz([item(1), item(2)]))
+        self.assertEqual(sorted(r["ado"]["id"] for r in self.crew.runs), [1, 2])
+
+    def test_default_name_and_test_button(self):
+        self.crew.act("trigger_add", {"name": "", "kind": "ado", "spec": self.SPEC | {"match": "assigned", "tag": ""}, "task": {}}, via="ui")
+        self.assertEqual(self.crew.triggers[-1]["name"], "ADO: assigned to me")
+        with mock.patch.object(azure, "az", FakeAz([item(1)])):
+            res = triggers.get("ado").form(self.crew, {"op": "test", "spec": {"match": "assigned"}})
+        self.assertEqual((res["total"], res["baseline"]), (1, True))

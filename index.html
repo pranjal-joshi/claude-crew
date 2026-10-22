@@ -2371,7 +2371,8 @@ function trigWhat(tr) {
     case 'webhook': return `POST ${location.origin}/api/hook/${tr.id}`;
     case 'pipeline': return `${cap(pipeRes(sp.result).map(k => PIPE_RES[k]).join(' or '))} runs of ${sp.pipelines.join(', ')}${sp.mine ? ' · only mine' : ''} · every ${sp.every} min`;
     case 'teams': return `${sp.mode === 'all' ? 'New messages' : '@mentions of you'} in ${sp.name || (sp.thread ? 'the linked conversation' : sp.where)}${sp.about ? ` about ${sp.about}` : ''} · every ${sp.every} min`;
-    case 'ado': return `Items tagged “${sp.tag}”${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min · then ${({tag_picked: `add ${sp.tag}-picked`, remove_tag: 'remove the tag', none: 'leave tags'})[sp.after]}`;
+    case 'ado': if (sp.match === 'assigned') return `Items newly assigned to me${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min${sp.existing === 'start' ? ' · incl. ones already assigned' : ''}`;
+      return `Items tagged “${sp.tag}”${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min · then ${({tag_picked: `add ${sp.tag}-picked`, remove_tag: 'remove the tag', none: 'leave tags'})[sp.after]}`;
   }
 }
 function hookBox(tr) {
@@ -2473,9 +2474,12 @@ function drawTrigForm() {
       <div class="two"><div><div class="label">Every (min)</div><input class="field" type="number" min="1" data-s="every" value="${sp.every}"></div>
       <div><div class="label">Fire when</div>${seg('s', 'when', [['change', 'output changes'], ['fail', 'it starts failing'], ['output', 'it prints something new']], sp.when)}</div></div>`;
   if (k === 'ado') {
-    const wfs = S.workflows || [], useAgent = !!sp.agent, tg = sp.tag || '<tag>', out = tv.adoOut;
-    spec = `<div><div class="label">Which tag will you put on items?<span class="faint lc">required</span></div>
-        <input class="field mono" data-s="tag" value="${esc(sp.tag)}" placeholder="crew" maxlength="50" spellcheck="false" autocomplete="off"></div>
+    const wfs = S.workflows || [], useAgent = !!sp.agent, tg = sp.tag || '<tag>', out = tv.adoOut, mine = sp.match === 'assigned';
+    spec = `<div><div class="label">Pick up items</div>${seg('s', 'match', [['tag', 'that carry a tag'], ['assigned', 'assigned to me']], sp.match || 'tag')}</div>
+      ${mine ? `<div><div class="label">Already assigned to you</div>${seg('s', 'existing', [['skip', 'skip them'], ['start', 'start them too']], sp.existing || 'skip')}
+        <div class="thint">“Assigned to me” is whoever <code>az login</code> is signed in as. Skipped items are remembered on the first check; only items assigned after it start.</div></div>`
+      : `<div><div class="label">Which tag will you put on items?<span class="faint lc">required</span></div>
+        <input class="field mono" data-s="tag" value="${esc(sp.tag)}" placeholder="crew" maxlength="50" spellcheck="false" autocomplete="off"></div>`}
       <div class="two" style="grid-template-columns:1fr 160px"><div><div class="label">Organization URL<span class="faint lc">from az devops configure, if set</span></div><input class="field mono" data-s="org" value="${esc(sp.org)}" placeholder="https://dev.azure.com/yourorg" spellcheck="false" autocomplete="off"></div>
       <div><div class="label">Project</div><input class="field" data-s="project" value="${esc(sp.project)}" spellcheck="false" autocomplete="off"></div></div>
       <div><div class="label">Start</div><div class="seg"><button data-ado-target="workflow" class="${useAgent ? '' : 'on'}">A workflow run</button><button data-ado-target="agent" class="${useAgent ? 'on' : ''}">A single agent</button></div>
@@ -2485,10 +2489,10 @@ function drawTrigForm() {
         <div class="thint">One ${useAgent ? 'task' : 'run'} per item, titled <code>AB#id title</code>, with the item's type, state, link and description.</div></div>
       <div><div class="label">Work item types<span class="faint lc">none ticked = all</span></div><div class="chkrow">${ADO_TYPES.map(t => `<label><input type="checkbox" data-sa="types" data-v="${esc(t)}" ${(sp.types || []).includes(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div></div>
       <div class="two"><div><div class="label">Check every (min)</div><input class="field" type="number" min="1" data-s="every" value="${sp.every}"></div>
-      <div><div class="label">After pickup</div>${seg('s', 'after', [['tag_picked', `add tag ${tg}-picked`], ['remove_tag', `remove the tag ${tg}`], ['none', 'do nothing']], sp.after)}
+      <div><div class="label">After pickup</div>${mine ? '' : seg('s', 'after', [['tag_picked', `add tag ${tg}-picked`], ['remove_tag', `remove the tag ${tg}`], ['none', 'do nothing']], sp.after)}
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sc="comment" ${sp.comment ? 'checked' : ''}> Post a comment: “Picked up by Crew: …, run #…”</label></div></div>
       <div><button class="btn sm" data-ado-test ${out?.busy ? 'disabled' : ''}>${out?.busy ? 'Asking Azure DevOps…' : 'Test: list matching items'}</button><span class="faint" style="font-size:11.5px;margin-left:8px">Read-only: starts nothing, writes nothing.</span></div>
-      ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="ah">${out.total} item${out.total === 1 ? '' : 's'} would start${out.total > 10 ? ' · 10 per check' : ''}${out.total > out.items.length ? ` · showing ${out.items.length}` : ''}</div>` + out.items.map(i => `<div class="ai"><b>AB#${+i.id}</b><span class="t">${esc(i.title)}</span><span class="m">${esc(i.type)} · ${esc(i.state)}</span></div>`).join('') : '<div class="none">No open items carry that tag yet.</div>'}</div>` : ''}
+      ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="ah">${out.total} item${out.total === 1 ? '' : 's'} ${out.baseline ? 'assigned now: skipped as the baseline, new ones start' : `would start${out.total > 10 ? ' · 10 per check' : ''}`}${out.total > out.items.length ? ` · showing ${out.items.length}` : ''}</div>` + out.items.map(i => `<div class="ai"><b>AB#${+i.id}</b><span class="t">${esc(i.title)}</span><span class="m">${esc(i.type)} · ${esc(i.state)}</span></div>`).join('') : '<div class="none">${mine ? 'No open items are assigned to you.' : 'No open items carry that tag yet.'}</div>'}</div>` : ''}
       <div class="thint">Needs the Azure CLI signed in (<code>az login</code>) with <code>az extension add --name azure-devops</code>. Items you tag get picked up, started once each, and marked in Azure DevOps.</div>`;
   }
   if (k === 'pipeline') {
