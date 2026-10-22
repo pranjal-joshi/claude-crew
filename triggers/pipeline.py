@@ -14,8 +14,20 @@ from .base import Trigger, now, register
 # Azure Pipelines runs through the az CLI you are signed in with. A finished run of a named pipeline starts one task or
 # workflow run, once. "Only mine" keeps runs requested for you, or that carry a work item assigned to you: a release
 # build is requested for whoever merged, but its linked work items say whose work shipped.
-PIPE_RESULTS = {"succeeded": ("succeeded",), "partial": ("partiallySucceeded",), "failed": ("failed",),
+PIPE_RESULTS = {"succeeded": ("succeeded",), "partial": ("partiallySucceeded",), "failed": ("failed",), "canceled": ("canceled",),
                 "any": ("succeeded", "failed", "partiallySucceeded", "canceled")}
+
+
+def pipe_results(raw) -> list[str]:
+    """The run results a trigger fires on, any of them: a list of PIPE_RESULTS keys (one key, from older triggers, is fine).
+    Nothing chosen, or "any" among them, means every finished run."""
+    keys = [raw] if isinstance(raw, str) else list(raw) if isinstance(raw, (list, tuple)) else []
+    keys = [k for k in dict.fromkeys(keys) if k in PIPE_RESULTS]
+    return ["any"] if not keys or "any" in keys else keys
+
+
+def pipe_wants(sp: dict, result: str) -> bool:
+    return any(result in PIPE_RESULTS[k] for k in pipe_results(sp.get("result")))
 PIPE_MAX = 10  # runs started per check
 
 
@@ -38,7 +50,7 @@ def pipe_spec(sp: dict) -> tuple[str | None, dict]:
     except (TypeError, ValueError):
         return "numbers only for intervals", {}
     return None, {"pipelines": names, "org": org, "project": project, "every": every,
-                  "result": sp.get("result") if sp.get("result") in PIPE_RESULTS else "any", "mine": bool(sp.get("mine"))}
+                  "result": pipe_results(sp.get("result")), "mine": bool(sp.get("mine"))}
 
 
 def pipe_ids(sp: dict) -> dict[str, int]:
@@ -129,7 +141,7 @@ class Pipeline(Trigger):
                 err, sp = pipe_spec(p.get("spec") or {})
                 if err:
                     return {"error": err}
-                runs = [r for r in pipe_runs(sp, list(pipe_ids(sp).values()), 25) if r["result"] in PIPE_RESULTS[sp["result"]]]
+                runs = [r for r in pipe_runs(sp, list(pipe_ids(sp).values()), 25) if pipe_wants(sp, r["result"])]
                 runs = [r for r in runs if r["finished"] > now() - 7 * 86400][:10]
                 me = azure.az_me()
                 for r in runs:
@@ -191,7 +203,7 @@ class Pipeline(Trigger):
                 seen = set(tr.get("seen") or [])
             every = pipe_runs(sp, tr["_ids"])
             runs = [r for r in every if r["finished"] >= since - 120 and r["id"] not in seen
-                    and r["result"] in PIPE_RESULTS[sp["result"]]]
+                    and pipe_wants(sp, r["result"])]
             for r in runs:
                 r["twins"] = [o["id"] for o in every if r["number"] and o["id"] != r["id"] and (o["pipeline"], o["number"]) == (r["pipeline"], r["number"])]
             found = len(runs)

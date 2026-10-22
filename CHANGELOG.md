@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Pipeline triggers fire on several results:** pick any of succeeds, partially succeeds, fails, is canceled, or finishes; a run with any of them fires it. Triggers saved with one result keep working.
 - **Scheduled jobs on the board:** every trigger (cron, event, webhook, pipeline, Teams, ADO, poll, watch) shows at the top of the Backlog, tagged *scheduled* and its kind, soonest first, with its next time. Click one to edit it, ▶ to fire it now, or drag it to In progress to run it: it stays there while its check, workflow run or task is in progress, then goes back to the Backlog.
 - **Workflow runs grouped on the board:** each run is one frame in the column of its current step, with a stepper; its other steps show as one-line rows inside it, and ▾ collapses it. Tasks outside a workflow are unchanged.
 - **Screenshots in chat:** paste, drop or attach up to 4 images (PNG, JPEG, GIF, WebP, 5 MB each) with a message to the boss or an agent.

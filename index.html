@@ -2291,6 +2291,9 @@ function fmtWhen(ts) {
   const rel = s < 3600 ? `${Math.max(1, Math.round(s / 60))}m` : s < 86400 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`;
   return `${d.toLocaleDateString(undefined, {weekday: 'short'})} ${pad2(d.getHours())}:${pad2(d.getMinutes())} (in ${rel})`;
 }
+// Pipeline triggers fire on any of the chosen results; older triggers saved one as a string.
+const PIPE_RES = {succeeded: 'successful', partial: 'partially successful', failed: 'failed', canceled: 'canceled', any: 'finished'};
+const pipeRes = r => { const k = (Array.isArray(r) ? r : [r]).filter(x => x in PIPE_RES); return !k.length || k.includes('any') ? ['any'] : k; };
 function trigWhat(tr) {
   const sp = tr.spec;
   switch (tr.kind) {
@@ -2299,7 +2302,7 @@ function trigWhat(tr) {
     case 'watch': return `When ${sp.glob} changes · checks every ${sp.every}s`;
     case 'poll': return `Every ${sp.every} min: ${sp.command}  →  on ${({change: 'changed output', fail: 'failure', output: 'new output'})[sp.when]}`;
     case 'webhook': return `POST ${location.origin}/api/hook/${tr.id}`;
-    case 'pipeline': return `${({succeeded: 'Successful', partial: 'Partially successful', failed: 'Failed', any: 'Finished'})[sp.result]} runs of ${sp.pipelines.join(', ')}${sp.mine ? ' · only mine' : ''} · every ${sp.every} min`;
+    case 'pipeline': return `${cap(pipeRes(sp.result).map(k => PIPE_RES[k]).join(' or '))} runs of ${sp.pipelines.join(', ')}${sp.mine ? ' · only mine' : ''} · every ${sp.every} min`;
     case 'teams': return `${sp.mode === 'all' ? 'New messages' : '@mentions of you'} in ${sp.name || (sp.thread ? 'the linked conversation' : sp.where)}${sp.about ? ` about ${sp.about}` : ''} · every ${sp.every} min`;
     case 'ado': return `Items tagged “${sp.tag}”${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min · then ${({tag_picked: `add ${sp.tag}-picked`, remove_tag: 'remove the tag', none: 'leave tags'})[sp.after]}`;
   }
@@ -2311,7 +2314,7 @@ function hookBox(tr) {
 function openTriggers() { tv = {mode: 'list'}; drawTriggers(); $('#trigModal').classList.add('on'); }
 function blankTrig(kind = 'schedule') {
   return {name: '', kind, enabled: true, spec: {cron: '0 9 * * 1-5', on: 'done', tag: '', agent: '', glob: 'src/**/*', every: kind === 'poll' || kind === 'ado' ? 5 : 10, cooldown: 60, command: '', when: 'change',
-                  org: '', project: '', workflow: '', types: [], after: 'tag_picked', comment: true, where: '', mode: 'mention', about: '', pipelines: [], result: 'any', mine: true},
+                  org: '', project: '', workflow: '', types: [], after: 'tag_picked', comment: true, where: '', mode: 'mention', about: '', pipelines: [], result: ['any'], mine: true},
           task: {title: '', details: '', tag: '', agent: '', workflow: ''}};
 }
 function editTrig(tr) {
@@ -2410,7 +2413,7 @@ function drawTrigForm() {
         <datalist id="pipeNames">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>
       <div class="two" style="grid-template-columns:1fr 160px"><div><div class="label">Organization URL<span class="faint lc">from az devops configure, if set</span></div><input class="field mono" data-s="org" value="${esc(sp.org)}" placeholder="https://dev.azure.com/yourorg" spellcheck="false" autocomplete="off"></div>
       <div><div class="label">Project</div><input class="field" data-s="project" value="${esc(sp.project)}" spellcheck="false" autocomplete="off"></div></div>
-      <div class="two" style="grid-template-columns:1fr 120px"><div><div class="label">Fire when a run</div>${seg('s', 'result', [['succeeded', 'succeeds'], ['partial', 'partially succeeds'], ['failed', 'fails'], ['any', 'finishes']], sp.result)}</div>
+      <div class="two" style="grid-template-columns:1fr 120px"><div><div class="label">Fire when a run<span class="faint lc">pick any number: it fires on any of them</span></div><div class="seg">${[['succeeded', 'succeeds'], ['partial', 'partially succeeds'], ['failed', 'fails'], ['canceled', 'is canceled'], ['any', 'finishes (any)']].map(([v, l]) => `<button data-pres="${v}" aria-pressed="${pipeRes(sp.result).includes(v)}" class="${pipeRes(sp.result).includes(v) ? 'on' : ''}">${l}</button>`).join('')}</div></div>
       <div><div class="label">Check every (min)</div><input class="field" type="number" min="2" data-s="every" value="${sp.every}"></div></div>
       <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sc="mine" ${sp.mine ? 'checked' : ''} style="margin-top:2px"><span><b>Only runs for me</b>: requested for you, or carrying a work item assigned to you. A release build runs as whoever merged, so its linked work items tell whose work shipped.</span></label>
       <div><div class="label">Start</div><div class="seg"><button data-ado-target="agent" class="${useAgent ? 'on' : ''}">A single agent</button><button data-ado-target="workflow" class="${useAgent ? '' : 'on'}">A workflow run</button></div>
@@ -2537,6 +2540,11 @@ $('#trigModal').addEventListener('click', async e => {
   if (d.cron) { tv.f.spec.cron = d.cron; return drawTrigForm(); }
   if (d.target) { tv.f.task.workflow = d.target === 'workflow' ? (tv.f.task.workflow || S.workflows?.[0]?.id || '') : ''; return drawTrigForm(); }
   if (d.s) { tv.f.spec[d.s] = d.v; return drawTrigForm(); }
+  if (d.pres) {
+    const cur = pipeRes(tv.f.spec.result).filter(x => x !== 'any');
+    tv.f.spec.result = d.pres === 'any' ? ['any'] : pipeRes(cur.includes(d.pres) ? cur.filter(x => x !== d.pres) : [...cur, d.pres]);
+    return drawTrigForm();
+  }
   if (d.k) { tv.f.task[d.k] = d.v; return drawTrigForm(); }
 });
 $('#trigModal').addEventListener('input', e => {
