@@ -43,11 +43,13 @@ bypass-selection = true
 "server.py" = "claude_crew/server.py"
 "crew_mcp.py" = "claude_crew/crew_mcp.py"
 "triggers" = "claude_crew/triggers"
+"agents" = "claude_crew/agents"
+"workflows" = "claude_crew/workflows"
 "index.html" = "claude_crew/index.html"
 "demo/fake_claude.py" = "claude_crew/demo/fake_claude.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["/server.py", "/crew_mcp.py", "/index.html", "/triggers", "/demo", "/wheelfiles", "/tests",
+include = ["/server.py", "/crew_mcp.py", "/index.html", "/triggers", "/agents", "/workflows", "/demo", "/wheelfiles", "/tests",
            "/README.md", "/LICENSE", "/CHANGELOG.md"]
 
 [tool.ruff]

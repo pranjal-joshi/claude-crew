@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import agents
 from tests.helpers import TempCrewCase, server
 
 G = ["-c", "user.name=t", "-c", "user.email=t@localhost"]
@@ -84,9 +85,9 @@ class SyncedFiles(GitCrewCase):
         return (self.wt / out).read_text(encoding="utf-8").splitlines()
 
     def test_synced_paths_are_excluded_once(self):
-        copied = server.sync_claude_files(self.project, self.wt)
+        copied = agents.files.sync_claude_files(self.project, self.wt)
         self.assertEqual(sorted(copied), [".claude/settings.local.json", ".mcp.json"])
-        server.sync_claude_files(self.project, self.wt)  # idempotent, even when nothing is copied again
+        agents.files.sync_claude_files(self.project, self.wt)  # idempotent, even when nothing is copied again
         lines = self.exclude_lines()
         for want in ("/.claude/settings.local.json", "/.mcp.json"):
             self.assertEqual(lines.count(want), 1)
@@ -99,7 +100,7 @@ class SyncedFiles(GitCrewCase):
         return t
 
     def test_approve_does_not_commit_synced_files(self):
-        server.sync_claude_files(self.project, self.wt)
+        agents.files.sync_claude_files(self.project, self.wt)
         (self.wt / "feature.py").write_text("print(1)\n", encoding="utf-8")
         t = self.approve()
         self.assertTrue(t["commit"])
@@ -107,7 +108,7 @@ class SyncedFiles(GitCrewCase):
         self.assertEqual(files, ["feature.py"])
 
     def test_approve_unstages_synced_files_already_staged(self):
-        server.sync_claude_files(self.project, self.wt)
+        agents.files.sync_claude_files(self.project, self.wt)
         (self.wt / "feature.py").write_text("print(1)\n", encoding="utf-8")
         run(self.wt, "add", "-f", ".mcp.json")  # even if one slipped into the index
         self.approve()

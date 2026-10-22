@@ -341,7 +341,7 @@ Ideas and PRs welcome. Open an issue first for anything big.
 
 ## Contributing
 
-The app is `server.py` (Python standard library), `index.html` (vanilla JS) and the `triggers/` package, one module per trigger kind: [triggers/README.md](triggers/README.md) shows how to add one by dropping in a single file. `python server.py --demo` is the fastest loop; `demo/fake_claude.py` speaks the same stream-json protocol as Claude Code.
+The app is `server.py` (Python standard library), `index.html` (vanilla JS) and three packages with one module per piece: `triggers/` (trigger kinds), `agents/` (records, processes, presets) and `workflows/` (runs, definitions, templates). Each README shows how to add one by dropping in a single file: [triggers](triggers/README.md), [agents](agents/README.md), [workflows](workflows/README.md). `python server.py --demo` is the fastest loop; `demo/fake_claude.py` speaks the same stream-json protocol as Claude Code.
 
 Tests are standard-library `unittest` (`python -m unittest discover`), lint is `ruff check .`, and CI runs both on Linux, Windows and macOS.
 

@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import agents
 from tests.helpers import ROOT, TempCrewCase, server
 from tests.test_git import GitCrewCase
 
@@ -465,12 +466,12 @@ class Pidfile(TempCrewCase):
                 33: CLAUDE_CMD.replace(KEY, "other-ffffff"),       # a claude of another project
                 os.getpid(): CLAUDE_CMD}                           # never ourselves
         # 44 is not alive at all (absent from cmds)
-        self.assertEqual(server.orphans_to_kill(entries, cmds, KEY), [11])
-        self.assertEqual(server.orphans_to_kill(entries, cmds, ""), [11, 33])
-        self.assertTrue(server.is_agent_cmdline('node C:\\x\\claude-code\\cli.js -p --output-format stream-json', ""))
-        self.assertFalse(server.is_agent_cmdline("claude --version", ""))
-        self.assertFalse(server.is_agent_cmdline("python -m http.server stream-json", ""))
-        self.assertFalse(server.is_agent_cmdline("", KEY))
+        self.assertEqual(agents.procs.orphans_to_kill(entries, cmds, KEY), [11])
+        self.assertEqual(agents.procs.orphans_to_kill(entries, cmds, ""), [11, 33])
+        self.assertTrue(agents.procs.is_agent_cmdline('node C:\\x\\claude-code\\cli.js -p --output-format stream-json', ""))
+        self.assertFalse(agents.procs.is_agent_cmdline("claude --version", ""))
+        self.assertFalse(agents.procs.is_agent_cmdline("python -m http.server stream-json", ""))
+        self.assertFalse(agents.procs.is_agent_cmdline("", KEY))
 
     def test_reap_only_signals_matching_pids(self):
         self.crew.pid_file.parent.mkdir(parents=True, exist_ok=True)
@@ -478,8 +479,8 @@ class Pidfile(TempCrewCase):
             {"pid": 11, "agent": "builder"}, {"pid": 22, "agent": "tester"}, {"pid": 33, "agent": "ops"}]}), encoding="utf-8")
         cmds = {11: CLAUDE_CMD.replace(KEY, self.crew.key), 22: "C:\\Windows\\notepad.exe"}
         killed = []
-        with mock.patch.object(server, "proc_cmdlines", side_effect=lambda pids: {p: c for p, c in cmds.items() if p in pids}), \
-                mock.patch.object(server, "terminate_tree", side_effect=lambda pid, *a, **k: killed.append(pid)):
+        with mock.patch.object(agents.procs, "proc_cmdlines", side_effect=lambda pids: {p: c for p, c in cmds.items() if p in pids}), \
+                mock.patch.object(agents.procs, "terminate_tree", side_effect=lambda pid, *a, **k: killed.append(pid)):
             self.assertEqual(self.crew.reap_orphans(), 1)
         self.assertEqual(killed, [11])  # not the unrelated 22, not the dead 33
         self.assertFalse(self.crew.pid_file.exists())
@@ -489,8 +490,8 @@ class Pidfile(TempCrewCase):
         self.crew.pid_file.parent.mkdir(parents=True, exist_ok=True)
         self.crew.pid_file.write_text(json.dumps({"owner": 7, "procs": [{"pid": 11, "agent": "builder"}]}), encoding="utf-8")
         cmds = {7: "python C:\\code\\claude-crew\\server.py --project x", 11: CLAUDE_CMD.replace(KEY, self.crew.key)}
-        with mock.patch.object(server, "proc_cmdlines", side_effect=lambda pids: {p: c for p, c in cmds.items() if p in pids}), \
-                mock.patch.object(server, "terminate_tree") as term:
+        with mock.patch.object(agents.procs, "proc_cmdlines", side_effect=lambda pids: {p: c for p, c in cmds.items() if p in pids}), \
+                mock.patch.object(agents.procs, "terminate_tree") as term:
             self.assertEqual(self.crew.reap_orphans(), 0)
         term.assert_not_called()
 
@@ -529,7 +530,7 @@ class OwnProcesses(unittest.TestCase):
     def test_proc_cmdlines_reads_a_live_process_and_skips_dead_pids(self):
         p = self.spawn()
         for _ in range(40):  # the child may still be starting (exec) on a slow runner
-            got = server.proc_cmdlines([p.pid, 999999])
+            got = agents.procs.proc_cmdlines([p.pid, 999999])
             if "crew-test-sleeper" in got.get(p.pid, ""):
                 break
             time.sleep(0.1)
@@ -539,7 +540,7 @@ class OwnProcesses(unittest.TestCase):
     def test_terminate_tree_ends_the_process_and_reports_success(self):
         p = self.spawn()
         t0 = time.time()
-        self.assertIsNone(server.terminate_tree(p.pid, p))
+        self.assertIsNone(agents.procs.terminate_tree(p.pid, p))
         self.assertIsNotNone(p.poll())
         self.assertLess(time.time() - t0, 10)
 
@@ -549,7 +550,7 @@ class OwnProcesses(unittest.TestCase):
                              stdout=subprocess.PIPE, text=True, start_new_session=True)
         self.addCleanup(reap, p)
         p.stdout.readline()
-        self.assertIsNone(server.terminate_tree(p.pid, p, grace=0.5))
+        self.assertIsNone(agents.procs.terminate_tree(p.pid, p, grace=0.5))
         self.assertIsNotNone(p.poll())
 
     @unittest.skipUnless(server.IS_WIN, "Windows: taskkill's exit code is checked")
@@ -557,7 +558,7 @@ class OwnProcesses(unittest.TestCase):
         p = self.spawn()
         failed = subprocess.CompletedProcess(["taskkill"], 1, "", "ERROR: Access is denied.")
         with mock.patch.object(server.subprocess, "run", return_value=failed):
-            err = server.terminate_tree(p.pid, p)
+            err = agents.procs.terminate_tree(p.pid, p)
         self.assertIn("taskkill exited 1", err)
         self.assertIn("Access is denied", err)
 
@@ -569,13 +570,13 @@ class HungStdin(TempCrewCase):
         self.addCleanup(reap, p)
         a = self.crew.agents["builder"]
         self.crew.procs["builder"] = p  # the process never reads, so a big write fills the pipe and blocks
-        self.crew.writers["builder"] = server.StdinWriter(p)
+        self.crew.writers["builder"] = agents.procs.StdinWriter(p)
         t0 = time.time()
         self.assertTrue(self.crew._send(a, "x" * 4_000_000))
         self.assertTrue(self.crew._send(a, "second"))
         self.assertLess(time.time() - t0, 2)  # queued on the writer thread: the caller never waited on the pipe
         wait_for(lambda: self.crew.writers["builder"].stuck(0.3), "the writer to be stuck on the full pipe", 10)
-        with mock.patch.object(server, "STDIN_LIMIT", 0.3):
+        with mock.patch.object(agents.procs, "STDIN_LIMIT", 0.3):
             self.assertFalse(self.crew._send(a, "third"))
         self.assertIn("has not read its input", a["error"])
         self.assertNotIn("builder", self.crew.procs)
@@ -590,10 +591,10 @@ class HungStdin(TempCrewCase):
         self.crew.tasks.append(t)
         a.update(status="running", task=1)
         self.crew.procs["builder"] = p
-        self.crew.writers["builder"] = server.StdinWriter(p)
+        self.crew.writers["builder"] = agents.procs.StdinWriter(p)
         self.crew._send(a, "y" * 4_000_000)
         wait_for(lambda: self.crew.writers["builder"].stuck(0.3), "the writer to be stuck", 10)
-        with mock.patch.object(server, "STDIN_LIMIT", 0.3):
+        with mock.patch.object(agents.procs, "STDIN_LIMIT", 0.3):
             self.crew.dispatch()
         self.assertEqual((a["status"], t["col"]), ("error", "backlog"))
         wait_for(lambda: p.poll() is not None, "the hung process to be ended", 15)

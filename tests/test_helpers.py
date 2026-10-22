@@ -1,6 +1,8 @@
 import time
 import unittest
 
+import agents
+import workflows
 from tests.helpers import server
 from triggers import schedule
 
@@ -10,13 +12,13 @@ class PureHelpers(unittest.TestCase):
         self.assertRegex(server.__version__, r"^\d+\.\d+\.\d+")
 
     def test_clean_tags(self):
-        self.assertEqual(server.clean_tags("Plan, triage  PLAN"), ["plan", "triage"])
-        self.assertEqual(server.clean_tags(["A_b!", "", "x" * 40]), ["ab", "x" * 20])
-        self.assertEqual(server.clean_tags(None), [])
-        self.assertEqual(len(server.clean_tags([f"t{i}" for i in range(20)])), 8)
+        self.assertEqual(agents.record.clean_tags("Plan, triage  PLAN"), ["plan", "triage"])
+        self.assertEqual(agents.record.clean_tags(["A_b!", "", "x" * 40]), ["ab", "x" * 20])
+        self.assertEqual(agents.record.clean_tags(None), [])
+        self.assertEqual(len(agents.record.clean_tags([f"t{i}" for i in range(20)])), 8)
 
     def test_fill(self):
-        self.assertEqual(server.fill("Build: {input} {nope}", {"input": "x"}), "Build: x {nope}")
+        self.assertEqual(workflows.fill("Build: {input} {nope}", {"input": "x"}), "Build: x {nope}")
 
     def test_cron_validation(self):
         self.assertIsNone(schedule.cron_error("*/15 9-17 * * 1-5"))
