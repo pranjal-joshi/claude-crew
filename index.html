@@ -390,6 +390,26 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .lc{text-transform:none;letter-spacing:0;font-weight:400;margin-left:6px}
 .srcl{display:flex;align-items:center;gap:5px;font:10.5px var(--mono);color:var(--amber);margin-bottom:5px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .modal .mf{padding:12px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+.alerts{margin:0 18px 4px;border:1px solid color-mix(in srgb,var(--red) 35%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--red) 5%,var(--surface));overflow:hidden}
+.alerts.warn{border-color:color-mix(in srgb,var(--amber) 40%,var(--line));background:color-mix(in srgb,var(--amber) 5%,var(--surface))}
+.alerts.calm{border-color:var(--line);background:var(--surface)}
+.alerts .ah{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;user-select:none}
+.alerts .ah .faint{font-weight:400}.alerts .ah .chev{margin-left:auto;color:var(--faint)}
+.alrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:8px 12px;border-top:1px solid var(--line)}
+.alrow.ack{opacity:.68}.alrow .sev{font:600 10.5px var(--sans);text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:6px;margin-top:2px}
+.sev.critical{background:var(--red-soft);color:var(--red)}.sev.warning{background:var(--amber-soft);color:var(--amber)}.sev.info{background:var(--blue-soft);color:var(--blue)}
+.alrow .t{font-weight:600;font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alrow.open .t{white-space:normal}.alrow .m{font-size:11.5px;color:var(--faint);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.alrow .d{margin-top:6px;font:12px/1.5 var(--mono);color:var(--muted);white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.alrow .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.alerts .more{padding:6px 12px;border-top:1px solid var(--line);font-size:12px}
+@media (max-width:760px){.alerts{margin:0 12px 4px}.alrow{grid-template-columns:minmax(0,1fr)}.alrow .sev{justify-self:start}.alrow .acts{justify-content:flex-start}}
+.cc .step{display:flex;flex-direction:column;gap:6px}.cc .step .label{display:flex;align-items:center;gap:8px}
+.cc pre{margin:0;font:12px/1.5 var(--mono);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;white-space:pre-wrap;word-break:break-all;color:var(--text)}
+.cc pre.brief{max-height:min(38vh,340px);overflow:auto;word-break:break-word}
+.cc .warnbox{font-size:12.5px;border:1px solid color-mix(in srgb,var(--amber) 40%,var(--line));background:var(--amber-soft);border-radius:9px;padding:8px 10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.card.sending{opacity:.72;pointer-events:none}.card .sendl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--accent);margin-top:8px}
+.spinner.sm{width:13px;height:13px;border-width:2px}
 .iolist{display:flex;flex-direction:column;gap:4px;max-height:min(52vh,460px);overflow:auto;margin:0 -4px;padding:0 4px}
 .iorow{display:grid;grid-template-columns:18px 30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--bg2);cursor:pointer}
 .iorow:hover{background:var(--hover)}.iorow.off{opacity:.55}.iorow .av{width:28px;height:28px;font-size:12px}
@@ -794,6 +814,7 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
         <span class="muted boardhint">Drag a card onto an agent to assign · unassigned cards go to matching roles</span>
         <button class="btn sm ghost clearbtn" id="clearBtn" aria-haspopup="menu" title="Remove finished or all tasks from the board">Clear board ▾</button>
       </div>
+      <div class="alerts" id="alerts" hidden role="region" aria-label="Alerts"></div>
       <div class="colnav" id="colnav"></div>
       <div class="board" id="board"></div>
       <div class="flows" id="flows" hidden></div>
@@ -895,6 +916,13 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
     <div class="mf" id="ioFoot"></div>
   </div>
   <input type="file" id="ioFile" accept=".json,application/json" hidden>
+</div>
+
+<div class="scrim" id="ccModal">
+  <div class="modal tm cc" role="dialog" aria-labelledby="ccTitle">
+    <div class="mh"><span id="ccTitle">Continue in Claude Code</span><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
+    <div class="mb" id="ccBody"></div>
+  </div>
 </div>
 
 <div class="scrim" id="lanModal">
@@ -1003,6 +1031,7 @@ const blockedAll = () => S.agents.flatMap(a => (a.denials || []).map(d => ({...d
 function render() {
   if (!S) return;
   queueMicrotask(renderChat);
+  renderAlerts();
   $('#projName').textContent = S.project_name || S.project; if (!LAN_CLIENT) $('#projBtn').title = S.project + ' · switch project';
   $('#projGit').textContent = S.git ? 'git' : 'no git';
   const demoB = $('#demoB'); demoB.hidden = !(S.demo || S.scratch);
@@ -1099,6 +1128,52 @@ function subChips(a) {
     `<span class="subchip"><span class="sd"></span>${SUBI}<span class="sl">${esc(x.type ? `${x.type} · ${x.label}` : x.label)}</span></span>`).join('')}</div>`;
 }
 
+// ---- alerts: raised by agents (crew tool raise_alert) or by Crew; stay on the board until resolved ----------
+const SEV_RANK = {critical: 0, warning: 1, info: 2};
+let alertSig = '';
+function renderAlerts() {
+  const box = $('#alerts'), live = (S.alerts || []).filter(x => x.status !== 'resolved');
+  if (!live.length) { box.hidden = true; alertSig = ''; return; }
+  const sig = JSON.stringify([live, view.alertsMin, view.alertsAll, view.alertOpen]);
+  if (sig === alertSig || box.contains(document.activeElement) && document.activeElement.tagName !== 'BUTTON') return;
+  alertSig = sig;
+  live.sort((a, b) => (a.status === 'ack') - (b.status === 'ack') || SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.last - a.last);
+  const open = live.filter(x => x.status === 'open'), worst = open[0]?.severity;
+  box.hidden = false;
+  box.className = 'alerts' + (worst === 'critical' ? '' : worst === 'warning' ? ' warn' : ' calm');
+  const head = `<div class="ah" data-al-min role="button" tabindex="0" aria-expanded="${!view.alertsMin}"><span>${worst === 'critical' ? '🔴' : worst ? '⚠' : '✓'}</span>Alerts
+    <span class="faint">${open.length ? `${open.length} open` : 'none open'}${live.length > open.length ? ` · ${live.length - open.length} acknowledged` : ''}</span><span class="chev">${view.alertsMin ? '▸' : '▾'}</span></div>`;
+  if (view.alertsMin) { box.innerHTML = head; return; }
+  const rows = view.alertsAll ? live : live.slice(0, 3);
+  box.innerHTML = head + rows.map(x => {
+    const exp = view.alertOpen === x.id, who = x.agent ? `<span class="who">${esc(x.agent)}</span>` : 'Crew';
+    return `<div class="alrow ${x.status} ${exp ? 'open' : ''}"><span class="sev ${x.severity}">${x.severity}</span>
+      <div style="min-width:0"><div class="t" data-al-open="${x.id}" title="${esc(x.title)}">${esc(x.title)}</div>
+        <div class="m">${who} · ${agoText(x.last)}${x.count > 1 ? ` · seen ${x.count}×` : ''}${x.status === 'ack' ? ' · acknowledged' : ''}${x.task ? ` · <a href="#" data-al-card="${x.task}">task #${x.task}</a>` : ''}${x.link ? ` · <a href="${esc(/^https?:\/\//i.test(x.link) ? x.link : '#')}" target="_blank" rel="noopener">link ↗</a>` : ''}</div>
+        ${exp ? `<div class="d">${esc(x.details || 'No details.')}</div>` : ''}</div>
+      <div class="acts">${x.task ? '' : `<button class="btn sm" data-al-task="${x.id}" title="Put this on the board as an incident task">Make task</button>`}${x.status === 'open' ? `<button class="btn sm ghost" data-al-ack="${x.id}" title="Seen it: keep it listed, dimmed">Ack</button>` : ''}<button class="btn sm ghost" data-al-resolve="${x.id}" title="Fixed: remove it from the board">Resolve</button></div></div>`;
+  }).join('') + (live.length > 3 ? `<div class="more"><button class="lk" data-al-all style="border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font:inherit">${view.alertsAll ? 'Show fewer' : `Show all ${live.length}`}</button></div>` : '');
+}
+function agoText(t) {
+  const s = Math.max(0, Date.now() / 1000 - t);
+  return s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`;
+}
+try { view.alertsMin = localStorage.getItem('crew.alertsMin') === '1'; } catch {}
+$('#alerts').addEventListener('click', async e => {
+  const b = e.target.closest('[data-al-min],[data-al-open],[data-al-all],[data-al-task],[data-al-ack],[data-al-resolve],[data-al-card]');
+  if (!b) return;
+  const d = b.dataset;
+  if ('alMin' in d) { view.alertsMin = !view.alertsMin; try { localStorage.setItem('crew.alertsMin', view.alertsMin ? '1' : ''); } catch {} }
+  else if (d.alOpen) view.alertOpen = view.alertOpen === +d.alOpen ? null : +d.alOpen;
+  else if ('alAll' in d) view.alertsAll = !view.alertsAll;
+  else if (d.alTask) { const r = await act('alert_task', {id: +d.alTask}); if (r.ok) toast(`Alert is now task #${r.task} in Backlog`, 'var(--accent)'); }
+  else if (d.alAck) act('alert_ack', {id: +d.alAck});
+  else if (d.alResolve) act('alert_resolve', {id: +d.alResolve});
+  else if (d.alCard) { e.preventDefault(); const t = task(+d.alCard); if (t?.who) { view.drawer = {agent: t.who}; } else toast(`#${d.alCard} is in ${t ? t.col : 'no column'}`, 'var(--faint)'); }
+  alertSig = ''; renderAlerts(); render();
+});
+$('#alerts').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-al-min]')) e.target.click(); });
+
 function renderBoard() {
   renderColnav();
   const flows = view.tab === 'flows';
@@ -1191,7 +1266,9 @@ function card(t) {
   const subs = liveSubs ? `<span class="subtag live" title="${liveSubs} subagent${liveSubs > 1 ? 's' : ''} running">${SUBI}${liveSubs}</span>`
     : t.subagents ? `<span class="subtag" title="used ${t.subagents} subagent${t.subagents > 1 ? 's' : ''}">${SUBI}${t.subagents}</span>` : '';
   const hand = t.history?.length ? `<span class="handoff" title="Handed off ${t.history.length}x. Last hand-off went to ${esc(t.history[t.history.length - 1].who || 'another agent')}">${FWD}<span class="et">${esc(t.history[t.history.length - 1].who || '')}</span></span>` : '';
-  return `<div class="card ${t.col}" draggable="true" tabindex="0" data-card="${t.id}" aria-label="#${t.id} ${esc(t.title)}, ${t.col}">
+  const sending = view.sending?.[t.id];
+  if (sending) cta = `<div class="sendl" role="status"><span class="spinner sm" aria-hidden="true"></span>${esc(sending)}</div>`;
+  return `<div class="card ${t.col}${sending ? ' sending' : ''}" draggable="true" tabindex="0" data-card="${t.id}" aria-label="#${t.id} ${esc(t.title)}, ${t.col}">
     ${t.source ? `<div class="srcl" title="Created by trigger: ${esc(t.source.name)}">${BOLT}${esc(t.source.name)}</div>` : ''}
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Hand off: forward this task to another agent as a to-do, with this task's summary as context" aria-label="Hand off task #${t.id} to another agent" aria-haspopup="menu">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete" aria-label="More actions for task #${t.id}" aria-haspopup="menu">⋮</button></span></div>
@@ -1535,7 +1612,7 @@ function renderReviewDrawer(d, t) {
   $('#fb')?.addEventListener('input', autosize);
 }
 
-const FEED_COLOR = {handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)',blocked:'var(--amber)',budget:'var(--red)'};
+const FEED_COLOR = {alert:'var(--red)',handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)',blocked:'var(--amber)',budget:'var(--red)'};
 function renderFeed() {
   const f = S.feed;
   const last = f.length ? f[f.length - 1].t : 0;
@@ -1692,6 +1769,7 @@ function openTaskMenu(id, anchor) {
   }
   h += item('Backlog · anyone with a matching role', () => moveTo(id, 'backlog'), {disabled: t.col === 'backlog' && !t.who});
   h += item('Mark done', () => moveTo(id, 'done'), {disabled: t.col === 'done'});
+  h += item('Continue in Claude Code…', () => openCC({task: id}), {sub: 'resume it in your terminal, or copy a brief'});
   h += item('Delete', () => askConfirm('Delete task', `Delete <b>#${t.id} ${esc(t.title)}</b>?${t.col === 'doing' ? ' Its agent will be stopped first.' : ''}`, 'Delete',
     async () => { if (task(id)?.col === 'doing') await act('move', {task: id, col: 'backlog'}); act('delete', {task: id}); }, true), {cls: 'danger'});
   showMenu(anchor, h);
@@ -1705,6 +1783,7 @@ function openAgentMenu(n, anchor) {
   h += item('Rename…', () => renameAgent(n), {disabled: a.status === 'running', sub: a.status === 'running' ? 'stop it first' : ''});
   h += item('Icon, color, role and model…', () => open(true));
   h += item('Message…', () => { view.chatTo = n; view.chatOpen = true; render(); $('#chatIn').focus(); });
+  h += item('Continue in Claude Code…', () => openCC({agent: n}), {sub: 'resume its session in your terminal'});
   h += '<div class="sep"></div>';
   if (a.status === 'running') h += item('■ Stop', () => act('stop', {agent: n}));
   if (a.status === 'paused') h += item('▶ Resume', () => act('resume', {agent: n}));
@@ -1754,9 +1833,15 @@ function setMode(m) {
       'Enable bypass', () => act('mode', {mode: m}), true);
   return act('mode', {mode: m});
 }
+// Assigning can take a few seconds (stopping the old owner's Claude process, starting the new one): show it on the card at once.
+async function pending(id, label, fn) {
+  view.sending = view.sending || {}; view.sending[id] = label; renderBoard();
+  try { return await fn(); } finally { delete view.sending[id]; renderBoard(); }
+}
 function handTo(id, name) {
   const t = task(id); if (!t) return;
-  const go = () => act('assign', {task: id, agent: name}).then(r => {
+  const a = agent(name), starts = a && (a.status === 'idle' || a.status === 'paused');
+  const go = () => pending(id, starts ? `Sending to ${name} · starting its Claude session…` : `Queuing for ${name}…`, () => act('assign', {task: id, agent: name})).then(r => {
     if (r.ok && (t.col === 'done' || t.col === 'review') && t.summary) toast(`#${t.id} → ${name}, with the earlier summary as context`, 'var(--accent)');
   });
   if (t.col === 'doing' && t.who && t.who !== name)
@@ -1765,7 +1850,7 @@ function handTo(id, name) {
 }
 function moveTo(id, col) {
   const t = task(id); if (!t) return;
-  const go = () => act('move', {task: id, col});
+  const go = () => pending(id, t.col === 'doing' ? `Stopping ${t.who || 'the agent'} and moving…` : 'Moving…', () => act('move', {task: id, col}));
   if (t.col === 'doing')
     return askConfirm(col === 'done' ? 'Stop and mark done?' : 'Stop and return to backlog?', `<b>${esc(t.who)}</b> is working on <b>#${t.id}</b> and will be stopped. Its session is kept.`, 'Stop agent', go);
   return go();
@@ -2394,7 +2479,7 @@ function agentSpec(a) {  // keep only known keys with safe values: a shared file
   const o = {};
   for (const k of AGENT_KEYS) if (a[k] != null && a[k] !== '' && !(Array.isArray(a[k]) && !a[k].length)) o[k] = a[k];
   o.name = String(o.name || '').trim();
-  if (o.role) o.role = String(o.role).slice(0, 500);
+  if (o.role) o.role = String(o.role).slice(0, 4000);
   o.tags = (Array.isArray(o.tags) ? o.tags : String(o.tags || '').split(',')).map(t => String(t).trim()).filter(Boolean);
   if (!o.tags.length) delete o.tags;
   if (o.icon && !AGENT_ICONS[o.icon]) delete o.icon;
@@ -2492,6 +2577,72 @@ for (const ev of ['dragenter', 'dragover']) $('#ioModal').addEventListener(ev, e
 });
 $('#ioModal').addEventListener('dragleave', e => { if (e.target.id === 'ioDrop') e.target.classList.remove('over'); });
 $('#ioModal').addEventListener('drop', e => { if (io.mode !== 'import') return; e.preventDefault(); ioLoad(e.dataTransfer.files[0]); });
+
+// ---- continue in Claude Code: for work Crew can't finish on its own (logins, MFA, GUIs, local devices, prod approvals) ----
+// Every agent session is a normal Claude Code session, so `claude --resume <id>` in the agent's folder picks it up with
+// its whole context. The brief is the fallback: a self-contained prompt for a fresh session anywhere.
+let ccFor = null;
+function openCC(target) { ccFor = target; drawCC(); $('#ccModal').classList.add('on'); }
+const shq = p => /[\s'"&;$`]/.test(p) ? `"${p.replace(/"/g, '\\"')}"` : p;
+function ccBrief(t, a) {
+  const texts = (a?.log || []).filter(m => m.kind === 'text').slice(-3).map(m => m.text.trim()).filter(Boolean);
+  const L = [];
+  L.push(`# Continue: ${t ? `#${t.id} ${t.title}` : `${a.name}'s work`}`, '');
+  L.push('I am taking this over from my Crew agent team because it needs me at my own machine. Pick it up from here.', '');
+  if (t?.details) L.push('## The task', t.details, '');
+  L.push('## Where', `- Project: ${S.project}`);
+  if (a?.cwd && a.cwd !== S.project) L.push(`- Agent worktree: ${a.cwd}`);
+  if (a?.branch) L.push(`- Branch: ${a.branch} (work so far is here; commits not merged yet unless said below)`);
+  if (t?.commit) L.push(`- Approved commit: ${t.commit}`);
+  if (t?.pr) L.push(`- PR: ${t.pr}`);
+  if (t?.ado) L.push(`- Azure DevOps: AB#${t.ado}`);
+  L.push('');
+  if (t?.summary) L.push(`## What ${t.who || 'the agent'} reported`, t.summary.trim(), '');
+  if (texts.length) L.push(`## Last messages from ${a.name}`, ...texts.map(x => '> ' + x.replace(/\n/g, '\n> ')), '');
+  if (a?.error) L.push('## Last error', a.error, '');
+  L.push('## What I need from you', '- Read the state above and the branch, then tell me in one paragraph where things stand.',
+    '- Do the steps that need this machine (sign-ins, MFA, browser, local tools, approvals) with me, then finish the task.',
+    '- When done, summarise what changed so I can mark the card done in Crew.');
+  return L.join('\n');
+}
+function drawCC() {
+  const t = ccFor.task ? task(ccFor.task) : null;
+  const who = ccFor.agent || t?.who || t?.history?.at(-1)?.who || t?.handoff?.from;
+  const a = who ? agent(who) : null;
+  $('#ccTitle').textContent = t ? `Continue #${t.id} in Claude Code` : `Continue ${who} in Claude Code`;
+  const brief = ccBrief(t, a);
+  const busy = a?.status === 'running', live = a?.alive;
+  const cmd = a?.session ? `cd ${shq(a.cwd || S.project)}; claude --resume ${a.session}` : '';
+  $('#ccBody').innerHTML = `
+    <div class="step"><div class="label"><b>1. Resume ${esc(who || 'the agent')}'s session</b><span class="faint lc">same context, same folder</span></div>
+      ${cmd ? `${busy || live ? `<div class="warnbox">${busy ? `${esc(who)} is working right now.` : `${esc(who)}'s Claude process is still open in Crew.`} Stop it first, so Crew and your terminal don't both write to the session.
+          <button class="btn sm" data-cc-stop="${esc(who)}">${busy ? 'Stop and close it' : 'Close it'}</button></div>` : ''}
+        <pre id="ccCmd">${esc(cmd)}</pre><div><button class="btn sm" data-cc-copy="cmd">Copy command</button>
+        <span class="faint" style="font-size:12px;margin-left:8px">Works in PowerShell and bash. Back in Crew, ${esc(who)} continues from wherever you left the session.</span></div>`
+      : `<div class="faint" style="font-size:12.5px">${who ? `${esc(who)} has no session yet.` : 'No agent has worked on this yet.'} Use the brief below in a new session.</div>`}</div>
+    <div class="step"><div class="label"><b>2. Or start fresh with a brief</b><span class="faint lc">paste into any Claude Code session</span></div>
+      <pre class="brief" id="ccBrief">${esc(brief)}</pre>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-cc-copy="brief">Copy brief</button><button class="btn sm ghost" data-cc-save>Download .md</button>
+      ${a ? '' : ''}<span class="faint" style="font-size:12px;align-self:center">Tip: the <b>Handoff</b> agent writes a fuller brief into the repo for you.</span></div></div>`;
+  ccBrief.last = brief; ccBrief.cmd = cmd; ccBrief.name = t ? `crew-handoff-${t.id}.md` : `crew-handoff-${who}.md`;
+}
+$('#ccModal').addEventListener('click', async e => {
+  const b = e.target.closest('[data-cc-copy],[data-cc-save],[data-cc-stop]'); if (!b) return;
+  const d = b.dataset;
+  if (d.ccCopy) {
+    try { await navigator.clipboard.writeText(d.ccCopy === 'cmd' ? ccBrief.cmd : ccBrief.last); toast(d.ccCopy === 'cmd' ? 'Command copied: paste it in a terminal' : 'Brief copied', 'var(--green)'); }
+    catch { toast('Copy failed: select the text instead', 'var(--red)'); }
+  } else if ('ccSave' in d) {
+    const url = URL.createObjectURL(new Blob([ccBrief.last + '\n'], {type: 'text/markdown'}));
+    const link = Object.assign(document.createElement('a'), {href: url, download: ccBrief.name});
+    document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } else if (d.ccStop) {
+    const a = agent(d.ccStop);
+    if (a?.status === 'running') await act('stop', {agent: d.ccStop});
+    const r = await act('release', {agent: d.ccStop});
+    if (r.ok) { toast(`${d.ccStop}'s process is closed; the session is yours`, 'var(--green)'); setTimeout(drawCC, 400); }
+  }
+});
 
 const REPO = 'https://github.com/pranjal-joshi/claude-crew';
 $('#hMenu').onclick = e => {

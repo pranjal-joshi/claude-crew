@@ -157,3 +157,54 @@ class ImportAgents(TempCrewCase):
 
     def test_import_is_ui_only(self):
         self.assertNotIn("import_agents", server.MCP_ACTIONS)
+
+
+class Alerts(TempCrewCase):
+    def test_raise_dedupes_and_escalates(self):
+        a = next(iter(self.crew.agents))
+        r = self.crew.act("alert", {"from": a, "title": "Deploy failed on nonprod", "severity": "warning", "details": "pod crashloop"}, via="mcp")
+        self.assertTrue(r["ok"])
+        r2 = self.crew.act("alert", {"from": a, "title": "deploy  failed on NONPROD", "severity": "critical"}, via="mcp")
+        self.assertEqual((r2["id"], r2["count"]), (r["id"], 2))  # same problem: one alert, counted, now critical
+        live = [x for x in self.crew.snapshot()["alerts"] if x["status"] != "resolved"]
+        self.assertEqual(len(live), 1)
+        self.assertEqual(live[0]["severity"], "critical")
+        self.assertIn("alert", [e["kind"] for e in self.crew.feed])
+
+    def test_validation(self):
+        self.assertIn("error", self.crew.act("alert", {"title": " "}))
+        self.assertIn("error", self.crew.act("alert", {"title": "x", "severity": "panic"}))
+
+    def test_ack_task_resolve(self):
+        al = self.crew.act("alert", {"title": "Pipeline red on master", "severity": "warning", "link": "https://ci.example/1"})
+        self.crew.act("alert_ack", {"id": al["id"]})
+        self.assertEqual(self.crew.alerts[-1]["status"], "ack")
+        r = self.crew.act("alert_task", {"id": al["id"]})
+        t = next(t for t in self.crew.tasks if t["id"] == r["task"])
+        self.assertEqual((t["col"], t["alert"]), ("backlog", al["id"]))
+        self.assertIn("https://ci.example/1", t["details"])
+        self.assertIn("error", self.crew.act("alert_task", {"id": al["id"]}))  # only once
+        self.crew.act("alert_resolve", {"id": al["id"]})
+        self.assertEqual(self.crew.alerts[-1]["status"], "resolved")
+
+    def test_agents_resolve_only_their_own(self):
+        a, b = list(self.crew.agents)[:2]
+        al = self.crew.act("alert", {"from": a, "title": "Rollout stuck", "severity": "warning"}, via="mcp")
+        self.assertIn("error", self.crew.act("alert_resolve", {"from": b, "id": al["id"]}, via="mcp"))
+        self.assertTrue(self.crew.act("alert_resolve", {"from": a, "title": "rollout stuck"}, via="mcp")["ok"])
+
+    def test_failing_trigger_alerts_and_recovers(self):
+        self.crew.raise_alert("Trigger x check failed", "warning", "az: login expired", key="trigger:t1")
+        self.assertTrue(self.crew.resolve_alert("trigger:t1"))
+        self.assertFalse(self.crew.resolve_alert("trigger:t1"))
+
+    def test_alert_actions_allowed_for_agents(self):
+        self.assertTrue({"alert", "alert_resolve"} <= server.MCP_ACTIONS)
+        self.assertFalse({"alert_task", "alert_ack", "release"} & server.MCP_ACTIONS)
+
+    def test_release_refuses_running_agent(self):
+        a = next(iter(self.crew.agents.values()))
+        a["status"] = "running"
+        self.assertIn("error", self.crew.act("release", {"agent": a["name"]}))
+        a["status"] = "idle"
+        self.assertTrue(self.crew.act("release", {"agent": a["name"]})["ok"])

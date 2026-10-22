@@ -33,6 +33,16 @@ TOOLS = [
          "whose tags match `tag` pick it up. Use once, when your finished work clearly needs another specialist next "
          "(tests, review, docs, deploy check). Include what you did and where (branch/commit) in `details`.",
          {"to": S, "title": S, "details": S, "tag": S}, ["to", "title"]),
+    tool("raise_alert", "Raise an alert on the Crew board for something failing that a person must see now: a failed "
+         "deployment or rollout, a red pipeline on the main branch, an outage or error spike, a security problem, a blocked "
+         "dependency or expired access. severity: critical (users affected or prod down), warning (needs attention soon) or "
+         "info. Put the evidence in `details` (what failed, where, since when, the query or log line) and a URL in `link` if "
+         "there is one. Raising the same title again updates the open alert (count, details) instead of adding a copy. "
+         "Not for your own task's normal progress or test failures you are fixing.",
+         {"title": S, "severity": {"type": "string", "enum": ["critical", "warning", "info"]}, "details": S, "link": S},
+         ["title", "severity"]),
+    tool("resolve_alert", "Resolve an alert you raised, by the same title, once the problem has recovered. Say how in `note`.",
+         {"title": S, "note": S}, ["title"]),
     tool("create_task", "Add a task to the board. Leave `agent` empty to let tags route it.",
          {"title": S, "details": S, "tag": S, "agent": S}, ["title"], boss=True),
     tool("assign_task", "Give an existing task (any column) to an agent as a to-do.", {"task": I, "agent": S}, ["task", "agent"], boss=True),
@@ -88,6 +98,10 @@ def status() -> str:
     lines.append("Triggers:")
     for tr in d.get("triggers", []):
         lines.append(f"- {tr['id']} {tr['name']} ({tr['kind']}, {'on' if tr['enabled'] else 'off'})")
+    live = [x for x in d.get("alerts", []) if x["status"] != "resolved"]
+    if live:
+        lines.append("Open alerts:")
+        lines += [f"- [{x['severity']}{', acknowledged' if x['status'] == 'ack' else ''}] {x['title']} (by {x['agent'] or 'Crew'}, x{x['count']})" for x in live]
     return "\n".join(lines)
 
 
@@ -96,6 +110,10 @@ def run_tool(name, a):
         return status()
     if name == "handoff":
         r = call("/api/act/handoff", {"from": ME, "to": a.get("to"), "title": a.get("title"), "details": a.get("details", ""), "tag": a.get("tag", "")})
+    elif name == "raise_alert":
+        r = call("/api/act/alert", {"from": ME, **{k: a.get(k) for k in ("title", "severity", "details", "link")}})
+    elif name == "resolve_alert":
+        r = call("/api/act/alert_resolve", {"from": ME, "title": a.get("title"), "note": a.get("note", "")})
     elif not BOSS:
         return {"error": f"{name} is for the boss only"}
     elif name == "create_task":

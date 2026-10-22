@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - **ADO tag trigger**: tag a work item on your Azure DevOps board with a tag you choose, and Crew starts a workflow run (or one agent's task) for it, once per item. It then adds `<tag>-picked`, removes the tag or leaves tags alone, and can post a comment. Uses your `az` login. A **Test** button lists matching items without starting anything. Cards and runs show an `AB#123` chip linking to the item. UI-only, like poll triggers.
 - **Light theme** built from the Book Cloth, Kraft and Manilla palette, with a **System / Dark / Light** switch in the header ⋮ menu. System follows the OS live; the choice is remembered and applied before first paint.
 - **Next check time** on ADO and poll triggers ("next check 11:42 (in 3 min)", "checking now…", "off"), computed by the server with the same rule the scheduler uses.
+- **Alerts on the board**: agents call the new `raise_alert` crew tool when something is failing that you must see (a failed deployment, a red main-branch pipeline, an outage, expired access), and `resolve_alert` once it recovers. Open alerts sit in a strip above the board, worst first, with the agent, age, count, details and link; **Make task** turns one into an incident task in Backlog, **Ack** dims it, **Resolve** clears it. Repeats of the same alert bump a count instead of stacking, and a worse severity re-opens it. Crew raises its own alerts for a trigger whose check fails (closed by its next good check) and for the daily budget.
+- **Continue in Claude Code** (card and agent ⋮ menus): the exact `cd <worktree>; claude --resume <session>` command to pick an agent's session up in your own terminal, with a button to close Crew's process first, plus a self-contained hand-off brief to copy or download for a fresh session. For work Crew can't finish alone: sign-ins, MFA, browsers, local devices, prod approvals.
+- Forwarding or moving a card shows **Sending to X · starting its Claude session…** on the card right away, instead of nothing until the new session is up.
 - **Export and import agents** (header ⋮ menu): download all or selected agents as JSON (settings only), and import a file with a preview, per-agent selection, and skip-or-update for names that already exist. Values from the file are validated on both sides; import is UI-only.
 - **Resizable side panel**: drag the left edge of the agent / review panel (or focus it and use the arrow keys) to make it wider or narrower; double-click resets. The width is remembered.
 
@@ -16,6 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Switching projects shows an "Opening <project>…" overlay at once instead of looking frozen while the old crew shuts down.
 - The agent **Role** box (settings and Add agent) grows to fit its text and can be resized, instead of a two-line box you had to scroll.
 - Notifications no longer repeat: an identical toast already on screen is refreshed instead of stacked (an action's own toast and the server's event for it show once), at most 4 show at a time, and editing an agent's role, tags, icon or colour posts one event naming what changed instead of repeating its model line, with none when nothing changed.
+- Agent roles can be up to 4000 characters (was 500, and longer roles were cut off silently).
 - Board card footers wrap and long agent names are shortened with an ellipsis instead of running off the card.
 
 ## [0.2.0] - 2026-10-21

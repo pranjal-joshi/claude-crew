@@ -140,6 +140,10 @@ Every card shows its cost. Set a **per-task** and a **per-day** budget (click th
 
 Give each agent an icon (two dozen dev line icons) and a colour in its settings; the glyph switches between black and white to stay readable. Every agent and every card has a **⋮** menu at its top right: rename, settings, stop, kill or delete an agent; move, mark done or delete a card. The forward button next to a card's ⋮ hands it to an agent (or lets the boss pick), and hand-offs show the same arrow with who it went to. Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
 
+**Alerts.** Any agent can raise an alert with the `raise_alert` crew tool when it finds something failing that you must see now: a failed deployment, a red pipeline on the main branch, an outage, expired access. Open alerts show in a strip above the board, worst first; turn one into an incident task, acknowledge it, or resolve it. Raising the same alert again bumps its count instead of adding a copy, and the agent resolves it when things recover. Crew raises its own when a trigger's check fails or the daily budget is reached.
+
+**Continue in Claude Code.** Some work needs you at your own machine (sign-ins, MFA, a browser, prod approvals). A card's or agent's **⋮ → Continue in Claude Code** gives the exact `claude --resume` command for that agent's session in its worktree, and a hand-off brief to paste into a fresh session. A **Handoff** agent (tags `manual`, `handoff`) can write a fuller brief into `crew-handoffs/` for you.
+
 **Export and import agents** from the header **⋮** menu: pick all or some agents and download them as a JSON file (settings only: name, role, tags, model, effort, context, icon, colour; no chats, sessions or costs), to back them up or share them. Import lists a file's agents first (an export or a `crew.json`), lets you untick some, and skips or updates agents whose names already exist.
 
 ## Context per task

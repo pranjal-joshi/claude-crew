@@ -129,6 +129,8 @@ def clean_tags(tags) -> list[str]:
 
 
 CONFIG_KEYS = ("model", "effort", "context", "role", "tags", "icon", "color")
+ROLE_MAX = 4000  # an agent role goes into its system prompt: room for a real brief, not a novel
+SEVERITIES = ("critical", "warning", "info")  # most severe first
 
 
 def config_change(key: str, value) -> str:
@@ -760,6 +762,8 @@ class Crew:
         self.next_trig = 1
         self.runs: list[dict] = []
         self.next_run = 1
+        self.alerts: list[dict] = []  # raised by agents (crew tool raise_alert) or by Crew; shown on the board until resolved
+        self.next_alert = 1
         self.agents: dict[str, dict] = {}
         for spec in config["agents"]:
             self.agents[spec["name"]] = self._new_agent(spec)
@@ -849,6 +853,8 @@ class Crew:
         self.mcp_allow = set(data.get("mcp_allow", []))
         self.triggers = data.get("triggers", [])
         self.runs = data.get("runs", [])[-50:]
+        self.alerts = data.get("alerts", [])[-200:]
+        self.next_alert = data.get("next_alert", max([x["id"] for x in self.alerts], default=0) + 1)
         self.next_run = data.get("next_run", len(self.runs) + 1)
         self.next_trig = data.get("next_trig", len(self.triggers) + 1)
         for tr in self.triggers:
@@ -876,6 +882,7 @@ class Crew:
         data = {"project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
                 "mcp_allow": sorted(self.mcp_allow), "triggers": self._public_triggers(), "next_trig": self.next_trig,
                 "runs": self.runs[-50:], "next_run": self.next_run,
+                "alerts": self.alerts[-200:], "next_alert": self.next_alert,
                 "day": self.day, "day_spend": round(self.day_spend, 6), "day_hit": self.day_hit,
                 "agents": {n: {"session": a["session"], "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
                            "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", []), "commands": a.get("commands", [])}
@@ -900,6 +907,98 @@ class Crew:
     def log(self, a: dict, kind: str, text: str, **extra) -> None:
         a["log"].append({"t": now(), "kind": kind, "text": text, **extra})
         a["log"] = a["log"][-400:]
+
+    # ---- alerts ----------------------------------------------------------------------
+    def raise_alert(self, title: str, severity: str = "warning", details: str = "", agent: str | None = None,
+                    link: str = "", key: str = "") -> dict:
+        """Open an alert, or bump the open one with the same key (lock held). Returns the alert."""
+        title = " ".join(str(title or "").split())[:160]
+        severity = severity if severity in SEVERITIES else "warning"
+        key = key or f"{agent or 'crew'}:{title.lower()}"
+        al = next((x for x in self.alerts if x["key"] == key and x["status"] != "resolved"), None)
+        if al:  # the same problem again: one alert with a count, never a pile of copies
+            al["count"] += 1
+            al["last"] = now()
+            al["details"] = str(details or al["details"])[:4000]
+            if SEVERITIES.index(severity) < SEVERITIES.index(al["severity"]):
+                al["severity"], al["status"] = severity, "open"  # it got worse: needs eyes again
+            return al
+        al = {"id": self.next_alert, "key": key, "title": title, "severity": severity, "details": str(details or "")[:4000],
+              "agent": agent, "link": str(link or "")[:500], "created": now(), "last": now(), "count": 1,
+              "status": "open", "task": None}
+        self.next_alert += 1
+        self.alerts.append(al)
+        self.alerts = [x for x in self.alerts if x["status"] != "resolved"][-150:] + \
+            [x for x in self.alerts if x["status"] == "resolved"][-50:]
+        self.alerts.sort(key=lambda x: x["id"])
+        self.event("alert", ("🔴 " if severity == "critical" else "⚠ " if severity == "warning" else "ℹ ")
+                   + (f"{agent}: " if agent else "") + title, agent)
+        return al
+
+    def resolve_alert(self, key: str, note: str = "") -> bool:
+        """Resolve the open alert with this key, e.g. when a failing trigger works again (lock held)."""
+        for al in self.alerts:
+            if al["key"] == key and al["status"] != "resolved":
+                al["status"], al["resolved"] = "resolved", now()
+                if note:
+                    al["note"] = note[:300]
+                return True
+        return False
+
+    def _public_alerts(self) -> list[dict]:
+        live = [x for x in self.alerts if x["status"] != "resolved"]
+        return live + [x for x in self.alerts if x["status"] == "resolved"][-10:]
+
+    def _alert_action(self, action: str, p: dict, via: str) -> dict:
+        """alert (raise), alert_ack, alert_resolve, alert_task (lock held)."""
+        if action == "alert":
+            title = str(p.get("title") or "").strip()
+            if not title:
+                return {"error": "title required"}
+            sev = p.get("severity") or "warning"
+            if sev not in SEVERITIES:
+                return {"error": "severity: critical, warning or info"}
+            who = p.get("from") if p.get("from") in self.agents or p.get("from") == "boss" else None
+            al = self.raise_alert(title, sev, p.get("details") or "", who, p.get("link") or "")
+            return {"ok": True, "id": al["id"], "count": al["count"]}
+        al = None
+        if p.get("id") is not None:
+            al = next((x for x in self.alerts if str(x["id"]) == str(p["id"])), None)
+        elif p.get("title") and via == "mcp":  # an agent resolving its own alert by title once things recover
+            key = f"{p.get('from') or 'crew'}:{' '.join(str(p['title']).split()).lower()}"
+            al = next((x for x in self.alerts if x["key"] == key and x["status"] != "resolved"), None)
+        if not al:
+            return {"error": "no such alert"}
+        if action == "alert_ack":
+            if al["status"] == "open":
+                al["status"] = "ack"
+        elif action == "alert_resolve":
+            if via == "mcp" and al["agent"] != p.get("from"):
+                return {"error": "agents resolve only their own alerts"}
+            al["status"], al["resolved"] = "resolved", now()
+            if p.get("note"):
+                al["note"] = str(p["note"])[:300]
+            self.event("alert", f"✓ resolved: {al['title']}", al["agent"])
+        elif action == "alert_task":
+            if al["task"] and self._task(al["task"]):
+                return {"error": f"already task #{al['task']}"}
+            who = p.get("agent") or None
+            if who and who not in self.agents:
+                return {"error": f"no agent {who}"}
+            t = {"id": self.next_id, "title": f"Alert: {al['title']}"[:200],
+                 "details": (f"Raised by {al['agent'] or 'Crew'} ({al['severity']}"
+                             + (f", seen {al['count']} times" if al["count"] > 1 else "") + ").\n\n" + al["details"]
+                             + (f"\n\nLink: {al['link']}" if al["link"] else "")).strip(),
+                 "tag": "incident" if "incident" in self._all_tags() else "bug", "col": "backlog",
+                 "who": who, "pinned": who, "created": now(), "alert": al["id"]}
+            self.next_id += 1
+            self.tasks.append(t)
+            al["task"] = t["id"]
+            if al["status"] == "open":
+                al["status"] = "ack"
+            self.event("add", f"#{t['id']} {t['title']}" + (f" → {who}" if who else ""))
+            return {"ok": True, "task": t["id"]}
+        return {"ok": True}
 
     def _all_tags(self) -> list[str]:
         tags = list(TAGS)
@@ -929,7 +1028,7 @@ class Crew:
                     "project_name": self.project.name, "app_version": __version__, "mcp_allow": sorted(self.mcp_allow),
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(),
                     "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []),
-                    "runs": self.runs[-30:], "contexts": CONTEXTS,
+                    "runs": self.runs[-30:], "contexts": CONTEXTS, "alerts": self._public_alerts(),
                     "awake": getattr(self, "awake", False), "demo": self.demo,
                     "scratch": self.project.parent.resolve() == WORK_ROOT.resolve()}
 
@@ -997,7 +1096,10 @@ class Crew:
                     "Never touch other agents' worktrees. "
                     + ("When your finished work clearly needs another specialist next, call the crew handoff tool once "
                        "(to a teammate's name, or 'auto' with a tag); say what you did and where. " if self.config.get("auto_handoff", True) else "")
-                    + "When you finish a task, end with a short summary: what you changed, files touched, and anything left open.")
+                    + "If you find something failing that a person must see now (a failed deployment, a red pipeline on the main branch, "
+                    "an outage, a security problem, a blocked dependency), call the crew raise_alert tool with a short title and the evidence; "
+                    "call resolve_alert with the same title once it recovers. Not for your own task's normal progress or failures you are fixing. "
+                    "When you finish a task, end with a short summary: what you changed, files touched, and anything left open.")
         mode = "acceptEdits" if boss else self.config["permission_mode"]
         cmd = [*self.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
                "--permission-mode", mode, "--append-system-prompt", role]
@@ -1473,6 +1575,8 @@ class Crew:
                         tk["budget_hold"] = True
                     n += 1
             self.event("budget", f"{msg}: " + (f"stopped {n} agent{'s' if n != 1 else ''}; " if n else "") + "no new work until tomorrow or you raise the budget")
+            self.raise_alert("Daily budget reached: agents paused", "warning",
+                             f"{msg}. No new work starts until tomorrow or until you raise the budget (header → Budgets).", key=f"budget:{self.day}")
 
     def _budget_refresh(self) -> None:
         """A new day or changed budgets: clear flags that no longer apply and resume what only the budget was holding."""
@@ -1496,6 +1600,7 @@ class Crew:
                 resumed = True
         if resumed:
             self.event("budget", "budget cleared: held work resumes")
+            self.resolve_alert(f"budget:{self.day}", "budget raised or cleared")
 
     # ---- tasks -----------------------------------------------------------------
     def _task(self, tid) -> dict | None:
@@ -2004,6 +2109,10 @@ class Crew:
                 return
             tr["error"] = err
             tr["checked"] = {"t": now(), "found": found, "picked": picked}
+            if err:  # one alert per failing trigger, closed by its next good check
+                self.raise_alert(f"Trigger {tr['name']} check failed", "warning", err, key=f"trigger:{tr['id']}")
+            else:
+                self.resolve_alert(f"trigger:{tr['id']}", "the next check worked")
         self.touch()
 
     def hook(self, tid: str, token: str, body: str) -> dict:
@@ -2319,7 +2428,7 @@ class Crew:
                         return {"error": f"unknown effort {p['effort']}"}
                     a["effort"] = p["effort"] or None
                 if "role" in p:
-                    a["role"] = str(p["role"]).strip()[:500]
+                    a["role"] = str(p["role"]).strip()[:ROLE_MAX]
                 if "tags" in p:
                     a["tags"] = clean_tags(p["tags"])
                 if p.get("context") in CONTEXTS:
@@ -2348,13 +2457,18 @@ class Crew:
                     return {"error": f"{name} already exists"}
                 if p.get("model") and p["model"] not in MODELS or p.get("effort") and p["effort"] not in EFFORTS:
                     return {"error": "unknown model or effort"}
-                self.agents[name] = self._new_agent({"name": name, "role": (p.get("role") or "").strip()[:500],
+                self.agents[name] = self._new_agent({"name": name, "role": (p.get("role") or "").strip()[:ROLE_MAX],
                                                      "tags": clean_tags(p.get("tags") or []),
                                                      "model": p.get("model"), "effort": p.get("effort"),
                                                      "icon": p.get("icon"), "color": p.get("color")})
                 self._attach_worktree(self.agents[name])
                 self._save_config()
                 self.event("agent", f"+ {name} joined the crew", name)
+            elif action in ("alert", "alert_ack", "alert_resolve", "alert_task"):
+                res = self._alert_action(action, p, via)
+                if "error" not in res:
+                    self.touch()
+                return res
             elif action == "import_agents":
                 res = self._import_agents(p.get("agents"), update=p.get("existing") == "update")
                 if "error" not in res:
@@ -2529,6 +2643,12 @@ class Crew:
                 a.update(status="killed", task=None, activity="", since=None)
                 self.log(a, "error", "killed by you")
                 self.event("kill", f"{a['name']} killed", a["name"])
+            elif action == "release" and a:
+                # Close an idle agent's Claude process (session kept) so you can `claude --resume` it in your own terminal
+                if a["status"] == "running":
+                    return {"error": f"{a['name']} is working: stop it first"}
+                self._kill_proc(a["name"])
+                self.log(a, "sys", "process closed so the session can continue in your terminal; the next task resumes it here")
             elif action == "clear_chat" and a:
                 if a["status"] == "running":
                     return {"error": f"{a['name']} is working: stop it first"}
@@ -2695,7 +2815,7 @@ class Crew:
             if spec.get("model") and spec["model"] not in MODELS or spec.get("effort") and spec["effort"] not in EFFORTS:
                 skipped.append({"name": name, "why": "unknown model or effort"})
                 continue
-            fields = {"role": str(spec.get("role") or "").strip()[:500], "tags": clean_tags(spec.get("tags") or []),
+            fields = {"role": str(spec.get("role") or "").strip()[:ROLE_MAX], "tags": clean_tags(spec.get("tags") or []),
                       "model": spec.get("model") or None, "effort": spec.get("effort") or None}
             for k, rx in (("icon", ICON_RE), ("color", COLOR_RE)):
                 fields[k] = spec.get(k) if rx.fullmatch(str(spec.get(k) or "")) else None
@@ -2814,7 +2934,8 @@ UI_TOKEN = secrets.token_urlsafe(24)
 MCP_TOKEN = secrets.token_urlsafe(24)
 GIT_ACTIONS = ("approve", "unapprove", "merge", "open_pr", "diff")  # UI only; each runs git outside the lock (_git_action)
 UI_TASK_ACTIONS = {"merge_rebase": "_merge_rebase"}
-MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add"}
+MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add",
+               "alert", "alert_resolve"}
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 MAX_BODY = 1_000_000
