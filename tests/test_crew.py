@@ -208,3 +208,26 @@ class Alerts(TempCrewCase):
         self.assertIn("error", self.crew.act("release", {"agent": a["name"]}))
         a["status"] = "idle"
         self.assertTrue(self.crew.act("release", {"agent": a["name"]})["ok"])
+
+
+class TellReopens(TempCrewCase):
+    def _review_task(self):
+        a = next(iter(self.crew.agents.values()))
+        self.crew.act("add", {"title": "Fix the thing", "tag": "bug"})
+        t = self.crew.tasks[-1]
+        t.update(col="review", who=a["name"])
+        a.update(status="review", task=t["id"])
+        self.crew._start = lambda ag: True
+        self.crew._send = lambda ag, text: True
+        return a, t
+
+    def test_message_moves_review_task_back_to_in_progress(self):
+        a, t = self._review_task()
+        self.assertNotIn("error", self.crew.act("tell", {"agent": a["name"], "text": "also handle empty input"}))
+        self.assertEqual((t["col"], a["status"]), ("doing", "running"))
+
+    def test_approved_task_stays_put(self):
+        a, t = self._review_task()
+        t["commit"] = "abc1234"
+        self.crew.act("tell", {"agent": a["name"], "text": "thanks"})
+        self.assertEqual(t["col"], "review")

@@ -2564,8 +2564,14 @@ class Crew:
                 if not self._send(a, text):
                     a.update(status="error", activity="")
                     return {"error": a["error"]}
-                if a["status"] in ("idle", "error", "paused"):
+                if a["status"] in ("idle", "error", "paused", "review"):
                     a.update(status="running", since=now(), activity="thinking…", error=None)
+                # a message about the task waiting for review is more work on it: back to In progress until the
+                # agent's turn ends, which puts it in Review again with the new summary and diff
+                rt = self._task(a["task"]) if a.get("task") else None
+                if rt and rt["col"] == "review" and rt.get("who") == a["name"] and not rt.get("commit"):
+                    rt.update(col="doing", started=now())
+                    a["activity"] = "working on your message…"
                 self.event("tell", f"→ {a['name']}: {text[:80]}", a["name"])
             elif action == "stop" and a:
                 if a["status"] != "running" and not self._alive(a["name"]):

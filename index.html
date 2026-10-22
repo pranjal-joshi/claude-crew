@@ -783,7 +783,115 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .budgetf label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .budgetf .brow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
 .budgetf .brow b{color:var(--text)}
+
+/* ---- simple view (A/B, header ⋮ → Simple view) ------------------------------------------------ */
+html:not(.ui-simple) .sx{display:none!important}
+.sx[hidden]{display:none!important}
+html.ui-simple :is(.top .slash,#mode,#trigBtn,#stats,#palBtn,#newBtn,.rail,.toolbar,#alerts,#colnav,#board,#flows,.chatbar,.mnav){display:none!important}
+html.ui-simple .body,html.ui-simple .body.rail-min{grid-template-columns:1fr}
+html.ui-simple .body.drawer-open,html.ui-simple .body.rail-min.drawer-open{grid-template-columns:1fr var(--dw,440px)}
+@media (max-width:1100px){html.ui-simple .body.drawer-open,html.ui-simple .body.rail-min.drawer-open{grid-template-columns:1fr}}
+.sxgrow{flex:1}
+.sxtabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}
+.sxtabs button{border:0;background:none;padding:4px 13px;border-radius:7px;color:var(--muted);font:500 13px var(--sans);cursor:pointer;display:flex;align-items:center;gap:6px}
+.sxtabs button.on{background:var(--raised);color:var(--text);box-shadow:0 1px 0 var(--line2)}
+.sxtabs .n{min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--on-accent);font-size:10.5px;font-weight:700;display:grid;place-items:center}
+.sxtabs .n:empty{display:none}
+.sxspend{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font:12.5px var(--sans);cursor:pointer}
+.sxspend b{color:var(--text)}.sxspend:hover{background:var(--hover)}
+.sxteam{display:flex;align-items:center;border:0;background:none;padding:0;cursor:pointer}
+.sxteam .sxdot{margin-left:-7px}.sxteam .sxdot:first-child{margin-left:0}
+.sxteam .sxav{box-shadow:0 0 0 2px var(--top2,var(--bg))}
+.sxteam .sxmore{margin-left:4px;font-size:11.5px;color:var(--faint)}
+.sxav{display:inline-grid;place-items:center;border-radius:50%;background:var(--raised);color:var(--text);font-weight:700;font-size:11px;flex:none;border:1px solid var(--line2)}
+.sxdot{position:relative;display:inline-flex;flex:none}
+.sxdot .st{position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 2px var(--bg)}
+.sxdot .st.running{background:var(--green);animation:sxping 2s infinite}.sxdot .st.review{background:var(--blue)}
+.sxdot .st.error,.sxdot .st.killed{background:var(--red)}.sxdot .st.paused{background:var(--amber)}
+@keyframes sxping{0%{box-shadow:0 0 0 2px var(--bg),0 0 0 2px color-mix(in srgb,var(--green) 60%,transparent)}70%{box-shadow:0 0 0 2px var(--bg),0 0 0 7px transparent}100%{box-shadow:0 0 0 2px var(--bg),0 0 0 2px transparent}}
+#simple{flex:1;overflow:auto;min-height:0}
+.sxwrap{max-width:1180px;margin:0 auto;padding:24px 24px 64px}
+.sxwelcome{position:relative;display:grid;grid-template-columns:1.1fr 2fr;gap:24px;align-items:center;padding:20px 24px;border:1px solid var(--line);border-radius:16px;background:radial-gradient(120% 140% at 0% 0%,var(--accent-soft),transparent 55%),var(--surface);margin-bottom:20px}
+.sxwelcome h2{margin:0 0 4px;font-size:18px;letter-spacing:-.01em}.sxwelcome p{margin:0;color:var(--muted);font-size:13.5px}
+.sxsteps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sxstep{padding:11px 13px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.sxstep i{width:21px;height:21px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font:700 11.5px var(--sans);margin-bottom:6px}
+.sxstep b{display:block;color:var(--text);font-size:13px}
+.sxwelcome .x{position:absolute;top:8px;right:8px}
+.sxcomposer{border:1px solid var(--line2);border-radius:16px;background:var(--surface);padding:6px;transition:border-color .15s,box-shadow .15s}
+.sxcomposer:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.sxcomposer textarea{display:block;width:100%;border:0;background:none;resize:none;outline:none;color:var(--text);font:15px/1.5 var(--sans);padding:11px 13px 6px;min-height:50px;max-height:220px}
+.sxcomposer textarea::placeholder{color:var(--faint)}
+.sxcrow{display:flex;align-items:center;gap:7px;padding:4px 6px 4px 9px;flex-wrap:wrap}
+.sxchip{border:1px solid var(--line);background:var(--bg2);color:var(--muted);border-radius:999px;padding:3px 11px;font:12.5px var(--sans);cursor:pointer}
+.sxchip:hover{color:var(--text);border-color:var(--line2)}
+.sxwho{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg2);border-radius:10px;padding:4px 9px;color:var(--muted);font-size:12.5px}
+.sxwho select{background:none;border:0;color:var(--text);font:inherit;outline:none;cursor:pointer;max-width:190px}
+.sxwho select option{background:var(--surface);color:var(--text)}
+.sxh{display:flex;align-items:baseline;gap:9px;margin:28px 2px 11px}
+.sxh h3{margin:0;font-size:14.5px}.sxh .sxn{font-size:12px;color:var(--faint)}
+.sxh .sxhint{margin-left:auto;color:var(--faint);font-size:12px}
+.sxinbox{display:grid;gap:9px}
+.sxneed{--k:var(--blue);--ks:var(--blue-soft);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:13px;align-items:center;padding:12px 14px;border-radius:13px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--k)}
+.sxneed.crit{--k:var(--red);--ks:var(--red-soft)}.sxneed.warn{--k:var(--amber);--ks:var(--amber-soft)}.sxneed.info{--k:var(--faint);--ks:var(--hover)}
+.sxneed.ack{opacity:.7}
+.sxneed .k{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--ks);color:var(--k)}
+.sxneed .t{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sxneed .m{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sxneed .ad{color:var(--green)}.sxneed .rm{color:var(--red)}
+.sxneed .acts{display:flex;gap:7px;align-items:center}
+.sxclear{display:flex;align-items:center;gap:9px;padding:13px 15px;border-radius:13px;border:1px dashed var(--line2);color:var(--muted);font-size:13px}
+.sxclear svg{color:var(--green)}
+.sxlanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.sxlane{background:var(--bg2);border:1px solid var(--line);border-radius:15px;padding:9px;min-height:160px;min-width:0}
+.sxlane h4{display:flex;align-items:center;gap:8px;margin:2px 4px 9px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.sxlane h4 i{width:8px;height:8px;border-radius:50%}
+.sxlane h4 .n{margin-left:auto;font-weight:500;color:var(--faint);font-size:12px}
+.sxcards{display:grid;gap:7px}
+.sxcard{border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:11px 12px;display:grid;gap:8px;cursor:pointer;transition:border-color .12s,background .12s,transform .12s;min-width:0}
+.sxcard:hover{border-color:var(--line2);background:var(--raised);transform:translateY(-1px)}
+.sxcard:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sxcard .th{display:flex;gap:6px;align-items:flex-start}
+.sxcard .tt{flex:1;min-width:0;font-weight:600;font-size:13.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.sxcard .kebab{opacity:0;margin:-3px -4px 0 0}.sxcard:hover .kebab,.sxcard:focus-within .kebab{opacity:1}
+.sxcard .now{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--muted);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sxcard.sending{border-color:var(--accent-line,var(--accent))}
+.sxbar{height:3px;border-radius:3px;background:var(--line);overflow:hidden}
+.sxbar i{display:block;height:100%;width:40%;background:linear-gradient(90deg,transparent,var(--green),transparent);animation:sxslide 1.6s linear infinite}
+@keyframes sxslide{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+.sxcard .meta{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);min-width:0}
+.sxcard .meta .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.sxcard .meta .tag{flex:0 1 auto;min-width:0}
+.sxcard .meta .tm{margin-left:auto;color:var(--faint);white-space:nowrap;flex:none}
+.sxcard.done .tt{color:var(--muted)}
+.sxchipm{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--hover);color:var(--muted);white-space:nowrap;flex:none}
+.sxchipm.ok{background:var(--green-soft);color:var(--green)}
+.sxempty{color:var(--faint);font-size:12.5px;text-align:center;padding:22px 8px}
+.sxmorebtn{border:0;background:none;color:var(--faint);font:12.5px var(--sans);padding:6px;cursor:pointer}.sxmorebtn:hover{color:var(--text)}
+.sxagents{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:13px}
+.sxagent{border:1px solid var(--line);background:var(--surface);border-radius:15px;padding:15px;display:grid;gap:11px;align-content:start;min-width:0}
+.sxagent .hd{display:flex;align-items:center;gap:11px;min-width:0}
+.sxagent .hd .sxdot .st{width:11px;height:11px;box-shadow:0 0 0 2px var(--surface)}
+.sxagent .who{min-width:0}
+.sxagent .nm{font-weight:650;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sxagent .rl{color:var(--muted);font-size:12.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sxagent .doing{font-size:13px;padding:9px 11px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);color:var(--muted);min-height:42px;overflow-wrap:anywhere}
+.sxagent .doing b{color:var(--text);font-weight:600}
+.sxagent .doing .act{font-size:12px;color:var(--faint);margin-top:3px}
+.sxagent.error .doing{border-color:color-mix(in srgb,var(--red) 35%,var(--line))}
+.sxagent .ft{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.sxagent .ft .c{margin-left:auto;font-size:12px;color:var(--faint);white-space:nowrap}
+.sxadd{border:1px dashed var(--line2);background:none;border-radius:15px;color:var(--muted);display:grid;place-items:center;align-content:center;gap:6px;min-height:170px;cursor:pointer;font:13px var(--sans)}
+.sxadd:hover{color:var(--text);background:var(--surface)}
+.menu .mi.swi::after{content:"";flex:none;margin-left:auto;width:30px;height:18px;border-radius:9px;background:radial-gradient(circle at 9px 50%,#fff 6px,transparent 6.5px),var(--line2);transition:background .15s}
+.menu .mi.swi.on::after{background:radial-gradient(circle at 21px 50%,#fff 6px,transparent 6.5px),var(--accent)}
+.menu .beta{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-left:6px}
+#simple{container-type:inline-size}
+@container (max-width:860px){.sxwelcome{grid-template-columns:1fr;gap:14px}.sxneed{grid-template-columns:auto minmax(0,1fr)}.sxneed .acts{grid-column:1/-1;justify-content:flex-end}.sxh .sxhint{display:none}}
+@container (max-width:640px){.sxlanes{grid-template-columns:1fr}.sxsteps{grid-template-columns:1fr}.sxwrap{padding:16px 12px 48px}}
+@media (max-width:900px){.sxspend,.sxteam{display:none!important}}
 </style>
+<script>try { if (localStorage.getItem('crew.ui') === 'simple') document.documentElement.classList.add('ui-simple'); } catch {}</script>
 </head>
 <body>
 <div class="app">
@@ -800,6 +908,11 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
     <div class="stats" id="stats"></div>
     <button class="btn ghost" id="palBtn" title="Command palette">Search <kbd>Ctrl K</kbd></button>
     <button class="btn primary" id="newBtn">＋ New<span class="nt"> task</span> <kbd class="kon">N</kbd></button>
+    <div class="sxtabs sx" id="sxTabs" role="tablist" aria-label="View"><button data-sx-tab="work" role="tab">Work <span class="n" id="sxNeedN" title="Things that need you"></span></button><button data-sx-tab="team" role="tab">Team</button></div>
+    <span class="sx sxgrow"></span>
+    <button class="sx sxspend" id="sxSpend" data-budgets title="Spent today · click to set budgets"></button>
+    <button class="sx sxteam" id="sxTeam" data-sx-tab="team" title="Your team" aria-label="Your team"></button>
+    <button class="sx iconbtn" data-sx-help title="How Crew works" aria-label="How Crew works">?</button>
     <span class="awake" id="awake" hidden title="Keeping this computer awake while agents work. Locking the screen is fine; closing a laptop lid still sleeps.">☕</span>
     <button class="iconbtn" id="hMenu" aria-label="More: phone, version, links" aria-haspopup="menu" title="More">⋮</button>
     <span class="conn" id="conn" title="connection"></span>
@@ -808,6 +921,39 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
     <aside class="rail" id="rail"></aside>
     <section class="main">
       <div class="banner" id="banner"></div>
+      <div class="sx" id="simple"><div class="sxwrap">
+        <section class="sxwelcome" id="sxWelcome" hidden>
+          <div><h2>Your AI team, working in your repo</h2><p>Describe the work in plain words. Crew gives it to the right agent and only asks you when a decision is needed.</p></div>
+          <div class="sxsteps">
+            <div class="sxstep"><i>1</i><b>Describe it</b>“Fix the flaky login test”</div>
+            <div class="sxstep"><i>2</i><b>An agent picks it up</b>On its own branch, never on your main</div>
+            <div class="sxstep"><i>3</i><b>You approve</b>See the change, approve it or reply with edits</div>
+          </div>
+          <button class="iconbtn x" data-sx-help title="Hide" aria-label="Hide">✕</button>
+        </section>
+        <div id="sxWork">
+          <div class="sxcomposer">
+            <textarea id="sxAsk" rows="1" placeholder="What should your crew do?" aria-label="New work for the crew"></textarea>
+            <div class="sxcrow">
+              <button class="sxchip" data-sx-chip="Fix the bug where ">Fix a bug</button>
+              <button class="sxchip" data-sx-chip="Review the open PR ">Review a PR</button>
+              <button class="sxchip" data-sx-chip="Check the latest deployments and pipelines, and raise an alert for anything that failed">Check deployments</button>
+              <button class="sxchip" data-sx-chip="Write tests for ">Write tests</button>
+              <span class="sxgrow"></span>
+              <label class="sxwho">For <select id="sxWho" aria-label="Who should do it"></select></label>
+              <button class="btn primary" id="sxSend" disabled>Send ↵</button>
+            </div>
+          </div>
+          <div class="sxh"><h3>Needs you</h3><span class="sxn" id="sxNeedC"></span><span class="sxhint">Reviews, problems and things only you can do</span></div>
+          <div class="sxinbox" id="sxInbox"></div>
+          <div class="sxh"><h3>Work</h3><span class="sxhint">Click a card to see details or message its agent</span></div>
+          <div class="sxlanes" id="sxLanes"></div>
+        </div>
+        <div id="sxTeamView" hidden>
+          <div class="sxh" style="margin-top:0"><h3>Your team</h3><span class="sxhint">Each agent has its own role, model and Claude Code session</span></div>
+          <div class="sxagents" id="sxAgents"></div>
+        </div>
+      </div></div>
       <div class="toolbar">
         <div class="tabs" id="tabs"><button data-tab="board" class="on">Board</button><button data-tab="flows">Workflows <span class="n" id="runN"></span></button></div>
         <div class="filters" id="filters"></div>
@@ -1065,7 +1211,7 @@ function render() {
   b.innerHTML = notes.map(n => `<div style="display:flex;align-items:center;gap:10px;width:100%">${n}</div>`).join('');
 
   const fk = focusKey();
-  renderAwake(); renderRail(); if (!view.dragging) renderBoard(); renderDrawer(); renderFeed();
+  renderAwake(); renderRail(); if (!view.dragging) renderBoard(); renderDrawer(); renderFeed(); renderSimple();
   restoreFocus(fk);
 }
 // a re-render replaces the cards, chips and drawer buttons: put keyboard focus back where it was
@@ -1835,8 +1981,8 @@ function setMode(m) {
 }
 // Assigning can take a few seconds (stopping the old owner's Claude process, starting the new one): show it on the card at once.
 async function pending(id, label, fn) {
-  view.sending = view.sending || {}; view.sending[id] = label; renderBoard();
-  try { return await fn(); } finally { delete view.sending[id]; renderBoard(); }
+  view.sending = view.sending || {}; view.sending[id] = label; renderBoard(); renderSimple();
+  try { return await fn(); } finally { delete view.sending[id]; renderBoard(); renderSimple(); }
 }
 function handTo(id, name) {
   const t = task(id); if (!t) return;
@@ -2644,11 +2790,168 @@ $('#ccModal').addEventListener('click', async e => {
   }
 });
 
+// ---- simple view (A/B test) -------------------------------------------------------------------------
+// One composer, a "Needs you" inbox (reviews, alerts, errors, blocked calls), three lanes and a team page.
+// Everything acts through the same actions as the classic board, and details open in the same drawer.
+let UI = (() => { try { return localStorage.getItem('crew.ui') === 'simple' ? 'simple' : 'classic'; } catch { return 'classic'; } })();
+const sx = {tab: 'work', sig: {}, doneAll: false, welcome: (() => { try { return localStorage.getItem('crew.sxWelcome') !== 'seen'; } catch { return true; } })()};
+try { sx.tab = localStorage.getItem('crew.sxTab') === 'team' ? 'team' : 'work'; } catch {}
+document.documentElement.classList.toggle('ui-simple', UI === 'simple');
+function setUI(u) {
+  UI = u; try { localStorage.setItem('crew.ui', u); } catch {}
+  document.documentElement.classList.toggle('ui-simple', u === 'simple');
+  sx.sig = {}; render();
+  toast(u === 'simple' ? 'Simple view: switch back any time from ⋮' : 'Classic view', 'var(--accent)');
+}
+const sxPut = (sel, html) => { if (sx.sig[sel] === html) return; sx.sig[sel] = html; $(sel).innerHTML = html; };
+const SXI = {
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  alert: '<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18h.01"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  wallet: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 9h18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  hand: '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+};
+const sxIco = (k, px = 16) => `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SXI[k]}</svg>`;
+const sxAv = (x, px = 22) => `<span class="sxav" style="width:${px}px;height:${px}px;font-size:${Math.round(px * .45)}px;${avCss(x)}">${avFace(x, Math.round(px * .55))}</span>`;
+const SX_LABEL = {running: 'Working', review: 'Waiting for your review', idle: 'Free', paused: 'Paused', error: 'Stopped with an error', killed: 'Stopped'};
+
+function sxNeeds() {
+  const out = [];
+  for (const t of S.tasks.filter(t => t.col === 'review').sort((a, b) => a.id - b.id)) {
+    const files = diffFiles(t.diff?.patch), add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0);
+    const what = t.diff?.pending ? 'reading the changes…' : files.length ? `${files.length} file${files.length > 1 ? 's' : ''} <span class="ad">+${add}</span> <span class="rm">−${del}</span>` : 'no file changes';
+    const manual = ['handoff', 'manual'].includes(t.tag) || t.who === 'Handoff';
+    out.push(`<div class="sxneed${manual ? ' warn' : ''}"><span class="k">${sxIco(manual ? 'hand' : 'eye')}</span>
+      <div style="min-width:0"><div class="t" title="${esc(t.title)}">${esc(t.title)}</div><div class="m">${esc(t.who || 'An agent')} finished #${t.id} · ${what}</div></div>
+      <div class="acts">${manual ? `<button class="btn sm" data-sx-cc="${t.id}">Open in Claude Code</button>` : ''}<button class="btn sm" data-review="${t.id}">See changes</button><button class="btn sm primary" data-approve="${t.id}" ${t.busy ? 'disabled' : ''}>✓ Approve</button></div></div>`);
+  }
+  const rank = {critical: 0, warning: 1, info: 2};
+  for (const al of (S.alerts || []).filter(x => x.status !== 'resolved').sort((a, b) => (a.status === 'ack') - (b.status === 'ack') || rank[a.severity] - rank[b.severity])) {
+    const link = al.link ? ` · <a href="${esc(/^https?:\/\//i.test(al.link) ? al.link : '#')}" target="_blank" rel="noopener">link ↗</a>` : '';
+    out.push(`<div class="sxneed ${al.severity === 'critical' ? 'crit' : al.severity === 'warning' ? 'warn' : 'info'}${al.status === 'ack' ? ' ack' : ''}"><span class="k">${sxIco('alert')}</span>
+      <div style="min-width:0"><div class="t" title="${esc(al.details || al.title)}">${esc(al.title)}</div><div class="m">${esc(al.agent || 'Crew')} · ${agoText(al.last)}${al.count > 1 ? ` · seen ${al.count}×` : ''}${link}</div></div>
+      <div class="acts"><button class="btn sm ghost" data-sx-alres="${al.id}" title="Fixed: take it off the list">Resolve</button>${al.task ? `<span class="faint" style="font-size:12px">task #${al.task}</span>` : `<button class="btn sm primary" data-sx-altask="${al.id}" title="Put it in Up next as an incident task">Make a task</button>`}</div></div>`);
+  }
+  for (const a of S.agents.filter(a => a.status === 'error'))
+    out.push(`<div class="sxneed crit"><span class="k">${sxAv(a, 28)}</span>
+      <div style="min-width:0"><div class="t">${esc(a.name)} stopped with an error</div><div class="m" title="${esc(a.error || '')}">${esc(a.error || 'unknown error')}</div></div>
+      <div class="acts"><button class="btn sm ghost" data-sx-open="${esc(a.name)}">Open</button><button class="btn sm primary" data-respawn="${esc(a.name)}">↻ Restart</button></div></div>`);
+  const nb = blockedAll().length;
+  if (nb) out.push(`<div class="sxneed warn"><span class="k">${sxIco('ban')}</span><div style="min-width:0"><div class="t">${nb} tool call${nb > 1 ? 's' : ''} blocked</div>
+    <div class="m">The permission mode refused ${nb > 1 ? 'them' : 'it'}. Allow or dismiss so the agent can carry on.</div></div><div class="acts"><button class="btn sm primary" data-blocked>Review</button></div></div>`);
+  return out;
+}
+function sxCard(t) {
+  const a = t.who && agent(t.who), sending = view.sending?.[t.id];
+  const who = t.who ? `${sxAv(t.who, 20)}<span class="nm">${esc(t.who)}</span>` : '<span class="nm" style="color:var(--faint)">Next free agent</span>';
+  const time = t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : t.col === 'done' && t.finished ? agoText(t.finished) : '';
+  const st = t.hold ? '<span class="sxchipm">⏸ on hold</span>' : t.col !== 'done' ? '' : t.merged ? '<span class="sxchipm ok">merged</span>' : t.pr ? '<span class="sxchipm ok">PR open</span>' : t.commit ? '<span class="sxchipm">approved</span>' : '';
+  const now = sending ? `<div class="now"><span class="spinner sm" aria-hidden="true"></span>${esc(sending)}</div>`
+    : t.col === 'doing' ? `<div class="now">${esc(a?.activity || 'Starting…')}</div><div class="sxbar"><i></i></div>` : '';
+  return `<div class="sxcard ${t.col}${sending ? ' sending' : ''}" tabindex="0" data-sx-card="${t.id}" aria-label="#${t.id} ${esc(t.title)}">
+    <div class="th"><div class="tt" title="${esc(t.title)}">${esc(t.title)}</div><button class="kebab" data-menu="${t.id}" title="Give to an agent, move, mark done…" aria-label="More actions for #${t.id}" aria-haspopup="menu">⋮</button></div>
+    ${now}<div class="meta">${who}<span class="tag ${esc(t.tag)}">${esc(t.tag)}</span>${st}<span class="tm">${time}</span></div></div>`;
+}
+function sxAgent(a) {
+  const t = a.task ? task(a.task) : null, done = S.tasks.filter(x => x.col === 'done' && x.who === a.name).length;
+  const text = a.status === 'running' ? esc(t ? t.title : a.activity || 'thinking…') : a.status === 'review' && t ? esc(t.title)
+    : a.status === 'error' ? esc(a.error || '') : a.status === 'idle' ? 'give it something to do.' : '';
+  const main = a.status === 'running' ? `<button class="btn sm" data-stop="${esc(a.name)}" title="Stop now: session kept, task on hold">■ Stop</button>`
+    : a.status === 'error' || a.status === 'killed' ? `<button class="btn sm" data-respawn="${esc(a.name)}">↻ Restart</button>`
+    : `<button class="btn sm" data-sx-give="${esc(a.name)}">＋ Give a task</button>`;
+  return `<div class="sxagent ${a.status}"><div class="hd"><span class="sxdot">${sxAv(a, 40)}<i class="st ${a.status}"></i></span>
+      <div class="who"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="rl" title="${esc(a.role)}">${esc(a.role)}</div></div></div>
+    <div class="doing"><b>${SX_LABEL[a.status] || esc(a.status)}${text ? ':' : '.'}</b> ${text}${a.status === 'running' && t && a.activity ? `<div class="act">${esc(a.activity)}</div>` : ''}</div>
+    <div class="ft">${main}<button class="btn sm ghost" data-sx-open="${esc(a.name)}">Message</button><span class="c">${done} done${showCost ? ' · ' + money(a.cost) : ''}</span></div></div>`;
+}
+function renderSimple() {
+  if (UI !== 'simple' || !S) return;
+  const needs = sxNeeds();
+  $('#sxNeedN').textContent = needs.length || '';
+  document.querySelectorAll('#sxTabs [data-sx-tab]').forEach(b => { b.classList.toggle('on', b.dataset.sxTab === sx.tab); b.setAttribute('aria-selected', b.dataset.sxTab === sx.tab); });
+  const shown = S.agents.slice(0, 6);
+  sxPut('#sxTeam', shown.map(a => `<span class="sxdot" title="${esc(a.name)} · ${a.status}">${sxAv(a, 26)}<i class="st ${a.status}"></i></span>`).join('') + (S.agents.length > 6 ? `<span class="sxmore">+${S.agents.length - 6}</span>` : ''));
+  $('#sxSpend').hidden = !showCost;
+  sxPut('#sxSpend', `${sxIco('wallet', 14)}<b>${money(S.budget?.day_spent || 0)}</b> today`);
+  $('#sxWelcome').hidden = !sx.welcome;
+  $('#sxWork').hidden = sx.tab !== 'work'; $('#sxTeamView').hidden = sx.tab !== 'team';
+  const opts = '<option value="">Best fit</option><option value="@boss">The boss: plan bigger work</option>' + S.agents.map(a => `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('');
+  if (sx.sig.who !== opts) { const sel = $('#sxWho'), v = sel.value; sel.innerHTML = opts; sx.sig.who = opts; sel.value = v; if (sel.value !== v) sel.value = ''; }
+  $('#sxNeedC').textContent = needs.length || '';
+  sxPut('#sxInbox', needs.join('') || `<div class="sxclear">${sxIco('check')}Nothing needs you right now.${S.agents.some(a => a.status === 'running') ? ' Your crew is on it.' : ''}</div>`);
+  const col = c => S.tasks.filter(t => t.col === c);
+  const next = col('backlog').sort((a, b) => a.id - b.id), work = col('doing').sort((a, b) => (a.started || 0) - (b.started || 0));
+  const done = col('done').sort((a, b) => (b.finished || 0) - (a.finished || 0) || b.id - a.id);
+  const lane = (k, label, c, list, empty, extra = '') => `<section class="sxlane ${k}" aria-label="${label}"><h4><i style="background:${c}"></i>${label}<span class="n">${list.length || ''}</span></h4>
+    <div class="sxcards">${list.length ? list.map(sxCard).join('') : `<div class="sxempty">${empty}</div>`}${extra}</div></section>`;
+  sxPut('#sxLanes', lane('next', 'Up next', 'var(--faint)', next, 'Nothing queued. Type above to add work.')
+    + lane('work', 'Working', 'var(--green)', work, 'No one is working right now.')
+    + lane('done', 'Done', 'var(--violet)', sx.doneAll ? done : done.slice(0, 5), 'Approved work lands here.',
+      done.length > 5 ? `<button class="sxmorebtn" data-sx-done>${sx.doneAll ? 'Show fewer' : `Show ${done.length - 5} more`}</button>` : ''));
+  if (sx.tab === 'team') sxPut('#sxAgents', S.agents.map(sxAgent).join('') + `<button class="sxadd" data-add-agent>${sxIco('plus', 22)}<span>Add an agent</span></button>`);
+}
+function sxOpenCard(id) {
+  const t = task(id); if (!t) return;
+  const who = t.who || t.history?.at(-1)?.who || t.handoff?.from;
+  if ((t.col === 'review' || t.col === 'done') && (t.summary || t.commit || t.diff)) view.drawer = {review: id};
+  else if (who && agent(who)) view.drawer = {agent: who};
+  else return toast(t.col === 'backlog' ? 'Waiting for a free agent whose role fits. Use ⋮ to give it to someone now.' : 'No agent worked on this task', 'var(--faint)');
+  render();
+}
+async function sxSend() {
+  const el = $('#sxAsk'), v = el.value.trim(); if (!v) return;
+  const who = $('#sxWho').value;
+  $('#sxSend').disabled = true;
+  let r;
+  if (who === '@boss') {
+    r = await act('tell', {agent: S.boss?.name || 'boss', text: v});
+    if (r.ok) toast('The boss is planning it: its tasks will show up in Up next', 'var(--accent)');
+  } else {
+    const [title, ...rest] = v.split('\n'), g = guessTag(title);
+    const tag = S.tags.includes(g) ? g : S.tags.includes('feature') ? 'feature' : S.tags[0];
+    r = await act('add', {title: title.trim().slice(0, 200), details: rest.join('\n').trim(), tag, agent: who || null});
+    if (r.ok) toast(who ? `Sent to ${who}` : 'Added to Up next: the first free agent whose role fits picks it up', 'var(--green)');
+  }
+  if (r.ok) { el.value = ''; el.style.height = ''; }
+  $('#sxSend').disabled = !el.value.trim();
+}
+$('#sxAsk').addEventListener('input', e => { const t = e.target; t.style.height = 'auto'; t.style.height = Math.min(220, t.scrollHeight) + 'px'; $('#sxSend').disabled = !t.value.trim(); });
+$('#sxAsk').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sxSend(); } });
+$('#sxSend').onclick = sxSend;
+function sxTab(tab) { sx.tab = tab; try { localStorage.setItem('crew.sxTab', tab); } catch {} renderSimple(); }
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-sx-tab],[data-sx-chip],[data-sx-done],[data-sx-alres],[data-sx-altask],[data-sx-open],[data-sx-give],[data-sx-help],[data-sx-cc]');
+  if (b) {
+    const d = b.dataset;
+    if (d.sxTab) sxTab(d.sxTab);
+    else if (d.sxChip) { const el = $('#sxAsk'); el.value = d.sxChip; el.focus(); el.setSelectionRange(el.value.length, el.value.length); el.dispatchEvent(new Event('input')); }
+    else if ('sxDone' in d) { sx.doneAll = !sx.doneAll; renderSimple(); }
+    else if (d.sxAlres) act('alert_resolve', {id: +d.sxAlres});
+    else if (d.sxAltask) { const r = await act('alert_task', {id: +d.sxAltask}); if (r.ok) toast(`Alert is now task #${r.task} in Up next`, 'var(--accent)'); }
+    else if (d.sxOpen) { view.drawer = {agent: d.sxOpen}; render(); setTimeout(() => $('#msg')?.focus(), 0); }
+    else if (d.sxGive) { sxTab('work'); $('#sxWho').value = d.sxGive; $('#sxAsk').focus(); }
+    else if ('sxHelp' in d) { sx.welcome = !sx.welcome; try { localStorage.setItem('crew.sxWelcome', sx.welcome ? '' : 'seen'); } catch {} renderSimple(); }
+    else if (d.sxCc) openCC({task: +d.sxCc});
+    return;
+  }
+  const c = e.target.closest('[data-sx-card]');
+  if (c && !e.target.closest('button,a')) sxOpenCard(+c.dataset.sxCard);
+});
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-sx-card]')) { e.preventDefault(); sxOpenCard(+e.target.dataset.sxCard); } });
+
 const REPO = 'https://github.com/pranjal-joshi/claude-crew';
 $('#hMenu').onclick = e => {
   e.stopPropagation(); MENU_ACTIONS = [];
   const go = u => () => window.open(u, '_blank', 'noopener');
-  let h = '';
+  let h = '<div class="mh">View</div>' + item(`Simple view<span class="beta">beta</span><span class="sub">${UI === 'simple' ? 'On. Switch off for the classic board' : 'A calmer layout: one inbox, three lanes'}</span>`,
+    () => setUI(UI === 'simple' ? 'classic' : 'simple'), {cls: 'swi' + (UI === 'simple' ? ' on' : '')});
+  if (UI === 'simple' && S) h += item('Permissions…', () => openModeMenu($('#hMenu')), {sub: esc(MODE_INFO[S.permission_mode]?.label || S.permission_mode)}) +
+    item('Triggers…', openTriggers, {sub: 'Schedules, ADO queries, webhooks'}) +
+    item('Workflows', () => { setUI('classic'); document.querySelector('#tabs [data-tab=flows]')?.click(); }, {sub: 'Opens in the classic view'}) +
+    item('Budgets…', () => openBudgets($('#hMenu')), {sub: `${usd(S.budget?.day_spent)} spent today`}) + item('Search…', openPalette, {sub: 'Ctrl K'});
+  h += '<div class="sep"></div>';
   if (['localhost', '127.0.0.1'].includes(location.hostname)) h += item('Open on phone…', openLan, {sub: 'Scan a code from a phone on the same Wi-Fi'}) + '<div class="sep"></div>';
   h += '<div class="mh">Agents</div>' + item('Export agents…', () => openIO('export'), {sub: 'Save all or some agents as a JSON file'}) +
     item('Import agents…', () => openIO('import'), {sub: 'Add agents from an exported file'}) + '<div class="sep"></div>';
