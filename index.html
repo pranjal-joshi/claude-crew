@@ -299,7 +299,13 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .tic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:var(--raised);color:var(--muted)}
 .tic.k-schedule{background:var(--blue-soft);color:var(--blue)}.tic.k-event{background:var(--accent-soft);color:#f0a07f}
 .tic.k-watch{background:var(--teal-soft);color:var(--teal)}.tic.k-poll{background:var(--violet-soft);color:var(--violet)}
-.tic.k-webhook{background:var(--amber-soft);color:var(--amber)}
+.tic.k-webhook{background:var(--amber-soft);color:var(--amber)}.tic.k-ado{background:var(--blue-soft);color:var(--blue)}
+.adochip{font:600 10.5px var(--mono);color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:5px;padding:0 5px;background:var(--blue-soft)}
+.adochip:hover{text-decoration:underline}
+.adoout{border:1px solid var(--line);border-radius:9px;background:var(--bg2);padding:8px 10px;font-size:12px;max-height:200px;overflow:auto}
+.adoout .ai{display:flex;gap:8px;padding:2px 0}.adoout .ai b{font:600 11px var(--mono);color:var(--blue);flex:none}
+.adoout .ai span:last-child{color:var(--faint);flex:none;margin-left:auto}.adoout .err{color:var(--red)}
+.chkrow{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px}.chkrow label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .tmain{min-width:0;display:flex;flex-direction:column;gap:4px}
 .tmain .tn{font-weight:600;font-size:13.5px}
 .tmain .tw{font:12px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1096,7 +1102,7 @@ function card(t) {
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Hand off: forward this task to another agent as a to-do, with this task's summary as context" aria-label="Hand off task #${t.id} to another agent" aria-haspopup="menu">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete" aria-label="More actions for task #${t.id}" aria-haspopup="menu">⋮</button></span></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
-    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}from ${esc(t.handoff.from)}</span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
+    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado)}${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}from ${esc(t.handoff.from)}</span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
   </div>`;
 }
@@ -1664,14 +1670,19 @@ function closeModals() { document.querySelectorAll('.scrim').forEach(s => s.clas
 // ---- triggers ------------------------------------------------------------------
 // Assigning a task is the manual trigger; these start work on their own.
 const BOLT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>';
+const adoChip = a => !a ? '' : /^https?:\/\//.test(a.url || '')
+  ? `<a class="adochip" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer" title="Open work item ${+a.id} in Azure DevOps" onclick="event.stopPropagation()">AB#${+a.id}</a>`
+  : `<span class="adochip" title="Azure DevOps work item ${+a.id}">AB#${+a.id}</span>`;
+const ADO_TYPES = ['Bug', 'Product Backlog Item', 'Task', 'User Story'];
 const TRIG_KIND = {
   schedule: {label: 'Schedule', ic: '◷', hint: "Cron in this computer's time zone."},
   event: {label: 'Event', ic: '↯', hint: 'When a task reaches Review, is approved, or fails. Chains stop after 5 hops.'},
   watch: {label: 'File watch', ic: '◉', hint: 'When files in the project folder change (not the agents\' worktrees).'},
   poll: {label: 'Poll command', ic: '⟳', hint: 'Runs a command in the project folder and fires on its result: CI status, queues, APIs.'},
   webhook: {label: 'Webhook', ic: '⇢', hint: 'An HTTP endpoint with a secret token, for CI, git hooks and scripts.'},
+  ado: {label: 'ADO tag', ic: '⬡', hint: 'Start a workflow when you tag a work item on your Azure DevOps board. Needs the az CLI, signed in.'},
 };
-const TRIG_VARS = {schedule: '{weekday}', event: '{id} {title} {who} {summary} {branch} {commit} {merge}', watch: '{files}', poll: '{output} {exit}', webhook: '{payload}'};
+const TRIG_VARS = {schedule: '{weekday}', event: '{id} {title} {who} {summary} {branch} {commit} {merge}', watch: '{files}', poll: '{output} {exit}', webhook: '{payload}', ado: ''};
 const TRIG_PRESETS = [
   {name: 'Daily standup', blurb: 'Weekdays 11:00, the scribe writes your standup report.', kind: 'schedule', spec: {cron: '0 11 * * 1-5'},
    task: {title: 'Standup report for {date}', tag: 'report', agent: 'scribe', details: "Summarise what merged since the last working day, what is in review, and what is blocked. Link every PR and work item. End with 'New on my plate'."}},
@@ -1722,6 +1733,7 @@ function trigWhat(tr) {
     case 'watch': return `When ${sp.glob} changes · checks every ${sp.every}s`;
     case 'poll': return `Every ${sp.every} min: ${sp.command}  →  on ${({change: 'changed output', fail: 'failure', output: 'new output'})[sp.when]}`;
     case 'webhook': return `POST ${location.origin}/api/hook/${tr.id}`;
+    case 'ado': return `Items tagged “${sp.tag}”${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min · then ${({tag_picked: `add ${sp.tag}-picked`, remove_tag: 'remove the tag', none: 'leave tags'})[sp.after]}`;
   }
 }
 function hookBox(tr) {
@@ -1730,7 +1742,8 @@ function hookBox(tr) {
 }
 function openTriggers() { tv = {mode: 'list'}; drawTriggers(); $('#trigModal').classList.add('on'); }
 function blankTrig(kind = 'schedule') {
-  return {name: '', kind, enabled: true, spec: {cron: '0 9 * * 1-5', on: 'done', tag: '', agent: '', glob: 'src/**/*', every: kind === 'poll' ? 5 : 10, cooldown: 60, command: '', when: 'change'},
+  return {name: '', kind, enabled: true, spec: {cron: '0 9 * * 1-5', on: 'done', tag: '', agent: '', glob: 'src/**/*', every: kind === 'poll' || kind === 'ado' ? 5 : 10, cooldown: 60, command: '', when: 'change',
+                  org: '', project: '', workflow: '', types: [], after: 'tag_picked', comment: true},
           task: {title: '', details: '', tag: '', agent: '', workflow: ''}};
 }
 function editTrig(tr) {
@@ -1744,6 +1757,10 @@ function presetForm(i) {
   if (task.agent && !S.agents.some(a => a.name === task.agent)) task.agent = '';  // roster may differ
   return {mode: 'form', id: null, f: {...b, name: pr.name, kind: pr.kind, spec: {...b.spec, ...pr.spec}, task}};
 }
+function ttRow(tr) {
+  if (tr.kind === 'ado') return `<div class="tt"><span class="faint">→</span><span class="tag eval">${tr.task.workflow ? '⛓' : '⬡'} ${esc(tr.task.workflow ? ((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow) : tr.task.agent)}</span><span>one ${tr.task.workflow ? 'run' : 'task'} per item</span></div>`;
+  return `<div class="tt"><span class="faint">→</span>${tr.task.workflow ? `<span class="tag eval">⛓ ${esc((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow)}</span>` : `<span class="tag ${esc(tr.task.tag || 'feature')}">${esc(tr.task.tag || 'feature')}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(tr.task.title)}</span><span class="faint">· ${tr.task.workflow ? 'workflow run' : tr.task.agent ? esc(tr.task.agent) : 'whoever matches'}</span></div>`;
+}
 function drawTriggers() {
   if (tv.mode === 'form') return drawTrigForm();
   $('#tmTitle').textContent = 'Triggers';
@@ -1753,13 +1770,14 @@ function drawTriggers() {
       <div class="tmain">
         <div class="tn">${esc(tr.name)} <span class="faint" style="font-weight:400">· ${TRIG_KIND[tr.kind].label}</span></div>
         <div class="tw" title="${esc(trigWhat(tr))}">${esc(trigWhat(tr))}</div>
-        <div class="tt"><span class="faint">→</span>${tr.task.workflow ? `<span class="tag eval">⛓ ${esc((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow)}</span>` : `<span class="tag ${esc(tr.task.tag || 'feature')}">${esc(tr.task.tag || 'feature')}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(tr.task.title)}</span><span class="faint">· ${tr.task.workflow ? 'workflow run' : tr.task.agent ? esc(tr.task.agent) : 'whoever matches'}</span></div>
+        ${ttRow(tr)}
         ${tr.kind === 'webhook' ? hookBox(tr) : ''}
-        <div class="tmeta">${tr.fired ? `fired ${tr.fired}× · last ${ago(tr.last)} ago${tr.note ? ' · ' + esc(tr.note) : ''}` : 'not fired yet'}${tr.kind === 'schedule' && tr.enabled ? ` · next ${fmtWhen(tr.next)}` : ''}${tr.kind === 'poll' && tr.checked ? ` · checked ${ago(tr.checked.t)} ago, exit ${tr.checked.exit}` : ''}</div>
+        <div class="tmeta">${tr.fired ? `fired ${tr.fired}× · last ${ago(tr.last)} ago${tr.note ? ' · ' + esc(tr.note) : ''}` : 'not fired yet'}${tr.kind === 'schedule' && tr.enabled ? ` · next ${fmtWhen(tr.next)}` : ''}${tr.kind === 'poll' && tr.checked ? ` · checked ${ago(tr.checked.t)} ago, exit ${tr.checked.exit}` : ''}${tr.kind === 'ado' ? (tr.checked ? ` · checked ${ago(tr.checked.t)} ago, ${tr.checked.found} match${tr.checked.found === 1 ? '' : 'es'}, ${tr.picked || 0} picked up in all` : ' · not checked yet') : ''}</div>
+        ${tr.kind === 'ado' && tr.error ? `<div class="tmeta" style="color:var(--red)" title="${esc(tr.error)}">⚠ ${esc(tr.error)}</div>` : ''}
       </div>
       <div class="tact">
         <button class="sw ${tr.enabled ? 'on' : ''}" data-tr-toggle="${tr.id}" title="${tr.enabled ? 'On: click to pause' : 'Off: click to turn on'}"><span></span></button>
-        <button class="btn sm" data-tr-run="${tr.id}" title="Fire once now">Run</button>
+        <button class="btn sm" data-tr-run="${tr.id}" title="${tr.kind === 'ado' ? 'Check the board now' : 'Fire once now'}">${tr.kind === 'ado' ? 'Check' : 'Run'}</button>
         <button class="btn sm ghost" data-tr-edit="${tr.id}">Edit</button>
         <button class="iconbtn danger" data-tr-del="${tr.id}" title="Delete trigger" aria-label="Delete trigger">✕</button>
       </div>
@@ -1790,19 +1808,47 @@ function drawTrigForm() {
   if (k === 'poll') spec = `<div><div class="label">Command<span class="faint lc">runs in the project folder, 2 min timeout</span></div><textarea class="field mono" rows="2" data-s="command" spellcheck="false" placeholder="gh run list --status failure --limit 1">${esc(sp.command)}</textarea></div>
       <div class="two"><div><div class="label">Every (min)</div><input class="field" type="number" min="1" data-s="every" value="${sp.every}"></div>
       <div><div class="label">Fire when</div>${seg('s', 'when', [['change', 'output changes'], ['fail', 'it starts failing'], ['output', 'it prints something new']], sp.when)}</div></div>`;
+  if (k === 'ado') {
+    const wfs = S.workflows || [], useAgent = !!sp.agent, tg = sp.tag || '<tag>', out = tv.adoOut;
+    spec = `<div><div class="label">Which tag will you put on items?<span class="faint lc">required</span></div>
+        <input class="field mono" data-s="tag" value="${esc(sp.tag)}" placeholder="crew" maxlength="50" spellcheck="false" autocomplete="off"></div>
+      <div class="two" style="grid-template-columns:1fr 160px"><div><div class="label">Organization URL<span class="faint lc">from az devops configure, if set</span></div><input class="field mono" data-s="org" value="${esc(sp.org)}" placeholder="https://dev.azure.com/yourorg" spellcheck="false" autocomplete="off"></div>
+      <div><div class="label">Project</div><input class="field" data-s="project" value="${esc(sp.project)}" spellcheck="false" autocomplete="off"></div></div>
+      <div><div class="label">Start</div><div class="seg"><button data-ado-target="workflow" class="${useAgent ? '' : 'on'}">A workflow run</button><button data-ado-target="agent" class="${useAgent ? 'on' : ''}">A single agent</button></div>
+        <select class="field" data-s="${useAgent ? 'agent' : 'workflow'}" style="margin-top:8px">${useAgent
+          ? S.agents.map(a => `<option value="${esc(a.name)}" ${sp.agent === a.name ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+          : wfs.map(w => `<option value="${esc(w.id)}" ${sp.workflow === w.id ? 'selected' : ''}>${esc(w.name)}</option>`).join('') || '<option value="">No workflows yet</option>'}</select>
+        <div class="thint">One ${useAgent ? 'task' : 'run'} per item, titled <code>AB#id title</code>, with the item's type, state, link and description.</div></div>
+      <div><div class="label">Work item types<span class="faint lc">none ticked = all</span></div><div class="chkrow">${ADO_TYPES.map(t => `<label><input type="checkbox" data-sa="types" data-v="${esc(t)}" ${(sp.types || []).includes(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div></div>
+      <div class="two"><div><div class="label">Check every (min)</div><input class="field" type="number" min="1" data-s="every" value="${sp.every}"></div>
+      <div><div class="label">After pickup</div>${seg('s', 'after', [['tag_picked', `add tag ${tg}-picked`], ['remove_tag', `remove the tag ${tg}`], ['none', 'do nothing']], sp.after)}
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sc="comment" ${sp.comment ? 'checked' : ''}> Post a comment: “Picked up by Crew: …, run #…”</label></div></div>
+      <div><button class="btn sm" data-ado-test ${out?.busy ? 'disabled' : ''}>${out?.busy ? 'Asking Azure DevOps…' : 'Test: list matching items'}</button><span class="faint" style="font-size:11.5px;margin-left:8px">Read-only: starts nothing, writes nothing.</span></div>
+      ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="faint" style="margin-bottom:4px">${out.total} item${out.total === 1 ? '' : 's'} would start${out.total > 10 ? ' (10 per check)' : ''}</div>` + out.items.map(i => `<div class="ai"><b>AB#${+i.id}</b><span>${esc(i.title)}</span><span>${esc(i.type)} · ${esc(i.state)}</span></div>`).join('') : '<div class="faint">No open items carry that tag yet.</div>'}</div>` : ''}
+      <div class="thint">Needs the Azure CLI signed in (<code>az login</code>) with <code>az extension add --name azure-devops</code>. Items you tag get picked up, started once each, and marked in Azure DevOps.</div>`;
+  }
   if (k === 'webhook') spec = `<div class="thint">Saving creates a URL and a secret token. POST to it from CI, a git hook or a script; the body becomes <code>{payload}</code>. The server only listens on this computer, so remote services need a tunnel.</div>`;
   $('#tmBody').innerHTML = `
-    <input class="field" data-f="name" placeholder="Name, e.g. Daily standup" value="${esc(f.name)}" maxlength="60" autocomplete="off">
+    <input class="field" data-f="name" placeholder="${k === 'ado' ? 'Name (optional), e.g. My board' : 'Name, e.g. Daily standup'}" value="${esc(f.name)}" maxlength="60" autocomplete="off">
     <div><div class="label">Trigger</div><div class="seg">${Object.entries(TRIG_KIND).map(([v, i]) => `<button data-kind="${v}" class="${k === v ? 'on' : ''}">${i.ic} ${i.label}</button>`).join('')}</div><div class="thint">${esc(TRIG_KIND[k].hint)}</div></div>
     ${spec}
-    <div class="tsep">${BOLT} Creates a task</div>
+    ${k === 'ado' ? '' : `<div class="tsep">${BOLT} Creates a task</div>
     <input class="field" data-k="title" placeholder="Task title" value="${esc(f.task.title)}" autocomplete="off">
     <textarea class="field" data-k="details" rows="4" placeholder="Details for the agent (optional)">${esc(f.task.details)}</textarea>
     <div class="thint">Placeholders: <code>${TRIG_VARS[k]}</code> <code>{date}</code> <code>{time}</code> <code>{trigger}</code></div>
     <div><div class="label">Starts</div><div class="seg"><button data-target="task" class="${f.task.workflow ? '' : 'on'}">A task</button><button data-target="workflow" class="${f.task.workflow ? 'on' : ''}">A workflow run</button></div></div>
     ${f.task.workflow ? `<div><div class="label">Workflow<span class="faint lc">the title becomes the run's goal</span></div>${seg('k', 'workflow', (S.workflows || []).map(w => [w.id, w.name]), f.task.workflow)}</div>` : `
     <div><div class="label">Tag</div>${seg('k', 'tag', [['', 'feature'], ...S.tags.filter(t => t !== 'feature').map(t => [t, t])], f.task.tag)}</div>
-    <div><div class="label">Give it to</div>${seg('k', 'agent', [['', 'whoever matches the tag'], ...S.agents.map(a => [a.name, a.name])], f.task.agent)}</div>`}`;
+    <div><div class="label">Give it to</div>${seg('k', 'agent', [['', 'whoever matches the tag'], ...S.agents.map(a => [a.name, a.name])], f.task.agent)}</div>`}`}`;
+  if (k === 'ado' && !tv.defTried) {  // prefill from `az devops configure --list`; quietly nothing if az isn't set up
+    tv.defTried = true;
+    const mine = tv;
+    if (!sp.org || !sp.project) fetch('/api/ado', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'defaults'})}).then(r => r.json()).then(d => {
+      if (tv !== mine || tv.mode !== 'form' || tv.f.kind !== 'ado' || d.error) return;
+      for (const x of ['org', 'project']) if (!tv.f.spec[x] && d[x]) tv.f.spec[x] = d[x];
+      drawTrigForm();
+    }).catch(() => {});
+  }
   $('#tmFoot').innerHTML = `<button class="btn ghost" data-tr-back>Back</button><button class="btn primary" data-tr-save>${tv.id ? 'Save' : 'Create trigger'}</button>`;
 }
 $('#trigBtn').onclick = openTriggers;
@@ -1813,7 +1859,18 @@ $('#trigModal').addEventListener('click', async e => {
   if (d.trPreset) { tv = presetForm(+d.trPreset); return drawTriggers(); }
   if (d.trEdit) return editTrig(find(d.trEdit));
   if (d.trToggle) { const tr = find(d.trToggle); return act('trigger_update', {id: tr.id, enabled: !tr.enabled}); }
-  if (d.trRun) { const r = await act('trigger_run', {id: d.trRun}); if (r.ok) toast(`${find(d.trRun)?.name}: fired once`, 'var(--amber)'); return; }
+  if (d.trRun) { const r = await act('trigger_run', {id: d.trRun}); if (r.ok) toast(`${find(d.trRun)?.name}: ${find(d.trRun)?.kind === 'ado' ? 'checking the board' : 'fired once'}`, 'var(--amber)'); return; }
+  if ('adoTest' in d) {
+    const mine = tv; tv.adoOut = {busy: true}; drawTrigForm();
+    const j = await fetch('/api/ado', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'test', spec: tv.f.spec})}).then(r => r.json()).catch(() => ({error: 'could not reach Crew'}));
+    if (tv === mine) { tv.adoOut = j; drawTrigForm(); }
+    return;
+  }
+  if (d.adoTarget) {
+    const sp = tv.f.spec;
+    if (d.adoTarget === 'agent') { sp.workflow = ''; sp.agent = sp.agent || S.agents[0]?.name || ''; } else { sp.agent = ''; sp.workflow = sp.workflow || S.workflows?.[0]?.id || ''; }
+    return drawTrigForm();
+  }
   if (d.trDel) { const tr = find(d.trDel); return askConfirm('Delete trigger?', `<b>${esc(tr.name)}</b> stops firing. Tasks it already created stay on the board.`, 'Delete', async () => { await act('trigger_delete', {id: tr.id}); openTriggers(); }, true); }
   if ('trBack' in d) { tv = {mode: 'list'}; return drawTriggers(); }
   if ('trSave' in d) {
@@ -1826,7 +1883,11 @@ $('#trigModal').addEventListener('click', async e => {
     return save();
   }
   if (d.copy) { try { await navigator.clipboard.writeText(d.copy); toast('Copied', 'var(--green)'); } catch { toast('Copy failed: select the text instead', 'var(--red)'); } return; }
-  if (d.kind) { tv.f.kind = d.kind; tv.f.spec.every = d.kind === 'poll' ? 5 : d.kind === 'watch' ? 10 : tv.f.spec.every; return drawTrigForm(); }
+  if (d.kind) {
+    if (d.kind === 'ado' || tv.f.kind === 'ado') { tv.f.spec.tag = ''; tv.f.spec.agent = ''; }  // event triggers use these names too
+    if (d.kind === 'ado' && !tv.f.spec.workflow) tv.f.spec.workflow = S.workflows?.[0]?.id || '';
+    tv.f.kind = d.kind; tv.f.spec.every = d.kind === 'poll' || d.kind === 'ado' ? 5 : d.kind === 'watch' ? 10 : tv.f.spec.every; return drawTrigForm();
+  }
   if (d.cron) { tv.f.spec.cron = d.cron; return drawTrigForm(); }
   if (d.target) { tv.f.task.workflow = d.target === 'workflow' ? (tv.f.task.workflow || S.workflows?.[0]?.id || '') : ''; return drawTrigForm(); }
   if (d.s) { tv.f.spec[d.s] = d.v; return drawTrigForm(); }
@@ -1836,6 +1897,8 @@ $('#trigModal').addEventListener('input', e => {
   const el = e.target, d = el.dataset;
   if (d.f) tv.f[d.f] = el.value;
   if (d.k) tv.f.task[d.k] = el.value;
+  if (d.sa) { const a = tv.f.spec[d.sa] = (tv.f.spec[d.sa] || []).filter(x => x !== d.v); if (el.checked) a.push(d.v); }
+  if (d.sc) tv.f.spec[d.sc] = el.checked;
   if (d.s) {
     tv.f.spec[d.s] = el.type === 'number' ? +el.value : el.value;
     if (d.s === 'cron') $('#cronHint').textContent = cronText(el.value);
@@ -1889,7 +1952,7 @@ function renderFlows() {
       ${runs.map(r => `
         <div class="run">
           <div style="min-width:0">
-            <div class="rt"><span class="rpill ${r.status}">${r.status}</span><b>${esc(r.name)}</b><span class="faint">·</span><span class="ttl" title="${esc(r.title)}">${esc(r.title)}</span></div>
+            <div class="rt"><span class="rpill ${r.status}">${r.status}</span><b>${esc(r.name)}</b><span class="faint">·</span><span class="ttl" title="${esc(r.title)}">${esc(r.title)}</span>${adoChip(r.ado)}</div>
             <div class="chain" style="margin-top:9px">${chainHtml(r.steps, r)}</div>
             <div class="rmeta">started ${ago(r.started)} ago${r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}${r.status === 'running' ? ` · step ${r.step + 1} of ${r.steps.length}` : ''}${blockedNote(r)}${r.note ? ' · ' + esc(r.note) : ''}</div>
           </div>

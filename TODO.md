@@ -78,6 +78,7 @@ Legend: `[x]` done and tested · `[~]` in progress · `[ ]` pending · `[-]` dro
 - [ ] **Model routing:** suggest a model per task (Haiku for triage, Opus for hard ones) and compare $ per merged task at an equal approval rate
 - [ ] **Lessons:** append approve/reject reasons to a per-agent, user-editable `lessons.md` that the agent reads
 - [ ] GitHub/ADO in and out: issues with a label become cards, approval opens a PR, CI failures go back to the agent
+- [x] **ADO tag trigger:** tag a work item, a workflow run starts for it and the item is marked picked up (`az` CLI, UI-only)
 - [ ] UI system: one SVG icon set (no emoji), neutral tag colours with colour meaning status only, a tag filter dropdown, slimmer agent cards, 44 px phone targets
 - [ ] Parallel workflow steps (fan out, then join); `crew eval` on canned tasks
 

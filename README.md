@@ -155,6 +155,7 @@ Assigning a task is the manual trigger. Press <kbd>T</kbd> for the automatic one
 | ◉ **File watch** | Files matching a glob change in the project | `**/*prompt*` changes, so the evaluator reruns the evals |
 | ⟳ **Poll command** | A command's output changes, it starts failing, or it prints something new | `gh run list --status failure --limit 1` every 10 min goes to ops |
 | ⇢ **Webhook** | Something POSTs to the trigger's URL with its secret token | CI posts after a deploy, so ops checks telemetry |
+| ⬡ **ADO tag** | You tag a work item on your Azure DevOps board | Tag a bug `crew`, and the Bug fix workflow starts for it |
 
 Task templates take placeholders: `{date}` `{time}` everywhere, plus `{id}` `{title}` `{who}` `{summary}` `{branch}` `{commit}` `{merge}` for events, `{files}` for watches, `{output}` `{exit}` for polls and `{payload}` for webhooks. Event chains stop after five hops, and a trigger never fires on its own tasks.
 
@@ -163,6 +164,17 @@ curl -X POST "http://127.0.0.1:8770/api/hook/t7" -H "X-Crew-Token: <token from t
 ```
 
 Nine presets cover the common loops: daily standup, test what ships, review what merges, plan then build, CI failure watch, nightly hygiene, deploy webhook, prompt changes trigger re-evals, and proofreading changed docs.
+
+### Start work from your ADO board
+
+Tag a work item, and Crew starts a workflow for it. No copy and paste.
+
+1. **Prerequisites.** The Azure CLI, signed in (`az login`), with the DevOps extension (`az extension add --name azure-devops`). Crew uses your `az` session; it stores no token. Defaults from `az devops configure --defaults organization=... project=...` prefill the form.
+2. **Set up the trigger.** Press <kbd>T</kbd>, **New trigger**, **ADO tag**. Pick the tag you will use (you choose it, for example `crew`), the organization and project, and a workflow (or one agent). Optionally limit it to Bug, Product Backlog Item, Task or User Story, and set how often to check (5 min by default). **Test** lists the items that match right now, read-only.
+3. **Tag items.** Add your tag to a work item on the board. At the next check Crew starts one run for it, titled `AB#123 <title>`, with the item's type, state, link and description in the brief. The card shows an `AB#123` chip that opens the item.
+4. **What Crew writes back.** By default it adds the tag `crew-picked` (so it is never picked twice) and posts a comment: "Picked up by Crew: Bug fix, run #3". You can instead remove your tag, or leave tags alone. If the write fails, the run still goes ahead and the item is not started again; the trigger shows the warning.
+
+At most 10 items start per check, and closed, done and removed items are skipped. Crew only reads and updates the tags and discussion of items you tagged. Only the Triggers panel can create this trigger, not the boss or an agent, because it writes to ADO.
 
 ## Features
 

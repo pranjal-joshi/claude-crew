@@ -50,8 +50,8 @@ TOOLS = [
          {"id": S, "name": S, "description": S, "steps": {"type": "array", "items": STEP}, "output": {"type": "object"}},
          ["name", "steps"], boss=True),
     tool("add_trigger", "Create a trigger. kind: schedule (spec.cron, 5-field local time), event (spec.on: review|done|error, "
-         "optional spec.tag/spec.agent), watch (spec.glob, spec.every seconds) or webhook. kind poll (runs a shell command) "
-         "is UI-only: you cannot create it, so ask the user to add it in Crew's Triggers panel. It creates `task` (title, details, tag, agent) or, with task.workflow "
+         "optional spec.tag/spec.agent), watch (spec.glob, spec.every seconds) or webhook. kind poll (runs a shell command) and kind ado (writes to Azure DevOps) "
+         "are UI-only: you cannot create them, so ask the user to add it in Crew's Triggers panel. It creates `task` (title, details, tag, agent) or, with task.workflow "
          "set to a workflow id, starts that workflow with the task title as its goal.",
          {"name": S, "kind": S, "spec": {"type": "object"}, "task": {"type": "object"}}, ["name", "kind", "task"], boss=True),
 ]

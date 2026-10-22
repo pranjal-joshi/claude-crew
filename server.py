@@ -12,6 +12,7 @@ import argparse
 import functools
 import hashlib
 import hmac
+import html
 import json
 import re
 import os
@@ -28,7 +29,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 __version__ = "0.2.0"
 
@@ -273,10 +274,178 @@ def local_mcp_servers(project: Path) -> dict:
 
 
 # ---- triggers: cron, templates ---------------------------------------------------
-TRIGGER_KINDS = ["schedule", "event", "watch", "poll", "webhook"]
+TRIGGER_KINDS = ["schedule", "event", "watch", "poll", "webhook", "ado"]
 EVENT_ON = ["review", "done", "error"]
 POLL_WHEN = ["change", "fail", "output"]
 MAX_CHAIN = 5  # an event trigger never fires on a task that is already this many triggers deep
+
+
+# ---- ADO tag trigger: Azure DevOps through the `az` CLI ----------------------------------
+ADO_AFTER = ["tag_picked", "remove_tag", "none"]
+ADO_MAX = 10      # items started per check; the rest wait for the next one
+ADO_SEEN_MAX = 500
+ADO_CLOSED = ("Closed", "Done", "Removed")
+_AZ_UNSAFE = re.compile(r'[%^&|<>"!`\x00-\x1f]')  # az is a .cmd file on Windows: cmd.exe would read these as syntax
+
+
+class AzError(Exception):
+    pass
+
+
+def az_hint(err: str) -> str:
+    low = err.lower()
+    if "az login" in low or "aadsts" in low or "tf400813" in low or "not authorized" in low or "authentication" in low:
+        return "not logged in: run `az login`"
+    if "is not in the 'az' command group" in low or "'boards' is misspelled" in low or ("azure-devops" in low and "extension" in low):
+        return "azure-devops extension missing: `az extension add --name azure-devops`"
+    if "--organization must be specified" in low:
+        return "no organization: fill in the Organization URL"
+    return (err.strip().splitlines() or ["az failed"])[-1][:300]
+
+
+def az(*args: str, raw: bool = False, timeout: int = 90):
+    """Run `az` with an argument list (never a shell) and return its parsed JSON, or its text with raw=True.
+    An empty result prints nothing, which comes back as None."""
+    exe = shutil.which("az")
+    if not exe:
+        raise AzError("az not found: install the Azure CLI (https://aka.ms/installazurecli)")
+    for a in args:
+        if _AZ_UNSAFE.search(a):
+            raise AzError(f"unsupported character in {a[:40]!r}")
+    try:
+        r = subprocess.run([exe, *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=timeout, stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        raise AzError(f"az timed out after {timeout} s") from None
+    except OSError as e:
+        raise AzError(f"az could not start: {e}") from None
+    if r.returncode:
+        raise AzError(az_hint(r.stderr or r.stdout))
+    if raw:
+        return r.stdout
+    try:
+        return json.loads(r.stdout) if r.stdout.strip() else None
+    except ValueError:
+        raise AzError("az printed something that is not JSON") from None
+
+
+def ado_defaults() -> dict:
+    """Organization and project from `az devops configure --list` (lines like `Organization = https://...`)."""
+    out: dict = {}
+    for line in az("devops", "configure", "--list", raw=True).splitlines():
+        k, _, v = line.partition("=")
+        k = k.strip().lower()
+        if k in ("organization", "project") and v.strip():
+            out["org" if k == "organization" else "project"] = v.strip()
+    return out
+
+
+def ado_spec(sp: dict) -> tuple[str | None, dict]:
+    """The parts of an ADO spec the query needs: tag, org, project, types, every, after, comment."""
+    tag = " ".join(str(sp.get("tag") or "").split())
+    if not tag:
+        return "which tag will you put on items? Enter it", {}
+    if len(tag) > 50 or _AZ_UNSAFE.search(tag) or ";" in tag or "," in tag:
+        return "the tag is too long or has a character Azure DevOps tags can't use", {}
+    org = str(sp.get("org") or "").strip().rstrip("/")
+    project = str(sp.get("project") or "").strip()
+    if org and not org.startswith(("https://", "http://")):
+        return "the organization URL looks like https://dev.azure.com/yourorg", {}
+    if _AZ_UNSAFE.search(org) or _AZ_UNSAFE.search(project) or len(org) > 200 or len(project) > 100:
+        return "the organization or project has a character that can't be used", {}
+    types = [str(x).strip() for x in (sp.get("types") or []) if str(x).strip()][:10]
+    if any(_AZ_UNSAFE.search(x) or len(x) > 40 for x in types):
+        return "a work item type has a character that can't be used", {}
+    try:
+        every = max(1, int(sp.get("every") or 5))
+    except (TypeError, ValueError):
+        return "numbers only for intervals", {}
+    return None, {"tag": tag, "org": org, "project": project, "types": types, "every": every,
+                  "after": sp.get("after") if sp.get("after") in ADO_AFTER else "tag_picked",
+                  "comment": bool(sp.get("comment", True))}
+
+
+def wiql_quote(s: str) -> str:
+    return "'" + s.replace("'", "''") + "'"
+
+
+def ado_wiql(sp: dict) -> str:
+    cond = [f"[System.Tags] CONTAINS {wiql_quote(sp['tag'])}"]
+    if sp.get("after", "tag_picked") == "tag_picked":
+        cond.append(f"[System.Tags] NOT CONTAINS {wiql_quote(sp['tag'] + '-picked')}")
+    cond.append("[System.State] NOT IN (" + ", ".join(wiql_quote(x) for x in ADO_CLOSED) + ")")
+    if sp.get("types"):
+        cond.append("[System.WorkItemType] IN (" + ", ".join(wiql_quote(x) for x in sp["types"]) + ")")
+    if sp.get("project"):
+        cond.append(f"[System.TeamProject] = {wiql_quote(sp['project'])}")
+    return ("SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], [System.Tags] FROM WorkItems WHERE "
+            + " AND ".join(cond) + " ORDER BY [System.ChangedDate] DESC")
+
+
+def ado_org_args(sp: dict) -> list[str]:
+    return ["--organization", sp["org"]] if sp.get("org") else []
+
+
+def ado_query(sp: dict) -> list[dict]:
+    """Read-only: the work items that match the tag, as [{id, title, type, state, tags}]."""
+    args = ["boards", "query", "--wiql", ado_wiql(sp), "--output", "json", *ado_org_args(sp)]
+    if sp.get("project"):
+        args += ["--project", sp["project"]]
+    out = []
+    for it in az(*args) or []:
+        f = it.get("fields") or {}
+        try:
+            wid = int(it.get("id") or f.get("System.Id"))
+        except (TypeError, ValueError):
+            continue
+        out.append({"id": wid, "title": str(f.get("System.Title") or ""), "type": str(f.get("System.WorkItemType") or ""),
+                    "state": str(f.get("System.State") or ""), "tags": str(f.get("System.Tags") or "")})
+    return out
+
+
+def html_text(s: str) -> str:
+    s = re.sub(r"(?i)<br\s*/?>|</(p|div|li|h\d|tr)>", "\n", s or "")
+    s = html.unescape(re.sub(r"<[^>]*>", "", s)).replace("\xa0", " ")
+    return re.sub(r"\n\s*\n+", "\n\n", "\n".join(x.strip() for x in s.splitlines())).strip()
+
+
+def ado_item(sp: dict, wid: int) -> dict:
+    """Read-only: one item's title, type, state, tags, description (as text, ~3000 chars) and URL."""
+    d = az("boards", "work-item", "show", "--id", str(wid), "--output", "json", *ado_org_args(sp)) or {}
+    f = d.get("fields") or {}
+    if sp.get("org") and sp.get("project"):
+        url = f"{sp['org']}/{quote(sp['project'])}/_workitems/edit/{wid}"
+    else:
+        url = str(((d.get("_links") or {}).get("html") or {}).get("href") or "")
+    return {"id": wid, "title": str(f.get("System.Title") or f"work item {wid}"), "type": str(f.get("System.WorkItemType") or ""),
+            "state": str(f.get("System.State") or ""), "tags": str(f.get("System.Tags") or ""), "url": url,
+            "description": html_text(str(f.get("System.Description") or ""))[:3000]}
+
+
+def ado_tags_after(old: str, tag: str, after: str) -> str | None:
+    """The new System.Tags value ('; '-separated), or None when the tags stay as they are."""
+    tags = [x.strip() for x in (old or "").split(";") if x.strip()]
+    if after == "tag_picked":
+        if not any(x.lower() == (tag + "-picked").lower() for x in tags):
+            tags.append(tag + "-picked")
+    elif after == "remove_tag":
+        tags = [x for x in tags if x.lower() != tag.lower()]
+    else:
+        return None
+    return "; ".join(tags)
+
+
+def ado_write_back(sp: dict, item: dict, label: str) -> None:
+    """Mark the item as picked up: tags per `after`, plus a discussion comment. Raises AzError."""
+    new = ado_tags_after(item["tags"], sp["tag"], sp["after"])
+    if new is None and not sp.get("comment"):
+        return
+    args = ["boards", "work-item", "update", "--id", str(item["id"]), "--output", "json", *ado_org_args(sp)]
+    if new is not None:
+        args += ["--fields", f"System.Tags={new}"]
+    if sp.get("comment"):
+        args += ["--discussion", _AZ_UNSAFE.sub(" ", f"Picked up by Crew: {label}")]
+    az(*args)
 
 
 def _cron_field(field: str, lo: int, hi: int) -> frozenset:
@@ -1695,9 +1864,9 @@ class Crew:
                 elif kind == "watch" and now() - tr.get("_checked", 0) >= sp["every"]:
                     tr["_checked"] = now()
                     fired |= self._check_watch(tr)
-                elif kind == "poll" and not tr.get("_running") and now() - tr.get("_checked", 0) >= sp["every"] * 60:
+                elif kind in ("poll", "ado") and not tr.get("_running") and now() - tr.get("_checked", 0) >= sp["every"] * 60:
                     tr["_checked"], tr["_running"] = now(), True
-                    threading.Thread(target=self._run_poll, args=(tr,), daemon=True).start()
+                    threading.Thread(target=self._run_poll if kind == "poll" else self._run_ado, args=(tr,), daemon=True).start()
         if fired:
             self.touch()
 
@@ -1752,6 +1921,74 @@ class Crew:
                 self._fire(tr, {"output": out, "exit": code}, f"exit {code}")
         self.touch()
 
+    def _ado_live(self) -> set[int]:
+        """Work item ids that a running run or an open task already carries."""
+        ids = {(r.get("ado") or {}).get("id") for r in self.runs if r["status"] == "running"}
+        ids |= {(t.get("ado") or {}).get("id") for t in self.tasks if t["col"] != "done"}
+        return {i for i in ids if i is not None}
+
+    def _ado_start(self, tr: dict, item: dict) -> str:
+        """Start the workflow run (or create the task) for one work item. Caller holds the lock. Returns what to call it."""
+        sp = tr["spec"]
+        ado = {"id": item["id"], "url": item["url"]}
+        title = f"AB#{item['id']} {item['title']}"[:200]
+        details = f"{item['type']} · {item['state']}\n{item['url']}" + (f"\n\n{item['description']}" if item["description"] else "")
+        source = {"trigger": tr["id"], "name": tr["name"], "ado": ado}
+        if (w := self._workflow(sp.get("workflow"))) is not None:
+            run = self._start_run(w, title, details, source=source)
+            self.event("trigger", f"⚡ {tr['name']} → ⛓ {w['name']}: {title}")
+            return f"{w['name']}, run #{run['id'].lstrip('r')}"
+        if sp.get("workflow"):
+            raise AzError(f"workflow {sp['workflow']} no longer exists")
+        who = sp.get("agent") if sp.get("agent") in self.agents else None
+        t = {"id": self.next_id, "title": title, "details": details[:8000], "tag": "bug" if item["type"] == "Bug" and "bug" in self._all_tags() else "feature",
+             "col": "backlog", "who": who, "pinned": who, "created": now(), "depth": 0, "ado": ado,
+             "source": source | {"kind": "ado"}}
+        self.next_id += 1
+        self.tasks.append(t)
+        self.event("trigger", f"⚡ {tr['name']} → #{t['id']} {title}" + (f" → {who}" if who else ""), who)
+        return f"task #{t['id']}"
+
+    def _run_ado(self, tr: dict) -> None:
+        """One check of an ADO tag trigger. Runs in a thread; az never runs while the lock is held."""
+        sp = tr["spec"]
+        found = picked = 0
+        err = None
+        try:
+            items = ado_query(sp)
+            found = len(items)
+            with self.lock:
+                skip = set(tr.get("seen") or []) | self._ado_live()
+            for it in [i for i in items if i["id"] not in skip][:ADO_MAX]:
+                item = ado_item(sp, it["id"])
+                with self.lock:
+                    if tr not in self.triggers:
+                        return
+                    label = self._ado_start(tr, item)
+                    seen = [i for i in tr.get("seen") or [] if i != item["id"]] + [item["id"]]
+                    tr["seen"] = seen[-ADO_SEEN_MAX:]  # seen first: a failed write-back must not start it twice
+                    tr["fired"], tr["last"], tr["note"] = tr.get("fired", 0) + 1, now(), f"AB#{item['id']}"
+                    tr["picked"] = tr.get("picked", 0) + 1
+                    picked += 1
+                try:
+                    ado_write_back(sp, item, label)
+                except AzError as e:
+                    with self.lock:
+                        self.event("error", f"⚠ {tr['name']}: AB#{item['id']} started, but marking it in Azure DevOps failed: {e}")
+                    err = f"AB#{item['id']} started; write-back failed: {e}"
+                self.touch()
+        except AzError as e:
+            err = str(e)
+        except Exception as e:  # a bug here must not leave the trigger stuck as running
+            err = f"unexpected: {e}"
+        with self.lock:
+            tr["_running"] = False
+            if tr not in self.triggers:
+                return
+            tr["error"] = err
+            tr["checked"] = {"t": now(), "found": found, "picked": picked}
+        self.touch()
+
     def hook(self, tid: str, token: str, body: str) -> dict:
         with self.lock:
             tr = self._trigger(tid)
@@ -1770,8 +2007,23 @@ class Crew:
         name = str(p.get("name") or "").strip()[:60]
         task = p.get("task") or {}
         sp = p.get("spec") or {}
-        if not name:
+        if not name and kind != "ado":
             return "name the trigger", {}
+        if kind == "ado":
+            err, spec = ado_spec(sp)
+            if err:
+                return err, {}
+            if sp.get("workflow"):
+                if not self._workflow(sp["workflow"]):
+                    return f"no workflow {sp['workflow']}", {}
+            elif sp.get("agent") in self.agents:
+                pass
+            else:
+                return "pick a workflow or an agent to start", {}
+            spec |= {"workflow": sp.get("workflow") or "", "agent": "" if sp.get("workflow") else sp["agent"]}
+            name = name or f"ADO: {spec['tag']}"[:60]
+            return None, {"name": name, "kind": kind, "enabled": bool(p.get("enabled", True)), "spec": spec,
+                          "task": {"title": "AB#{id} {title}", "details": "", "tag": "", "agent": spec["agent"], "workflow": spec["workflow"]}}
         if not str(task.get("title") or "").strip():
             return "the task needs a title", {}
         if task.get("agent") and task["agent"] not in self.agents:
@@ -1823,7 +2075,7 @@ class Crew:
         run = {"id": f"r{self.next_run}", "wf": w["id"], "name": w["name"], "title": title[:200],
                "details": (details or "").strip()[:4000], "steps": json.loads(json.dumps(w["steps"])),
                "status": "running", "step": 0, "tasks": [None] * n, "results": [None] * n, "started": now(), "note": "",
-               "source": source}
+               "source": source, "ado": (source or {}).get("ado")}
         self.next_run += 1
         self.runs.append(run)
         self._wf_step(run, 0)
@@ -1865,6 +2117,8 @@ class Crew:
         t = {"id": self.next_id, "title": title, "details": ((body + "\n\n---\n") if body else "") + "\n\n".join(brief),
              "tag": (a["tags"] or ["feature"])[0], "col": "backlog", "who": a["name"], "pinned": a["name"], "created": now(),
              "run": {"id": run["id"], "step": i, "name": run["name"], "n": n}}
+        if run.get("ado"):
+            t["ado"] = run["ado"]
         self.next_id += 1
         self.tasks.append(t)
         run["step"], run["tasks"][i] = i, t["id"]
@@ -2296,6 +2550,8 @@ class Crew:
             elif action in ("trigger_add", "trigger_update"):
                 if p.get("kind") == "poll" and via != "ui":
                     return {"error": "poll triggers run shell commands: create them in Crew's Triggers panel, not through the boss or an agent"}
+                if p.get("kind") == "ado" and via != "ui":
+                    return {"error": "ado triggers write to Azure DevOps: create them in Crew's Triggers panel, not through the boss or an agent"}
                 tr = self._trigger(p.get("id")) if action == "trigger_update" else None
                 if action == "trigger_update" and not tr:
                     return {"error": "unknown trigger"}
@@ -2306,7 +2562,7 @@ class Crew:
                     if err:
                         return {"error": err}
                     if tr:
-                        for k in [k for k in tr if k.startswith("_")] + ["minute", "seen", "checked"]:
+                        for k in [k for k in tr if k.startswith("_")] + ["minute", "checked"] + ([] if tr["kind"] == "ado" else ["seen"]):
                             tr.pop(k, None)  # new settings, new baseline
                         tr.update(clean)
                     else:
@@ -2317,6 +2573,8 @@ class Crew:
                 self.event("trigger", f"trigger {tr['name']} {'on' if tr['enabled'] else 'off'}")
             elif action == "trigger_delete" and (tr := self._trigger(p.get("id"))):
                 self.triggers.remove(tr)
+            elif action == "trigger_run" and (tr := self._trigger(p.get("id"))) and tr["kind"] == "ado":
+                tr["_checked"] = 0  # "Run" on an ADO trigger means: check the board now
             elif action == "trigger_run" and (tr := self._trigger(p.get("id"))):
                 self._fire(tr, {"payload": "(run by hand)", "output": "(run by hand)", "files": "(run by hand)", "exit": 0},
                            "run by you")
@@ -2460,6 +2718,22 @@ def switch_project(path: str) -> dict:
             old.changed.notify_all()
         new.touch()
     return {"ok": True}
+
+
+def ado_form(p: dict) -> dict:
+    """POST /api/ado: {op: "defaults"} reads `az devops configure --list`; {op: "test", spec} runs the query and starts nothing."""
+    try:
+        if p.get("op") == "defaults":
+            return ado_defaults()
+        if p.get("op") == "test":
+            err, sp = ado_spec(p.get("spec") or {})
+            if err:
+                return {"error": err}
+            items = ado_query(sp)
+            return {"ok": True, "total": len(items), "items": items[:25], "wiql": ado_wiql(sp)}
+    except AzError as e:
+        return {"error": str(e)}
+    return {"error": "unknown op"}
 
 
 PORT = 8770
@@ -2679,7 +2953,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "bad json"}, 400)
         if not isinstance(payload, dict):
             return self._json({"error": "bad json"}, 400)
-        if self.path in ("/api/browse", "/api/project"):
+        if self.path == "/api/ado":  # read-only az calls for the trigger form: defaults, and the Test button
+            if tier != "ui":
+                return self._json({"error": "not allowed for this caller"}, 403)
+            res = ado_form(payload)
+        elif self.path in ("/api/browse", "/api/project"):
             if tier != "ui":
                 return self._json({"error": "not allowed for this caller"}, 403)
             if not self._local():
