@@ -1029,7 +1029,7 @@ class Crew:
                     "permission_mode": self.config["permission_mode"], "modes": MODES,
                     "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
                     "project_name": self.project.name, "app_version": __version__, "mcp_allow": sorted(self.mcp_allow),
-                    "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(),
+                    "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(), "ado_base": self._ado_base(),
                     "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []),
                     "runs": self.runs[-30:], "contexts": CONTEXTS, "alerts": self._public_alerts(),
                     "awake": getattr(self, "awake", False), "demo": self.demo,
@@ -1675,6 +1675,34 @@ class Crew:
         found = [m for x in texts if x for m in PR_URL.findall(x)]
         if found:
             t["prs"] = list(dict.fromkeys([*(t.get("prs") or []), *found]))[-5:]
+
+    _ado_dflt: dict | None = None  # az devops defaults, read once in the background when nothing else names the board
+
+    def _ado_base(self) -> str:
+        """Where an AB#123 on a card links: '<org>/<project>/_workitems/edit/' from an item Crew fetched, an ADO
+        trigger, or `az devops configure` defaults. Empty until one is known. Lock held."""
+        for tk in reversed(self.tasks):
+            u = (tk.get("ado") or (tk.get("source") or {}).get("ado") or {}).get("url") or ""
+            if m := re.match(r"(https://\S+?/_workitems/edit/)\d+$", u):
+                return m.group(1)
+        for tr in self.triggers:
+            sp = tr.get("spec") or {}
+            if tr.get("kind") == "ado" and sp.get("org") and sp.get("project"):
+                return f"{str(sp['org']).rstrip('/')}/{quote(sp['project'])}/_workitems/edit/"
+        d = Crew._ado_dflt
+        if d is None:
+            Crew._ado_dflt = {}
+            threading.Thread(target=Crew._read_ado_dflt, daemon=True).start()
+        elif d.get("org") and d.get("project"):
+            return f"{d['org'].rstrip('/')}/{quote(d['project'])}/_workitems/edit/"
+        return ""
+
+    @staticmethod
+    def _read_ado_dflt() -> None:
+        try:
+            Crew._ado_dflt = ado_defaults()
+        except (AzError, OSError):
+            pass
 
     def _forget_sessions(self, name: str) -> None:
         """The agent's sessions are gone (cleared, fresh respawn, renamed): its tasks start fresh next time."""

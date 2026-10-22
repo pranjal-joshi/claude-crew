@@ -585,12 +585,6 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .bossdot{width:7px;height:7px;border-radius:50%;background:var(--faint)}.bossdot.on{background:var(--green);animation:pulse 1.4s infinite}
 .chathead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 /* auto workflow builder */
-.awb{border:1px solid var(--line);background:var(--bg2);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.awb textarea{height:36px;min-height:0;resize:none;overflow:hidden;transition:height .15s}
-.awb:focus-within textarea,.awb.has textarea{height:96px;overflow:auto}
-.awb .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.awb:not(:focus-within):not(.has) .row{display:none}
-.awb .row .btn{white-space:nowrap}
 /* mobile app shell */
 .mnav,.colnav,.mhead{display:none}
 @media (max-width:760px){
@@ -610,7 +604,6 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   .drawer .dactions{flex-wrap:wrap}
   .ctxrow{flex-wrap:wrap}.ctxrow .ctxbar{flex-basis:100%;order:-1}
   .stats .stat{height:30px;padding:0 9px}
-  #chatToggle{display:none}
   .chatin{padding:8px 10px;gap:6px}
   .chatto{padding:0 8px 0 5px}
   .holdb{white-space:nowrap}
@@ -783,6 +776,58 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .budgetf label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .budgetf .brow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
 .budgetf .brow b{color:var(--text)}
+
+/* agent panel: edit settings scroll inside the panel so the message box stays on screen */
+.drawer .dset{flex:0 1 auto;min-height:0;overflow:auto;max-height:62%}
+.drawer .stream{min-height:96px}
+.dset .kvline{display:flex;flex-wrap:wrap;gap:4px 12px;font:11.5px var(--mono);color:var(--faint)}
+.dactions .editb{margin-left:auto}
+.dactions .iconbtn.bin{color:var(--red)}.dactions .iconbtn.bin:hover{background:var(--red-soft)}
+.colh .addt{margin-left:auto;height:24px;padding:0 9px;font-size:12px;white-space:nowrap;flex:none}
+.colh .addt+.n{margin-left:0}
+/* boss chat: a header with Hide, Esc or a click elsewhere closes it, and a one-line peek when the boss replies while closed */
+.chatpeek{display:flex;align-items:center;gap:8px;margin:8px 14px 0;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:12.5px;color:var(--muted);cursor:pointer;min-width:0}
+.chatpeek:hover{border-color:var(--line2);color:var(--text)}
+.chatpeek .pt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chatpeek b{color:var(--text);font-weight:600}
+.chathead .hidebtn{border:0;background:none;color:var(--faint);cursor:pointer;font:12px var(--sans);padding:2px 6px;border-radius:6px;white-space:nowrap;flex:none}
+.chathead .hidebtn:hover{color:var(--text);background:var(--hover)}
+/* workflows page: Workflows | Runs */
+.ftabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px;align-self:flex-start}
+.ftabs button{border:0;background:none;padding:5px 14px;border-radius:7px;color:var(--muted);font:500 12.5px var(--sans);cursor:pointer;display:flex;gap:6px;align-items:center}
+.ftabs button.on{background:var(--raised);color:var(--text);box-shadow:0 1px 0 var(--line2)}
+.ftabs .n{font:11px var(--mono);color:var(--green)}
+.rview{display:grid;grid-template-columns:minmax(240px,340px) minmax(0,1fr);gap:16px;align-items:start;min-height:0}
+.rlist{display:flex;flex-direction:column;gap:6px}
+.rli{display:grid;gap:4px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 11px;cursor:pointer;color:var(--text);font:inherit;min-width:0}
+.rli:hover{border-color:var(--line2)}.rli.on{border-color:var(--accent-line);box-shadow:0 0 0 1px var(--accent-line) inset}
+.rli .l1{display:flex;align-items:center;gap:7px;min-width:0;font-size:12.5px}
+.rli .l1 b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rli .l2{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rli .l3{font-size:11px;color:var(--faint)}
+.rdet{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.rdet .rdh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rdet .rdh h4{margin:0;font-size:14px}
+.rdet .rdt{font-size:13px;color:var(--text);overflow-wrap:anywhere}
+.rdet .rdesc{font-size:12.5px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;max-height:140px;overflow:auto;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.rsteps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rs{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--bg2);display:flex;flex-direction:column;gap:6px;min-width:0}
+.rs.current{border-color:color-mix(in srgb,var(--green) 45%,var(--line))}
+.rs.pending{opacity:.6}.rs.stopped{border-color:color-mix(in srgb,var(--red) 40%,var(--line))}
+.rs .rsh{display:flex;align-items:center;gap:8px;min-width:0;font-size:12.5px}
+.rs .num{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:600 11px var(--mono);background:var(--hover);color:var(--muted);flex:none}
+.rs.done .num{background:var(--green-soft);color:var(--green)}.rs.current .num{background:var(--green);color:#0b2117}
+.rs.stopped .num{background:var(--red-soft);color:var(--red)}
+.rs .who{font-weight:600;white-space:nowrap}
+.rs .stt{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs .sst{font-size:11.5px;color:var(--faint);white-space:nowrap}
+.rs details summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.rs .rsum{margin-top:6px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;color:var(--text)}
+.rs .act{font-size:12px;color:var(--muted)}
+#flows{container-type:inline-size}
+@container (max-width:820px){.rview{grid-template-columns:1fr}}
+.rs .rsh{flex-wrap:wrap}.rs .stt{order:5;flex-basis:100%;white-space:normal;overflow-wrap:anywhere;color:var(--text)}.rs .sst{margin-left:auto}
+.rs .mini{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;background:var(--hover);color:var(--muted);font-size:10px;flex:none}
 </style>
 </head>
 <body>
@@ -799,7 +844,6 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
     <button class="chip trigbtn" id="trigBtn" title="Triggers: schedules, events, file watches, polls and webhooks"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> <span class="tl">Triggers</span> <b id="trigN">0</b></button>
     <div class="stats" id="stats"></div>
     <button class="btn ghost" id="palBtn" title="Command palette">Search <kbd>Ctrl K</kbd></button>
-    <button class="btn primary" id="newBtn">＋ New<span class="nt"> task</span> <kbd class="kon">N</kbd></button>
     <span class="awake" id="awake" hidden title="Keeping this computer awake while agents work. Locking the screen is fine; closing a laptop lid still sleeps.">☕</span>
     <button class="iconbtn" id="hMenu" aria-label="More: phone, version, links" aria-haspopup="menu" title="More">⋮</button>
     <span class="conn" id="conn" title="connection"></span>
@@ -810,7 +854,6 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
       <div class="banner" id="banner"></div>
       <div class="toolbar">
         <div class="tabs" id="tabs"><button data-tab="board" class="on">Board</button><button data-tab="flows">Workflows <span class="n" id="runN"></span></button></div>
-        <div class="filters" id="filters"></div>
         <span class="muted boardhint">Drag a card onto an agent to assign · unassigned cards go to matching roles</span>
         <button class="btn sm ghost clearbtn" id="clearBtn" aria-haspopup="menu" title="Remove finished or all tasks from the board">Clear board ▾</button>
       </div>
@@ -820,11 +863,11 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
       <div class="flows" id="flows" hidden></div>
       <div class="chatbar" id="chatbar">
         <div class="chatlog" id="chatlog" hidden></div>
+        <div class="chatpeek" id="chatPeek" hidden role="button" tabindex="0"></div>
         <div class="chatin">
           <button class="chatto boss" id="chatTo" aria-haspopup="menu"></button>
           <textarea id="chatIn" rows="1" placeholder="Ask the boss to plan, delegate or run a workflow…"></textarea>
           <button class="btn primary sm" id="chatSend" style="height:36px">Send</button>
-          <button class="iconbtn" id="chatToggle" title="Show conversation" aria-label="Show conversation">▴</button>
         </div>
       </div>
     </section>
@@ -1071,7 +1114,7 @@ function render() {
 // a re-render replaces the cards, chips and drawer buttons: put keyboard focus back where it was
 function focusKey() {
   const a = document.activeElement;
-  if (!a || a === document.body || !a.closest('#rail,#board,#filters,#flows,#drawer')) return null;
+  if (!a || a === document.body || !a.closest('#rail,#board,#flows,#drawer')) return null;
   if (a.id) return {sel: '#' + CSS.escape(a.id), s: a.selectionStart, e: a.selectionEnd};
   for (const at of a.attributes) if (at.name.startsWith('data-')) return {sel: `${a.tagName.toLowerCase()}[${at.name}="${CSS.escape(at.value)}"]`};
   return null;
@@ -1177,20 +1220,18 @@ $('#alerts').addEventListener('keydown', e => { if (e.key === 'Enter' && e.targe
 function renderBoard() {
   renderColnav();
   const flows = view.tab === 'flows';
-  $('#board').hidden = flows; $('#filters').hidden = flows; $('#clearBtn').hidden = flows; $('#flows').hidden = !flows;
+  $('#board').hidden = flows; $('#clearBtn').hidden = flows; $('#flows').hidden = !flows;
   document.querySelector('.boardhint').hidden = flows;
   const running = (S.runs || []).filter(r => r.status === 'running').length;
   $('#runN').textContent = running ? `${running} running` : '';
   if (flows) return renderFlows();
   if (document.querySelector('.menu')) return; // keep an open menu anchored
-  const tags = ['all', ...S.tags];
-  $('#filters').innerHTML = tags.map(t => `<button class="fbtn ${view.filter === t ? 'on' : ''}" data-filter="${t}" aria-pressed="${view.filter === t}" title="${t === 'all' ? 'Show every task' : 'Show only ' + t + ' tasks'}">${t}</button>`).join('');
-  const show = t => view.filter === 'all' || t.tag === view.filter;
+  const show = () => true;
   if (!S.tasks.length) { $('#board').innerHTML = firstRunHtml(); return; }
   $('#board').innerHTML = COLS.map(([k, label, c]) => {
     const items = S.tasks.filter(t => t.col === k && show(t)).sort((a, b) => k === 'done' ? b.id - a.id : a.id - b.id);
     return `<div class="col" data-col="${k}">
-      <div class="colh"><span class="dot" style="background:${c}"></span>${label}<span class="n">${items.length}</span></div>
+      <div class="colh"><span class="dot" style="background:${c}"></span>${label}${k === 'backlog' ? '<button class="btn sm primary addt" data-new-task title="New task (N)">＋ New</button>' : ''}<span class="n">${items.length}</span></div>
       <div class="cards">${items.length ? items.map(card).join('') : `<div class="empty">${k === 'backlog' ? 'No tasks yet. Press <kbd>N</kbd> to add one.' : 'Nothing here'}</div>`}</div>
     </div>`;
   }).join('');
@@ -1244,6 +1285,7 @@ const iconSvg = (k, px) => `<svg width="${px}" height="${px}" viewBox="0 0 24 24
 function avFace(x, px = 16) { const a = agentOf(x), name = a?.name || (typeof x === 'string' ? x : '') || '?'; return a?.icon && AGENT_ICONS[a.icon] ? iconSvg(a.icon, px) : esc(name[0]); }
 function avCss(x) { const c = agentOf(x)?.color; return c ? `background:${c};color:${inkOn(c)};border-color:transparent;` : ''; }
 const avPaint = x => { const c = avCss(x); return c ? `style="${c}"` : ''; };
+const PEN = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const BIN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14M10 11v6M14 11v6"/></svg>';
 const FWD = '<svg class="fwd" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 4.5v4.2C7.6 9.6 4.3 14.1 3 19.5c2.6-3.6 6.2-5.3 11-5.3v4.3l7.5-7z"/></svg>';
 // a task whose agent opened a PR: one click runs the /address-review skill in that agent, in the task's own session
@@ -1289,7 +1331,7 @@ function card(t) {
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Hand off: forward this task to another agent as a to-do, with this task's summary as context" aria-label="Hand off task #${t.id} to another agent" aria-haspopup="menu">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete" aria-label="More actions for task #${t.id}" aria-haspopup="menu">⋮</button></span></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
-    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado)}${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.decision ? `<span class="holdb${t.decision.verdict === 'stop' ? ' red' : ''}" title="${esc(t.decision.by)}: ${esc(t.decision.reason)}">${t.decision.verdict === 'stop' ? '⏹ stopped' : '→ passed'}</span>` : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
+    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado || adoRef(t))}${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.decision ? `<span class="holdb${t.decision.verdict === 'stop' ? ' red' : ''}" title="${esc(t.decision.by)}: ${esc(t.decision.reason)}">${t.decision.verdict === 'stop' ? '⏹ stopped' : '→ passed'}</span>` : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
   </div>`;
 }
@@ -1326,14 +1368,11 @@ function renderAgentDrawer(d, a) {
       <span class="pill ${a.status}" style="margin-left:auto"><span class="dot" style="background:currentColor"></span>${a.status}</span>
       <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, kill, delete…" aria-label="More actions for ${a.name}" aria-haspopup="menu">⋮</button>
       <button class="iconbtn" data-close-drawer title="Close" aria-label="Close">✕</button></div>
-    <details class="dd" ${view.details ? 'open' : ''}><summary data-details-sum>Details</summary>
-      <div class="role">${esc(a.role)}</div>
-      <div class="kv"><span>${a.branch ? '⎇ ' + esc(a.branch) : 'shared folder'}</span><span>${esc(MODEL_INFO[a.model || '']?.[0] || a.model)} · ${esc(a.effort || 'default')} effort</span><span class="tok" title="Cumulative for this session: input · cache reads · output">this session: ${fmtTok(a.tokens?.in)} in · ${fmtTok(a.tokens?.cache)} cached · ${fmtTok(a.tokens?.out)} out${costTxt(a.cost)}</span>${a.mcp?.length || a.skills ? `<span class="mcpchip" data-inherit title="Skills, plugins and MCP servers this agent loaded: click to list">${a.skills || 0} skills · ${(a.mcp || []).filter(m => m.status === 'connected').length} MCP</span>` : ''}${a.session ? `<span title="${esc(a.session)}">session ${esc(a.session.slice(0, 8))}</span>` : ''}${t ? `<span>#${t.id} ${esc(t.title.slice(0, 32))}</span>` : ''}</div></details>
     <div class="dactions">
       ${a.status === 'killed' || a.status === 'error'
         ? `<button class="btn sm" data-respawn="${a.name}">↻ Respawn</button><button class="btn sm ghost" data-respawn-fresh="${a.name}">Respawn with fresh session</button>`
         : `${a.status === 'running' ? `<button class="btn sm danger" data-stop="${a.name}" title="End this run now. The session is kept and the task waits on hold.">■ Stop</button>` : ''}${a.status === 'paused' ? `<button class="btn sm" data-resume="${a.name}" style="color:var(--amber)">▶ Resume</button>` : ''}`}
-      <button class="btn sm ${view.showSettings ? 'on' : ''}" data-toggle-settings style="margin-left:auto">⚙ Model &amp; role</button>
+      <button class="btn sm primary editb" data-toggle-settings aria-expanded="${!!view.showSettings}" title="Model, effort, role, tags, look and triggers">${PEN} ${view.showSettings ? 'Done' : 'Edit'}</button><button class="iconbtn bin" data-remove-agent="${a.name}" title="Delete ${esc(a.name)}" aria-label="Delete ${esc(a.name)}">${BIN}</button>
     </div>
     ${ctxRow(a)}${blockedBox(a)}`;
   const inh = $('#dinh'); if (inh) { inh.hidden = !view.showInherit; if (view.showInherit) { const h = inheritHtml(a); if (inh.dataset.sig !== h) { inh.innerHTML = h; inh.dataset.sig = h; } } }
@@ -1399,15 +1438,22 @@ document.addEventListener('click', async e => {
     if (r.ok) { closeMenu(); toast('Budgets saved', 'var(--green)'); }
   }
 }, true);
+// branch, model, tokens, skills/MCP and session: shown at the top of the Edit panel
+function agentKv(a) {
+  const t = a.task ? task(a.task) : null;
+  return `<span>${a.branch ? '⎇ ' + esc(a.branch) : 'shared folder'}</span><span>${esc(MODEL_INFO[a.model || '']?.[0] || a.model)} · ${esc(a.effort || 'default')} effort</span><span class="tok" title="Cumulative for this session: input · cache reads · output">this session: ${fmtTok(a.tokens?.in)} in · ${fmtTok(a.tokens?.cache)} cached · ${fmtTok(a.tokens?.out)} out${costTxt(a.cost)}</span>${a.mcp?.length || a.skills ? `<span class="mcpchip" data-inherit title="Skills, plugins and MCP servers this agent loaded: click to list">${a.skills || 0} skills · ${(a.mcp || []).filter(m => m.status === 'connected').length} MCP</span>` : ''}${a.session ? `<span title="${esc(a.session)}">session ${esc(a.session.slice(0, 8))}</span>` : ''}${t ? `<span>#${t.id} ${esc(t.title.slice(0, 32))}</span>` : ''}`;
+}
 function renderSettings(a) {
   const box = $('#dset'); if (!box) return;
   box.hidden = !view.showSettings;
   if (!view.showSettings) return;
-  const sig = JSON.stringify([a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags, a.context, a.icon, a.color, (S.triggers || []).filter(t => t.task.agent === a.name)]);
+  const sig = JSON.stringify([agentKv(a), a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags, a.context, a.icon, a.color, (S.triggers || []).filter(t => t.task.agent === a.name)]);
   if (sig === view.setSig || box.contains(document.activeElement)) return;
   view.setSig = sig;
   const busy = a.status === 'running';
+  const kv = agentKv(a);
   box.innerHTML = `
+    ${kv ? `<div class="kvline">${kv}</div>` : ''}
     <div class="row2"><span class="k">Model</span><div class="seg tight" data-cfg="model">${['', ...S.models].map(m => `<button data-v="${m}" class="${(a.model || '') === m ? 'on' : ''}" title="${MODEL_INFO[m]?.[1] || ''}">${MODEL_INFO[m]?.[0] || m}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Effort</span><div class="seg tight" data-cfg="effort">${['', ...S.efforts].map(e => `<button data-v="${e}" class="${(a.effort || '') === e ? 'on' : ''}">${e || 'Default'}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Context</span><div class="seg tight" data-cfg="context">${[['fresh', 'Fresh per task'], ['keep', 'Keep across tasks']].map(([v, l]) => `<button data-v="${v}" class="${a.context === v ? 'on' : ''}" title="${v === 'fresh' ? 'New Claude session for each new task: cheaper, no stale context. Messages, Send back and re-running a task it already worked on continue that task’s own session.' : 'One session across tasks: remembers earlier work, but every turn re-reads it.'}">${l}</button>`).join('')}</div></div>
@@ -1417,7 +1463,7 @@ function renderSettings(a) {
     <div class="row2"><span class="k">Tags</span><input class="field" id="cfgTags" value="${esc(a.tags.join(', '))}" placeholder="comma separated"></div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:6px">Triggers</span>${agentTriggers(a)}</div>
     <div class="foot"><span class="muted">${busy ? 'Applies after the current turn. ' : ''}${a.context === 'fresh' ? 'Each new task starts a new session; going back to a task resumes its session.' : 'One session across tasks.'}</span>
-      <button class="btn sm danger" data-remove-agent="${a.name}" style="margin-left:auto">Remove agent</button></div>`;
+</div>`;
   const save = (k, v) => act('configure', {agent: a.name, [k]: v});
   box.querySelectorAll('[data-cfg] button').forEach(b => b.onclick = () => { const k = b.parentElement.dataset.cfg; b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); save(k, b.dataset.v); });
   // a clicked button keeps focus, and the panel doesn't redraw while it holds focus: drop it, then redraw
@@ -1652,7 +1698,7 @@ async function sendMsg() {
 /* ── interactions ──────────────────────────────────── */
 document.addEventListener('click', async e => {
   if (!e.target.closest('.menu')) closeMenu();
-  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-addrev],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-filter],[data-agent],[data-close]');
+  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-addrev],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-new-task],[data-agent],[data-close]');
   if (!el) return;
   const ds = el.dataset;
   if (ds.menu) { e.stopPropagation(); return openTaskMenu(+ds.menu, el); }
@@ -1679,7 +1725,7 @@ document.addEventListener('click', async e => {
   if (ds.refreshDiff) { await act('diff', {task: +ds.refreshDiff}); const d = $('#drawer'); d.innerHTML = ''; return render(); }
   if ('closeDrawer' in ds) { view.drawer = null; return render(); }
   if ('close' in ds) return closeModals();
-  if (ds.filter) { view.filter = ds.filter; return renderBoard(); }
+  if ('newTask' in ds) return openTask();
   if (ds.agent) { view.drawer = view.drawer?.agent === ds.agent ? null : {agent: ds.agent}; render(); setTimeout(() => $('#msg')?.focus(), 0); }
 });
 
@@ -1899,7 +1945,6 @@ $('#tCreate').onclick = createTask;
 const guessTag = t => /test|spec/i.test(t) ? 'test' : /review|pr/i.test(t) ? 'review' : /readme|docs?|document/i.test(t) ? 'docs' : /research|compare|investigat|evaluate/i.test(t) ? 'research' : /bug|fix|crash|broken/i.test(t) ? 'bug' : /ui|page|button|css|layout/i.test(t) ? 'ui' : /endpoint|api|route/i.test(t) ? 'api' : null;
 $('#tTitle').addEventListener('input', () => { if (view.tagTouched) return; const g = guessTag($('#tTitle').value); if (g) { view.newTag = g; $('#tTag').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.tag === g)); } });
 $('#taskModal').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey || e.target.id === 'tTitle')) { e.preventDefault(); createTask(); } });
-$('#newBtn').onclick = () => openTask();
 document.querySelectorAll('.scrim:not(.load)').forEach(s => s.addEventListener('mousedown', e => { if (e.target === s) closeModals(); }));
 function closeModals() { document.querySelectorAll('.scrim:not(.load)').forEach(s => s.classList.remove('on')); }
 
@@ -1907,6 +1952,8 @@ function closeModals() { document.querySelectorAll('.scrim:not(.load)').forEach(
 // ---- triggers ------------------------------------------------------------------
 // Assigning a task is the manual trigger; these start work on their own.
 const BOLT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>';
+// a card that mentions AB#123 links to it too, using the board URL Crew learned (a trigger, an item it fetched, az defaults)
+const adoRef = t => { const m = /\bAB#(\d+)/i.exec(`${t.title} ${t.details || ''}`); return m && {id: +m[1], url: S.ado_base ? S.ado_base + m[1] : ''}; };
 const adoChip = a => !a ? '' : /^https?:\/\//.test(a.url || '')
   ? `<a class="adochip" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer" title="Open work item ${+a.id} in Azure DevOps" onclick="event.stopPropagation()">AB#${+a.id}</a>`
   : `<span class="adochip" title="Azure DevOps work item ${+a.id}">AB#${+a.id}</span>`;
@@ -2181,34 +2228,59 @@ function blockedNote(r) {  // why the current step hasn't started
 }
 function renderFlows() {
   const flows = S.workflows || [], runs = [...(S.runs || [])].reverse();
-  $('#flows').innerHTML = `
-    ${awbHtml()}
+  const live = runs.filter(r => r.status === 'running').length, ft = view.flowTab === 'runs' ? 'runs' : 'workflows';
+  const tabs = `<div class="ftabs" role="tablist"><button role="tab" data-ftab="workflows" class="${ft === 'workflows' ? 'on' : ''}" aria-selected="${ft === 'workflows'}">Workflows</button><button role="tab" data-ftab="runs" class="${ft === 'runs' ? 'on' : ''}" aria-selected="${ft === 'runs'}">Runs <span class="faint">${runs.length || ''}</span>${live ? `<span class="n">● ${live} running</span>` : ''}</button></div>`;
+  if (ft === 'runs') { $('#flows').innerHTML = tabs + runsView(runs); return; }
+  $('#flows').innerHTML = `${tabs}
     <div><h3>Workflows <span class="faint">Run agents in a fixed order. ✋ Waits for your approval · ⚡ Continues automatically.</span>
-      <button class="btn sm" data-wf-new style="margin-left:auto">＋ New workflow</button></h3></div>
+      <button class="btn sm primary" data-wf-new style="margin-left:auto">＋ New workflow</button></h3></div>
     <div class="wfgrid">${flows.map(w => `
       <div class="wf">
         <div class="wh"><b>${esc(w.name)}</b><span class="faint" style="font:11px var(--mono)">${w.steps.length} steps</span>
           <span class="wact">${wfTrigChip(w)}<button class="btn sm run" data-wf-run="${w.id}"><i>▶</i>Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="kebab" data-wf-menu="${w.id}" title="More actions" aria-label="More actions for workflow ${esc(w.name)}" aria-haspopup="menu">⋮</button></span></div>
         ${w.description ? `<div class="wd">${esc(w.description)}</div>` : ''}
         <div class="chain">${chainHtml(w.steps)}</div>
-      </div>`).join('') || '<div class="empty">No workflows yet.</div>'}</div>
-    <div class="runs"><h3>Runs <span class="faint">${runs.length ? '' : 'Start one with ▶ Run.'}</span></h3>
-      ${runs.map(r => `
-        <div class="run">
-          <div style="min-width:0">
-            <div class="rt"><span class="rpill ${r.status}">${r.status}</span><b>${esc(r.name)}</b><span class="faint">·</span><span class="ttl" title="${esc(r.title)}">${esc(r.title)}</span>${adoChip(r.ado)}</div>
-            <div class="chain" style="margin-top:9px">${chainHtml(r.steps, r)}</div>
-            <div class="rmeta">started ${ago(r.started)} ago${r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}${r.status === 'running' ? ` · step ${r.step + 1} of ${r.steps.length}` : ''}${blockedNote(r)}${r.note ? ' · ' + esc(r.note) : ''}</div>
-          </div>
-          <div>${r.status === 'running' ? `<button class="btn sm danger" data-run-stop="${r.id}">Stop</button>` : `<button class="iconbtn bin" data-run-del="${r.id}" title="Remove from list" aria-label="Remove this run from the list">${BIN}</button>`}</div>
-        </div>`).join('')}
-    </div>`;
+      </div>`).join('') || '<div class="empty">No workflows yet.</div>'}</div>`;
+}
+// Runs tab: the list on the left, the selected run's steps (who, what, its summary, branch, decision) on the right
+function runsView(runs) {
+  if (!runs.length) return '<div class="empty">No runs yet. Start one with ▶ Run on a workflow, or let a trigger start one.</div>';
+  const sel = runs.find(r => r.id === view.runSel) || runs[0];
+  const list = runs.map(r => `<button class="rli ${r === sel ? 'on' : ''}" data-run-sel="${r.id}" aria-pressed="${r === sel}">
+      <div class="l1"><span class="rpill ${r.status}">${r.status}</span><b>${esc(r.name)}</b>${adoChip(r.ado)}</div>
+      <div class="l2" title="${esc(r.title)}">${esc(r.title)}</div>
+      <div class="l3">${ago(r.started)} ago${r.status === 'running' ? ` · step ${r.step + 1}/${r.steps.length}` : r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}</div></button>`).join('');
+  return `<div class="rview"><div class="rlist" role="list">${list}</div>${runDetail(sel)}</div>`;
+}
+function runDetail(r) {
+  const steps = r.steps.map((st, i) => {
+    const tid = r.tasks[i], t = tid ? task(tid) : null, res = r.results[i], a = agent(st.agent);
+    const state = res ? 'done' : r.status === 'running' && i === r.step ? 'current' : (r.status === 'stopped' || r.status === 'failed') && i === r.step ? 'stopped' : 'pending';
+    const title = t?.title || (st.title || '{input}').replace(/\{input\}/g, r.title);
+    const what = state === 'done' ? (res.commit ? `committed ${esc(res.commit)}` : 'done') : state === 'current' ? (t?.col === 'review' ? 'waiting for your review' : t?.col === 'backlog' ? 'queued' : 'working') : state === 'stopped' ? (t?.decision?.verdict === 'stop' ? 'stopped here' : 'run ended here') : 'not started';
+    const summary = res?.summary || (t?.col === 'done' || t?.col === 'review' ? t.summary : '');
+    return `<li class="rs ${state}"><div class="rsh"><span class="num">${state === 'done' ? '✓' : i + 1}</span>
+        <span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 11)}</span><span class="who">${esc(st.agent)}</span>
+        <span class="stt" title="${esc(title)}">${esc(title)}</span><span class="sst">${st.gate === 'auto' ? '⚡' : '✋'} ${what}</span>
+        ${tid && t ? `<button class="btn sm ghost" data-open-task="${tid}">#${tid}</button>` : ''}</div>
+      ${t?.decision ? `<div class="act">${t.decision.verdict === 'stop' ? '⏹ Stopped' : '→ Passed on'} by ${esc(t.decision.by)}: ${esc(t.decision.reason)}</div>` : ''}
+      ${state === 'current' && a?.status === 'running' && a.activity ? `<div class="act">${esc(a.activity)}</div>` : ''}
+      ${summary ? `<details ${state === 'stopped' || i === r.results.findLastIndex(x => x) ? 'open' : ''}><summary>Summary${res?.branch ? ` · ⎇ ${esc(res.branch)}` : ''}</summary><div class="rsum">${esc(summary)}</div></details>` : ''}</li>`;
+  }).join('');
+  return `<div class="rdet">
+    <div class="rdh"><span class="rpill ${r.status}">${r.status}</span><h4>${esc(r.name)}</h4>${adoChip(r.ado)}
+      <span style="margin-left:auto;display:flex;gap:6px">${r.status === 'running' ? `<button class="btn sm danger" data-run-stop="${r.id}">Stop run</button>` : `<button class="iconbtn bin" data-run-del="${r.id}" title="Remove from list" aria-label="Remove this run from the list">${BIN}</button>`}</span></div>
+    <div class="rdt">${esc(r.title)}</div>
+    <div class="rmeta">started ${ago(r.started)} ago${r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}${r.source?.name ? ` · by trigger ${esc(r.source.name)}` : ''}${blockedNote(r)}${r.note ? ' · ' + esc(r.note) : ''}</div>
+    ${r.details ? `<div class="rdesc">${esc(r.details)}</div>` : ''}
+    <ol class="rsteps">${steps}</ol></div>`;
 }
 $('#tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (!b) return; view.tab = b.dataset.tab; $('#tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); render(); };
 $('#flows').addEventListener('click', async e => {
-  const el = e.target.closest('[data-wf-new],[data-wf-run],[data-wf-edit],[data-wf-menu],[data-run-stop],[data-run-del],[data-open-task],[data-wf-trig],[data-awb]'); if (!el) return;
+  const el = e.target.closest('[data-wf-new],[data-wf-run],[data-wf-edit],[data-wf-menu],[data-run-stop],[data-run-del],[data-open-task],[data-wf-trig],[data-ftab],[data-run-sel]'); if (!el) return;
   if (el.dataset.wfTrig) return newTrigFor({workflow: el.dataset.wfTrig});
-  if ('awb' in el.dataset) return runAwb();
+  if (el.dataset.ftab) { view.flowTab = el.dataset.ftab; return renderFlows(); }
+  if (el.dataset.runSel) { view.runSel = el.dataset.runSel; return renderFlows(); }
   const d = el.dataset, wf = id => S.workflows.find(w => w.id === id);
   if ('wfNew' in d) return openWfEditor(null);
   if (d.wfRun) return openRun(wf(d.wfRun));
@@ -2744,13 +2816,19 @@ function renderChat() {
   to.innerHTML = `<span class="mini" ${boss ? '' : avPaint(t)}>${boss ? '✦' : avFace(t, 12)}</span>${boss ? 'Boss' : esc(t.name)}<span class="bossdot ${busy ? 'on' : ''}"></span>▾`;
   $('#chatIn').placeholder = boss ? 'Ask the boss to plan, delegate or run a workflow…' : `Message ${t.name}… it lands mid-run if busy`;
   const lg = $('#chatlog'), open = view.chatOpen || document.body.dataset.m === 'chat';
-  lg.hidden = !open; $('#chatToggle').textContent = open ? '▾' : '▴';
+  lg.hidden = !open;
+  // closed: a one-line peek when the boss (or the agent you talk to) said something you haven't seen
+  const last = [...t.log].reverse().find(m => m.kind === 'text'), unseen = !open && last && t.log.length > (view.chatSeen?.[t.name] ?? t.log.length);
+  const pk = $('#chatPeek'); pk.hidden = !unseen;
+  if (unseen) pk.innerHTML = `<b>${boss ? '✦ Boss' : esc(t.name)}</b><span class="pt">${esc(last.text.replace(/\s+/g, ' ').slice(0, 200))}</span><span class="faint">Show ▴</span>`;
+  view.chatSeen = view.chatSeen || {};
+  if (open || view.chatSeen[t.name] == null) view.chatSeen[t.name] = t.log.length;
   if (!open) return;
   const sig = t.name + ':' + t.log.length + ':' + t.status;
   if (lg.dataset.sig === sig) return;
   const atBottom = lg.scrollHeight - lg.scrollTop - lg.clientHeight < 60;
   lg.dataset.sig = sig;
-  lg.innerHTML = `<div class="chathead">${boss ? `<b style="color:var(--text)">Boss</b> · ${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : `<b style="color:var(--text)">${esc(t.name)}</b> · ${esc(t.role.slice(0, 80))}`}${busy ? ' · <span style="color:var(--green)">working…</span>' : ''}<span style="margin-left:auto" title="Cumulative tokens and cost for this chat session; Clear chat resets them">this session: ${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear chat</button></div>` +
+  lg.innerHTML = `<div class="chathead">${boss ? `<b style="color:var(--text)">Boss</b> · ${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : `<b style="color:var(--text)">${esc(t.name)}</b> · ${esc(t.role.slice(0, 80))}`}${busy ? ' · <span style="color:var(--green)">working…</span>' : ''}<span style="margin-left:auto" title="Cumulative tokens and cost for this chat session; Clear chat resets them">this session: ${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear chat</button><button class="hidebtn" data-chat-hide title="Hide the conversation (Esc)">Hide ▾</button></div>` +
     (t.log.length ? renderLog(t.log.slice(-120)) : `<div class="empty">${boss ? 'Try: “Plan and build CSV export for reports, then have it tested and reviewed.”' : 'No messages yet.'}</div>`);
   if (atBottom || lg.dataset.jump) { lg.scrollTop = lg.scrollHeight; delete lg.dataset.jump; }
 }
@@ -2879,7 +2957,13 @@ document.addEventListener('keydown', e => {
 document.addEventListener('focusout', e => { if (slash && e.target === slash.el) setTimeout(() => { if (document.activeElement !== slash?.el) slashClose(); }, 150); });
 sl.addEventListener('pointerdown', e => { e.preventDefault(); const it = e.target.closest('[data-si]'); if (it) slashPick(+it.dataset.si); });
 addEventListener('resize', () => slash && slashDraw());
-$('#chatToggle').onclick = () => { view.chatOpen = !view.chatOpen; renderChat(); };
+const chatShow = on => { if (view.chatOpen === on) return; view.chatOpen = on; if (on) $('#chatlog').dataset.jump = '1'; renderChat(); };
+$('#chatPeek').onclick = () => { chatShow(true); $('#chatIn').focus(); };
+$('#chatPeek').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#chatPeek').click(); } };
+$('#chatlog').addEventListener('click', e => { if (e.target.closest('[data-chat-hide]')) chatShow(false); });
+$('#chatIn').addEventListener('keydown', e => { if (e.key === 'Escape' && view.chatOpen && !document.body.dataset.m) { e.stopPropagation(); chatShow(false); $('#chatIn').blur(); } });
+// a click anywhere outside the chat bar folds the conversation away (not while a menu or dialog is up)
+document.addEventListener('pointerdown', e => { if (view.chatOpen && !document.body.dataset.m && !e.target.closest('#chatbar,.menu,.scrim,.toast')) chatShow(false); });
 $('#chatTo').onclick = e => {
   e.stopPropagation();
   MENU_ACTIONS = [];
@@ -2889,20 +2973,6 @@ $('#chatTo').onclick = e => {
 };
 
 // ---- auto workflow builder ------------------------------------------------------------------
-function awbHtml() {
-  return `<div class="awb ${view.awb ? 'has' : ''}"><h3 style="margin:0">✦ Auto Workflow Builder <span class="faint">Describe how work should flow. The boss creates or updates agents, workflows and triggers to match.</span></h3>
-    <textarea class="field" id="awbIn" rows="1" aria-label="Describe the process to build" placeholder="e.g. Every weekday at 10, triage new ADO bugs: reproduce with a failing test, fix, review, and post a summary to the work item. Model changes must be evaluated before and after.">${esc(view.awb || '')}</textarea>
-    <div class="row"><span class="faint" style="font-size:12px">Reuses existing agents where they fit. You'll see what it did in the boss chat.</span><button class="btn sm run" data-awb style="margin-left:auto"><i style="color:var(--accent)">✦</i>Build with the boss</button></div></div>`;
-}
-document.addEventListener('input', e => { if (e.target.id === 'awbIn') { view.awb = e.target.value; e.target.closest('.awb').classList.toggle('has', !!view.awb); } });
-function runAwb() {
-  const text = (view.awb || '').trim();
-  if (!text) return $('#awbIn')?.focus();
-  bossSays(`Auto Workflow Builder. Design the crew setup for this process:\n\n${text}\n\nSteps: 1) crew_status. 2) Map the process to stages; reuse existing agents whose role fits, update roles/tags where needed, add agents only for stages nobody covers (short names, clear roles, tags, model/effort). 3) save_workflow with ordered steps and gates (approve where a human should look, auto for mechanical steps); update an existing workflow instead of duplicating it. 4) add_trigger for any schedule, event, file or webhook the process mentions (point it at the workflow with task.workflow). 5) Reply with a short list of what you created or changed. Do not start any runs.`);
-  view.awb = '';
-  if (document.body.dataset.m) setM('chat');
-}
-
 // ---- mobile app shell ---------------------------------------------------------------------
 function setM(m) {
   if (m === 'new') return document.body.dataset.m === 'flows' ? openWfEditor(null) : openTask();
@@ -2961,7 +3031,6 @@ function buildPalette() {
     {ic: '⌫', label: 'Clear done tasks', run: () => act('clear', {scope: 'done'})},
     {ic: '⌫', label: 'Clear the whole board…', run: () => askConfirm('Clear the whole board?', 'All tasks are removed and running agents are stopped.', 'Clear everything', () => act('clear', {scope: 'all'}), true)},
     {ic: '✦', label: 'Talk to the boss', k: '/', run: () => { view.chatTo = 'boss'; view.chatOpen = true; render(); $('#chatIn').focus(); }},
-    {ic: '✦', label: 'Auto Workflow Builder', run: () => { setM && document.querySelector('[data-tab="flows"]').click(); setTimeout(() => $('#awbIn')?.focus(), 50); }},
     ...S.agents.filter(a => a.status === 'running').map(a => ({ic: '■', label: `Stop ${a.name}`, run: () => act('stop', {agent: a.name})})),
     ...S.agents.filter(a => a.alive && a.status !== 'running').map(a => ({ic: '⇣', label: `Compact ${a.name}'s context`, run: () => act('compact', {agent: a.name})})),
     {ic: '⛓', label: 'Workflows', k: 'W', run: () => document.querySelector('[data-tab="flows"]').click()},

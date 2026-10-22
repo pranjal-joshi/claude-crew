@@ -80,7 +80,7 @@ Type <kbd>/</kbd> in the chat bar (or in an agent's message box) for a picker of
 
 The boss runs with only the crew tools and a few read-only ones, so a turn costs about 10k tokens of context instead of your full setup.
 
-**Auto Workflow Builder** (Workflows tab): describe a process in plain words, and the boss maps it onto agents, workflows and triggers. It reuses agents that fit, adds the missing ones, and creates triggers for any schedule or event you mention.
+**Let the boss set it up**: describe a process in plain words in the boss chat ("every weekday at 10, triage new ADO bugs, fix, review"), and it maps it onto agents, workflows and triggers. It reuses agents that fit, adds the missing ones, and creates triggers for any schedule or event you mention.
 
 **Auto hand-off**: every agent has a `handoff` tool. When its finished work clearly needs another specialist, it hands a follow-up to a teammate by name, or `auto` by tag. Chains stop after five hops. The manual hand-off menu is unchanged, and it now also offers **Auto**: the boss picks the agent.
 

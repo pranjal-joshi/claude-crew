@@ -349,3 +349,14 @@ class PrLinks(TempCrewCase):
         t = {}
         server.Crew._note_prs(t, "see github.com/o/r/pull/1 and https://github.com/o/r/issues/2")
         self.assertNotIn("prs", t)
+
+
+class AdoBase(TempCrewCase):
+    def test_board_url_from_a_fetched_item(self):
+        server.Crew._ado_dflt = {}
+        self.crew.tasks.append({"id": 99, "title": "x", "col": "done", "ado": {"id": 5, "url": "https://dev.azure.com/acme/AI%20Studio/_workitems/edit/5"}})
+        self.assertEqual(self.crew.snapshot()["ado_base"], "https://dev.azure.com/acme/AI%20Studio/_workitems/edit/")
+
+    def test_empty_when_unknown(self):
+        server.Crew._ado_dflt = {}
+        self.assertEqual(self.crew.snapshot()["ado_base"], "")

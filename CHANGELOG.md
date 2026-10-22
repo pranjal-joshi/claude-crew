@@ -17,6 +17,10 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Resizable side panel**: drag the left edge of the agent / review panel (or focus it and use the arrow keys) to make it wider or narrower; double-click resets. The width is remembered.
 
 ### Changed
+- **Agent panel**: the Details fold-out is gone; its branch, model, tokens, skills/MCP and session line now sits at the top of the **✎ Edit** panel (was ⚙ Model & role). A bin icon next to Edit deletes the agent (Remove agent left the panel). The Edit panel scrolls on its own, so the message box below it stays visible.
+- **Board**: the row of tag filters is gone, and **＋ New task** moved from the header into the Backlog column (<kbd>N</kbd> still works). Any card that mentions `AB#123` links to the work item in a new tab, once Crew knows your board URL (from an ADO trigger, an item it fetched, or `az devops configure` defaults).
+- **Boss chat**: the ▴/▾ toggle is gone. The conversation opens when you focus the input and closes with **Hide**, <kbd>Esc</kbd> or a click elsewhere; while it is closed, a one-line peek shows a new reply.
+- **Workflows page**: **Workflows** and **Runs** tabs. Runs lists every run; select one to see each step's agent, task, state, decision and summary. **＋ New workflow** uses the accent colour. The Auto Workflow Builder box is removed: ask the boss in chat instead.
 - **Each task keeps its own Claude session** (agents on "Fresh per task"). Messages, **Send back** and re-running a task the agent already worked on continue that task's conversation, even after the agent has done other tasks since. Only a new task (from you, the boss or a trigger) starts a fresh session. Clear chat, a fresh respawn and renaming an agent forget its saved sessions.
 - **Messaging an agent whose task waits in Review moves the card back to In progress** until its turn ends, then it returns to Review with the new summary and diff. Approved tasks stay where they are.
 - Deleting a trigger uses a red bin icon instead of ✕ (same confirm).
