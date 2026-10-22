@@ -2,5 +2,5 @@
 templates (templates/). See README.md in this folder."""
 from __future__ import annotations
 
-from . import definitions, runs, templates  # noqa: F401
+from . import definitions, probe, runs, templates  # noqa: F401
 from .runs import fill  # noqa: F401

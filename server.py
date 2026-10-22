@@ -637,11 +637,15 @@ class Crew:
             tk = a["tokens"]
             w = task.setdefault("wait", {"checks": 0})
             w.update(checks=w.get("checks", 0) + 1, last=(d.get("result") or "").strip()[:2000], next=now() + step["every"] * 60)
+            w.pop("wake", None)
+            if pr := w.get("probe"):  # a watch: Crew runs the command now for a baseline and wakes the agent only on change
+                pr.pop("seen", None)
+                w["next"] = now()
             task.update(tokens=tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0), summary=d.get("result", ""), col="backlog",
                         who=a["name"], finished=now())
             a.update(status="idle", task=None)
-            self.event("wait", f"⟳ {a['name']} waits on #{task['id']} · check {w['checks']} of {step['checks']}, next in "
-                               f"{step['every']} min", a["name"])
+            self.event("wait", f"⟳ {a['name']} waits on #{task['id']} · check {w['checks']} of {step['checks']}, "
+                               + (f"watching every {step['every']} min" if w.get("probe") else f"next in {step['every']} min"), a["name"])
         elif task:
             tk = a["tokens"]
             task["tokens"] = tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0)
@@ -882,6 +886,7 @@ class Crew:
         a.update(status="running", task=t["id"], since=now(), activity="starting…")
         if (t.get("wait") or {}).get("checks") and (step := self._until_step(t)):
             body = workflows.runs.recheck_body(t, step)
+            t["wait"].pop("wake", None)
         else:
             body = f"Task #{t['id']}: {t['title']}"
             if t.get("details"):
@@ -956,6 +961,7 @@ class Crew:
                         continue
                     t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and not self._over_task(t) and
                               (t.get("wait") or {}).get("next", 0) <= now() and
+                              (not (t.get("wait") or {}).get("probe") or (t.get("wait") or {}).get("wake")) and
                               (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"]))), None)
                     if t:
                         self._begin(a, t)
@@ -1537,6 +1543,8 @@ class Crew:
                 return {"ok": True, "task": nt["id"]}
             elif action == "decide":  # an agent gates its own running task: continue or stop the work here
                 return workflows.runs.decide(self, p)
+            elif action == "watch":  # a ⟳ step's agent sets the cheap command Crew polls instead of waking it
+                return workflows.probe.set_watch(self, p)
             elif action == "kill" and a:
                 agents.launch.kill(self, a, p)
             elif action == "release" and a:
@@ -1775,7 +1783,7 @@ MCP_TOKEN = secrets.token_urlsafe(24)
 GIT_ACTIONS = ("approve", "unapprove", "merge", "open_pr", "diff")  # UI only; each runs git outside the lock (_git_action)
 UI_TASK_ACTIONS = {"merge_rebase": "_merge_rebase"}
 MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add",
-               "alert", "alert_resolve", "decide"}
+               "alert", "alert_resolve", "decide", "watch"}
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 MAX_BODY = 1_000_000
@@ -2141,6 +2149,7 @@ def main() -> None:
         while True:
             try:
                 CREW.tick_triggers()
+                workflows.probe.tick(CREW)
                 CREW.dispatch()
                 busy = args.awake == "always" or CREW.busy()
                 if busy != awake.on:

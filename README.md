@@ -109,6 +109,8 @@ The **Workflows** tab (<kbd>W</kbd>) chains agents in a fixed order. Run one wit
 
 Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on its own when the agent finishes, and ⟳ **checks until done**: for a goal that takes hours or days, such as a PR merging or a deployment landing. A ⟳ step's agent does what it can, then Crew asks it to check again every so often (30 minutes by default) in the same session, with a short "check again" message instead of the whole brief. The step passes when the agent calls `decide` with continue, ends the run on stop, and goes to Review for you after the set number of checks. A waiting card shows ⟳ with its next check.
 
+To keep a long wait cheap, the agent sets a **watch** (crew tool `watch`): one read-only `gh`, `az` or `git` command, such as `gh pr view 123 --json state --jq .state`, plus an optional `done` regex. Crew runs it on the step's schedule without the model and wakes the agent only when the output changes or matches `done`, so a PR that takes two days costs a few turns instead of one every half hour. Only read-only subcommands are allowed, with no shell: no pipes, redirects or `gh api` writes. The card shows 👁 while it watches.
+
 | Workflow | Steps |
 | --- | --- |
 | Feature delivery | planner ✋ → builder ✋ → tester ⚡ → reviewer ✋ → scribe |

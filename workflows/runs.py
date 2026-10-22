@@ -83,19 +83,28 @@ def start_step(crew, run: dict, i: int) -> None:
 def until_brief(step: dict) -> str:
     return (f"This step lasts until its goal is reached, which can take hours or days (a PR merging, a deployment landing). "
             f"Do what you can now. When the goal is reached, call the crew tool `decide` with verdict continue; if it can "
-            f"never be reached, call it with verdict stop. Otherwise end your turn with a short status: Crew asks you to "
-            f"check again in {step.get('every', 30)} minutes, in this same session, up to {step.get('checks', 96)} times, "
-            f"then hands it to a person.")
+            f"never be reached, call it with verdict stop. Otherwise, before you end your turn with a short status, call the "
+            f"crew tool `watch` with one read-only gh, az or git command whose output changes only when something you must "
+            f"act on happens (e.g. `gh pr view 123 --json state,reviewDecision,statusCheckRollup --jq "
+            f"'[.state,.reviewDecision,[.statusCheckRollup[].conclusion]]'`; no timestamps or counters that change "
+            f"every run), and `done` as a regex for the goal (e.g. MERGED). Crew runs it every {step.get('every', 30)} "
+            f"minutes at no cost and wakes you, in this same session, only when its output changes or matches done. "
+            f"Without a watch Crew wakes you every {step.get('every', 30)} minutes. Up to {step.get('checks', 96)} checks, "
+            f"then a person takes over.")
 
 
 def recheck_body(t: dict, step: dict) -> str:
     """What an "until" step's agent gets when Crew asks it to look again."""
     w = t.get("wait") or {}
     last = " ".join((w.get("last") or "").split())[:400]
+    pr = w.get("probe") or {}
+    seen = (f"Your watch `{pr['cmd']}` woke you ({w.get('wake')}). It now prints:\n{pr.get('out') or '(nothing)'}\n\n"
+            if pr and w.get("wake") else "")
     return (f"Task #{t['id']}: check again ({w.get('checks', 0) + 1} of {step.get('checks', 96)}): {t['title']}\n\n"
-            + (f"Last time you reported: {last}\n\n" if last else "")
+            + seen + (f"Last time you reported: {last}\n\n" if last else "")
             + "Look at the current state. Goal reached: call `decide` with continue and summarize. Can never be reached: "
-              f"`decide` stop. Still waiting: end with one or two lines of status, and Crew asks again in {step.get('every', 30)} min.")
+              f"`decide` stop. Still waiting: end with one or two lines of status; your watch stays set (call `watch` "
+              f"again to change it), or without one Crew asks again in {step.get('every', 30)} min.")
 
 
 def on_task_event(crew, t: dict, col: str, summary: str | None) -> None:

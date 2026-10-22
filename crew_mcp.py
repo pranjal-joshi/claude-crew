@@ -44,6 +44,12 @@ TOOLS = [
          ["title", "severity"]),
     tool("resolve_alert", "Resolve an alert you raised, by the same title, once the problem has recovered. Say how in `note`.",
          {"title": S, "note": S}, ["title"]),
+    tool("watch", "On a ⟳ (check until done) workflow step: instead of being woken on a timer, give Crew one read-only "
+         "command (gh pr view/checks/list/status, gh run view/list, gh api GET, az pipelines runs/build list|show, az repos pr "
+         "show|list, az boards work-item show, git log/ls-remote/rev-parse/merge-base; no pipes: trim with --jq or --query). "
+         "Crew runs it on the step's schedule at no cost and wakes you only when its output changes or matches the `done` "
+         "regex. Print only what matters (no timestamps). Empty command removes the watch.",
+         {"command": S, "done": S}, ["command"]),
     tool("decide", "Gate the task you are running: should this work go ahead? verdict 'continue': your task closes "
          "without review and, in a workflow, the next step starts with your summary (outside a workflow, hand the work on "
          "with the handoff tool first). verdict 'stop': your task closes marked stopped and the workflow run ends here; "
@@ -117,6 +123,8 @@ def run_tool(name, a):
         return status()
     if name == "handoff":
         r = call("/api/act/handoff", {"from": ME, "to": a.get("to"), "title": a.get("title"), "details": a.get("details", ""), "tag": a.get("tag", "")})
+    elif name == "watch":
+        r = call("/api/act/watch", {"from": ME, "command": a.get("command"), "done": a.get("done")})
     elif name == "decide":
         r = call("/api/act/decide", {"from": ME, "verdict": a.get("verdict"), "reason": a.get("reason")})
     elif name == "raise_alert":
