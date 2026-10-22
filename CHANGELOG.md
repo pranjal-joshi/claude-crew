@@ -9,10 +9,13 @@ All notable changes to this project are documented here. The format follows [Kee
 - **⏹ Stop workflow on board cards:** a workflow card in In progress or Review has a Stop workflow button. It ends the run and its open step: a working agent is stopped, a waiting ⟳ or 👁 step stops checking, and the card moves to Done marked ⏹ stopped. It also ends the step of a run that was already stopped but still checking.
 
 ### Changed
+- **Phone design pass:** 44px touch targets (an invisible touch area on small icons and switches), 8-point spacing, rounder cards, and empty columns that say what to do next, with a New task button in an empty Backlog. Desktop is unchanged.
+- **"ADO tag" trigger is now "ADO board"**, since it also picks up items assigned to you.
 - **Watches run every 2 minutes**, on their own clock instead of the step's interval (30 min by default, which still applies to an agent rechecking without a watch). Watch runs no longer count as the step's checks; a watch lasts as long as the step's checks would (checks × interval), then the agent gets a last look.
 - **Waiting steps show in In progress:** a ⟳ step waiting for its next check, or a 👁 step watching a command, is shown in In progress instead of Backlog.
 
 ### Fixed
+- **Phone layout:** the + button floats above the bottom bar so the five tabs share it evenly; Clear board moved to the ⋮ menu; workflow and chat headers fit on one line; card buttons share a row; the ADO trigger form is one column; menus dim the page behind them; toasts line up; a column keeps its scroll position when the board redraws (it jumped to the top whenever an agent reported).
 - **ADO "assigned to me" started old items after an edit:** widening the trigger (say, adding Product Backlog Item to Bug) kept the old baseline, so items already assigned to you that the new filter matched started as if new. Any change to what it matches (types, project, organization, mode, or skip/start) now takes a new baseline on the next check.
 
 ## [0.4.0] - 2026-10-22

@@ -785,6 +785,33 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   .menu{box-shadow:0 0 0 100vmax var(--scrim2),var(--shadow)}
 }
 .mo{display:none}
+@media (max-width:760px){
+  /* touch: 44px targets (visible where there is room, an invisible touch area on small icons and switches) */
+  .btn.sm{height:40px;padding:0 16px;border-radius:12px}
+  .card .cta .btn,.reviewbar .acts .btn{height:44px}
+  .colnav{gap:6px;padding:12px 12px 0}.colnav button{height:40px;padding:0 12px}
+  .ftabs button{height:40px;padding:0 16px}
+  .top .chip,.projbtn,.stats .stat,#hMenu{height:36px!important;min-width:36px}
+  .chatin .btn,.chatto,.chatatt{height:44px!important}.chatatt{width:40px}
+  .kebab,.sched .run,.sw,.add,.chathead .clearbtn,.railbtn,.iconbtn{position:relative}
+  .kebab::after,.sched .run::after,.sw::after,.add::after,.chathead .clearbtn::after,#hMenu::after,.stats .stat::after,.top .chip::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:44px;transform:translate(-50%,-50%)}
+  .cbtns{gap:8px}.kebab{width:32px;height:32px;opacity:.85}
+  .sched .run{padding:4px 10px;font-size:13px}
+  .add{padding:6px 12px}
+  /* 8-point spacing and softer, rounder surfaces */
+  .board,.body.drawer-open .board{gap:16px;padding:12px}
+  .board .col{border-radius:16px}
+  .colh{padding:16px 16px 8px;font-size:14px}
+  .board .col .cards{padding:4px 12px 80px}
+  .card{border-radius:16px;padding:16px;margin-bottom:12px}
+  .card .th{gap:8px}.card .t{font-size:15px;line-height:1.45}
+  .card .f{margin-top:12px;gap:8px}.card .cta{margin-top:12px;gap:8px}
+  .wf,.run,.agent{border-radius:16px}.wf{padding:16px;gap:12px}
+  .wf .wh .wact{gap:4px}.wf .wh .wact .btn.sm{padding:0 10px}.wf .wh b{flex:1 1 0}
+  .wfgrid{gap:12px}
+  .empty{padding:24px 16px;border-radius:16px;line-height:1.5}
+  .empty .mo .btn{margin-top:12px}
+}
 @keyframes sheet{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
 /* workflow canvas */
 .scrim.wfs{padding-top:4vh}
@@ -1162,6 +1189,12 @@ async function post(path, body) {
   const j = await r.json().catch(() => ({})); if (j.error) toast(j.error, 'var(--red)'); return j;
 }
 const boardCol = t => t.col === 'backlog' && !t.hold && (t.wait?.next || t.wait?.probe) ? 'doing' : t.col;
+const EMPTY_MO = {
+  backlog: 'No tasks yet. Add one and an agent with a matching role picks it up.<br><button class="btn sm primary" data-new-task>＋ New task</button>',
+  doing: 'Nothing running. Agents start on Backlog tasks by themselves.',
+  review: 'Nothing waiting for you. Finished work lands here for your approval.',
+  done: 'Approved work shows up here.',
+};
 const COLS = [['backlog','Backlog','var(--faint)'],['doing','In progress','var(--green)'],['review','Review','var(--blue)'],['done','Done','var(--violet)']];
 const STATUS_DOT = {idle:'var(--faint)',running:'var(--green)',review:'var(--blue)',error:'var(--red)',killed:'var(--red)'};
 
@@ -1377,7 +1410,7 @@ function renderBoard() {
     const sh = k === 'backlog' || k === 'doing' ? schedHtml(k) : '';
     return `<div class="col" data-col="${k}">
       <div class="colh"><span class="dot" style="background:${c}"></span>${label}${k === 'backlog' ? '<button class="btn sm primary addt" data-new-task title="New task (N)">＋ New</button>' : ''}<span class="n">${items.length}</span></div>
-      <div class="cards">${sh}${html.length || (sh && k === 'doing') ? html.join('') : `<div class="empty">${k === 'backlog' ? '<span class="dk">No tasks yet. Press <kbd>N</kbd> to add one.</span><span class="mo">No tasks yet. Tap + to add one.</span>' : 'Nothing here'}</div>`}</div>
+      <div class="cards">${sh}${html.length || (sh && k === 'doing') ? html.join('') : `<div class="empty">${k === 'backlog' ? '<span class="dk">No tasks yet. Press <kbd>N</kbd> to add one.</span>' : '<span class="dk">Nothing here</span>'}<span class="mo">${EMPTY_MO[k]}</span></div>`}</div>
     </div>`;
   }).join('');
   document.querySelectorAll('#board .col').forEach(c => { const y = keep[c.dataset.col]; if (y) c.querySelector('.cards').scrollTop = y; });
