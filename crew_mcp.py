@@ -31,7 +31,7 @@ TOOLS = [
     tool("crew_status", "The crew right now: agents (role, tags, model, status, current task), tasks by column, workflows, runs and triggers."),
     tool("handoff", "Hand follow-up work to a teammate as a new task. `to` is an agent name, or 'auto' to let the agent "
          "whose tags match `tag` pick it up. Use once, when your finished work clearly needs another specialist next "
-         "(tests, review, docs, deploy check). Include what you did and where (branch/commit) in `details`.",
+         "(tests, review, docs, deploy check). Include what you did and where (branch/commit) in `details`. `title` is what people read on the card: about 6 plain words saying what to do (\"Fix login timeout on upload\"), no links or long IDs (AB#123 is fine); put everything else in `details`.",
          {"to": S, "title": S, "details": S, "tag": S}, ["to", "title"]),
     tool("raise_alert", "Raise an alert on the Crew board for something failing that a person must see now: a failed "
          "deployment or rollout, a red pipeline on the main branch, an outage or error spike, a security problem, a blocked "
@@ -48,12 +48,12 @@ TOOLS = [
          "with the handoff tool first). verdict 'stop': your task closes marked stopped and the workflow run ends here; "
          "nothing else starts. `reason` is one line shown on the card. Call it once, last, then end with your summary.",
          {"verdict": {"type": "string", "enum": ["continue", "stop"]}, "reason": S}, ["verdict", "reason"]),
-    tool("create_task", "Add a task to the board. Leave `agent` empty to let tags route it.",
+    tool("create_task", "Add a task to the board. Leave `agent` empty to let tags route it. `title` is what people read on the card: about 6 plain words saying what to do (\"Fix login timeout on upload\"), no links or long IDs (AB#123 is fine); put everything else in `details`.",
          {"title": S, "details": S, "tag": S, "agent": S}, ["title"], boss=True),
     tool("assign_task", "Give an existing task (any column) to an agent as a to-do.", {"task": I, "agent": S}, ["task", "agent"], boss=True),
     tool("message_agent", "Send a message to an agent; it lands mid-run if the agent is busy.", {"agent": S, "text": S}, ["agent", "text"], boss=True),
     tool("stop_agent", "Stop an agent's current run. Its task goes back to the backlog on hold; the session is kept.", {"agent": S}, ["agent"], boss=True),
-    tool("run_workflow", "Start a workflow run on a goal.", {"workflow": S, "title": S, "details": S}, ["workflow", "title"], boss=True),
+    tool("run_workflow", "Start a workflow run on a goal. `title` is what people read on the run: about 6 plain words saying what to do (\"Fix login timeout on upload\"), no links or long IDs (AB#123 is fine); put everything else in `details`.", {"workflow": S, "title": S, "details": S}, ["workflow", "title"], boss=True),
     tool("add_agent", "Add an agent to the crew. model: fable|opus|sonnet|haiku or empty; effort: low..max or empty.",
          {"name": S, "role": S, "tags": {"type": "array", "items": S}, "model": S, "effort": S}, ["name", "role"], boss=True),
     tool("update_agent", "Change an agent's role, tags, model or effort.",

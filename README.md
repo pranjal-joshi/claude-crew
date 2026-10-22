@@ -164,6 +164,8 @@ Assigning a task is the manual trigger. Press <kbd>T</kbd> for the automatic one
 | ⟳ **Poll command** | A command's output changes, it starts failing, or it prints something new | `gh run list --status failure --limit 1` every 10 min goes to ops |
 | ⇢ **Webhook** | Something POSTs to the trigger's URL with its secret token | CI posts after a deploy, so ops checks telemetry |
 | ⬡ **ADO tag** | You tag a work item on your Azure DevOps board | Tag a bug `crew`, and the Bug fix workflow starts for it |
+| ▶ **Pipeline** | An Azure Pipelines run finishes (only yours, if you like) | A CD release succeeds, and ADO-QA checks it and updates your work items |
+| ✉ **Teams** | Someone @mentions you, or posts, in a Teams channel or chat | An @mention in *Platform > Incidents* becomes a task for Ops |
 
 Task templates take placeholders: `{date}` `{time}` everywhere, plus `{id}` `{title}` `{who}` `{summary}` `{branch}` `{commit}` `{merge}` for events, `{files}` for watches, `{output}` `{exit}` for polls and `{payload}` for webhooks. Event chains stop after five hops, and a trigger never fires on its own tasks.
 
@@ -181,6 +183,10 @@ Tag a work item, and Crew starts a workflow for it. No copy and paste.
 2. **Set up the trigger.** Press <kbd>T</kbd>, **New trigger**, **ADO tag**. Pick the tag you will use (you choose it, for example `crew`), the organization and project, and a workflow (or one agent). Optionally limit it to Bug, Product Backlog Item, Task or User Story, and set how often to check (5 min by default). **Test** lists the items that match right now, read-only.
 3. **Tag items.** Add your tag to a work item on the board. At the next check Crew starts one run for it, titled `AB#123 <title>`, with the item's type, state, link and description in the brief. The card shows an `AB#123` chip that opens the item.
 4. **What Crew writes back.** By default it adds the tag `crew-picked` (so it is never picked twice) and posts a comment: "Picked up by Crew: Bug fix, run #3". You can instead remove your tag, or leave tags alone. If the write fails, the run still goes ahead and the item is not started again; the trigger shows the warning.
+
+**Pipeline trigger.** **New trigger**, **Pipeline**: add the pipelines by name (the list offers your project's names), choose *succeeds*, *fails* or *finishes*, and an agent or workflow to start. Each finished run starts work once, titled `pipeline result`, with the run link, branch, commit, who it ran for and the run's linked work items. **Only runs for me** keeps runs requested for you or carrying a work item assigned to you (a release build runs as whoever merged, so its linked items tell whose work shipped); your items are listed first and the card links the first one, so an agent like ADO-QA can update or close them. Uses your `az` sign-in, read-only. **Test** lists matching runs from the last 7 days.
+
+**Teams trigger.** It reads Teams through the **Microsoft 365** connector in your Claude Code, so Crew needs no tokens of its own. Sign the connector in once (run `claude`, type `/mcp`, pick *claude.ai Microsoft 365*). Then **New trigger**, **Teams**: name the channel or chat the way you would to a person, choose *@mentions of me* or *every new message*, optionally a topic, and what each message starts. Each check is a short Haiku run (about a cent) allowed only the Microsoft 365 tools, read-only; every new message starts one task titled in about 6 words, with the sender, text and a link. **Test** lists the last 24 hours without starting anything.
 
 At most 10 items start per check, and closed, done and removed items are skipped. Crew only reads and updates the tags and discussion of items you tagged. Only the Triggers panel can create this trigger, not the boss or an agent, because it writes to ADO.
 

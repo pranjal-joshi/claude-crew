@@ -349,14 +349,20 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .trigbtn svg{color:var(--amber)}.trigbtn b{color:var(--text);font-weight:500}
 .modal.tm{width:min(860px,calc(100vw - 32px))}
 .modal.tm{width:min(760px,calc(100vw - 32px))}
-.modal.tm .mb{max-height:min(82vh,900px);overflow:auto}
+.modal.tm{max-height:calc(88vh - 24px);display:flex;flex-direction:column}  /* the scrim starts it 12vh down */
+.modal.tm .mb{flex:1 1 auto;min-height:0;overflow:auto}
+.modal.tm .mb>*,.modal.tm .mh,.modal.tm .mf{flex-shrink:0}
+.kindsel{display:flex;align-items:center;gap:10px}.kindsel select{max-width:260px;font-weight:600}
+.pchips{display:flex;flex-wrap:wrap;gap:6px}.pchips .pc{display:inline-flex;align-items:center;gap:6px;font:12px var(--mono);border:1px solid var(--line2);background:var(--bg2);border-radius:7px;padding:3px 4px 3px 9px}
+.pchips .pc button{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;padding:0 4px;border-radius:5px}.pchips .pc button:hover{color:var(--red);background:var(--red-soft)}
+.tic.k-pipeline{background:var(--green-soft);color:var(--green)}
 .trow{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--bg2)}
 .trow.off{opacity:.55}
 .trow.manual{background:transparent;border-style:dashed}
 .tic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:var(--raised);color:var(--muted)}
 .tic.k-schedule{background:var(--blue-soft);color:var(--blue)}.tic.k-event{background:var(--accent-soft);color:var(--accent-ink)}
 .tic.k-watch{background:var(--teal-soft);color:var(--teal)}.tic.k-poll{background:var(--violet-soft);color:var(--violet)}
-.tic.k-webhook{background:var(--amber-soft);color:var(--amber)}.tic.k-ado{background:var(--blue-soft);color:var(--blue)}
+.tic.k-webhook{background:var(--amber-soft);color:var(--amber)}.tic.k-ado{background:var(--blue-soft);color:var(--blue)}.tic.k-teams{background:var(--violet-soft);color:var(--violet)}
 .adochip{font:600 10.5px var(--mono);color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:5px;padding:0 5px;background:var(--blue-soft)}
 .adochip:hover{text-decoration:underline}
 .adoout{flex:none;border:1px solid var(--line);border-radius:10px;background:var(--bg2);font-size:12.5px;min-height:96px;max-height:min(420px,46vh);overflow:auto;overscroll-behavior:contain}
@@ -1861,9 +1867,9 @@ function killAgent(n) {
 }
 function removeAgent(n) {
   const ag = agent(n);
-  askConfirm(`Remove ${n}?`,
+  askConfirm(`Delete ${n}?`,
     `<b>${esc(n)}</b> will be stopped and removed from the crew.${ag?.task ? ' Its current task goes back to the backlog.' : ''}${ag?.branch ? ` Its work stays on branch <b>${esc(ag.branch)}</b> and its worktree is left on disk.` : ''}`,
-    'Remove agent', async () => { const r = await act('remove_agent', {agent: n}); if (r.ok) { view.drawer = null; render(); } }, true);
+    'Delete agent', async () => { const r = await act('remove_agent', {agent: n}); if (r.ok) { view.drawer = null; render(); } }, true);
 }
 function renameAgent(n) {
   askConfirm(`Rename ${n}`, `<input class="field" id="renIn" value="${esc(n)}" maxlength="24" spellcheck="false" autocomplete="off" style="width:100%">
@@ -1923,7 +1929,7 @@ let confirmRun = null;
 function askConfirm(title, body, ok, run, danger = false) {
   $('#cfTitle').textContent = title; $('#cfBody').innerHTML = `<p>${body}</p>`;
   $('#cfOk').textContent = ok; $('#cfOk').className = 'btn ' + (danger ? 'red' : 'primary');
-  confirmRun = run; $('#confirm').classList.add('on'); setTimeout(() => $('#cfOk').focus(), 0);
+  confirmRun = run; $('#confirm').classList.add('on'); setTimeout(() => (danger ? $('#confirm [data-close]') : $('#cfOk')).focus(), 0);
 }
 $('#cfOk').onclick = () => { const r = confirmRun; confirmRun = null; closeModals(); r && r(); };
 
@@ -1965,8 +1971,10 @@ const TRIG_KIND = {
   poll: {label: 'Poll command', ic: '⟳', hint: 'Runs a command in the project folder and fires on its result: CI status, queues, APIs.'},
   webhook: {label: 'Webhook', ic: '⇢', hint: 'An HTTP endpoint with a secret token, for CI, git hooks and scripts.'},
   ado: {label: 'ADO tag', ic: '⬡', hint: 'Start a workflow when you tag a work item on your Azure DevOps board. Needs the az CLI, signed in.'},
+  pipeline: {label: 'Pipeline', ic: '▶', hint: 'When an Azure Pipelines run finishes (a CD release, a build). Optionally only runs requested for you or carrying your work items. Needs the az CLI, signed in.'},
+  teams: {label: 'Teams', ic: '✉', hint: 'When someone @mentions you, or posts, in a Teams channel or chat. Reads Teams through the Microsoft 365 connector in your Claude Code; each check is a short Haiku run.'},
 };
-const TRIG_VARS = {schedule: '{weekday}', event: '{id} {title} {who} {summary} {branch} {commit} {merge}', watch: '{files}', poll: '{output} {exit}', webhook: '{payload}', ado: ''};
+const TRIG_VARS = {schedule: '{weekday}', event: '{id} {title} {who} {summary} {branch} {commit} {merge}', watch: '{files}', poll: '{output} {exit}', webhook: '{payload}', ado: '', pipeline: '', teams: '{title} {from} {text} {link} {when} {where}'};
 const TRIG_PRESETS = [
   {name: 'Daily standup', blurb: 'Weekdays 11:00, the scribe writes your standup report.', kind: 'schedule', spec: {cron: '0 11 * * 1-5'},
    task: {title: 'Standup report for {date}', tag: 'report', agent: 'scribe', details: "Summarise what merged since the last working day, what is in review, and what is blocked. Link every PR and work item. End with 'New on my plate'."}},
@@ -2017,6 +2025,8 @@ function trigWhat(tr) {
     case 'watch': return `When ${sp.glob} changes · checks every ${sp.every}s`;
     case 'poll': return `Every ${sp.every} min: ${sp.command}  →  on ${({change: 'changed output', fail: 'failure', output: 'new output'})[sp.when]}`;
     case 'webhook': return `POST ${location.origin}/api/hook/${tr.id}`;
+    case 'pipeline': return `${({succeeded: 'Successful', failed: 'Failed', any: 'Finished'})[sp.result]} runs of ${sp.pipelines.join(', ')}${sp.mine ? ' · only mine' : ''} · every ${sp.every} min`;
+    case 'teams': return `${sp.mode === 'all' ? 'New messages' : '@mentions of you'} in ${sp.where}${sp.about ? ` about ${sp.about}` : ''} · every ${sp.every} min`;
     case 'ado': return `Items tagged “${sp.tag}”${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min · then ${({tag_picked: `add ${sp.tag}-picked`, remove_tag: 'remove the tag', none: 'leave tags'})[sp.after]}`;
   }
 }
@@ -2027,7 +2037,7 @@ function hookBox(tr) {
 function openTriggers() { tv = {mode: 'list'}; drawTriggers(); $('#trigModal').classList.add('on'); }
 function blankTrig(kind = 'schedule') {
   return {name: '', kind, enabled: true, spec: {cron: '0 9 * * 1-5', on: 'done', tag: '', agent: '', glob: 'src/**/*', every: kind === 'poll' || kind === 'ado' ? 5 : 10, cooldown: 60, command: '', when: 'change',
-                  org: '', project: '', workflow: '', types: [], after: 'tag_picked', comment: true},
+                  org: '', project: '', workflow: '', types: [], after: 'tag_picked', comment: true, where: '', mode: 'mention', about: '', pipelines: [], result: 'any', mine: true},
           task: {title: '', details: '', tag: '', agent: '', workflow: ''}};
 }
 function editTrig(tr) {
@@ -2049,7 +2059,7 @@ function nextCheck(tr) {
   return tr.next ? ` · next check ${tr.next * 1000 > Date.now() ? clock(tr.next) + ' ' : ''}(<span data-until="${tr.next}">${untilTxt(tr.next)}</span>)` : '';
 }
 function ttRow(tr) {
-  if (tr.kind === 'ado') return `<div class="tt"><span class="faint">→</span><span class="tag eval">${tr.task.workflow ? '⛓' : '⬡'} ${esc(tr.task.workflow ? ((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow) : tr.task.agent)}</span><span>one ${tr.task.workflow ? 'run' : 'task'} per item</span></div>`;
+  if (tr.kind === 'ado' || tr.kind === 'pipeline') return `<div class="tt"><span class="faint">→</span><span class="tag eval">${tr.task.workflow ? '⛓' : '⬡'} ${esc(tr.task.workflow ? ((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow) : tr.task.agent)}</span><span>one ${tr.task.workflow ? 'run' : 'task'} per ${tr.kind === 'pipeline' ? 'finished run' : 'item'}</span></div>`;
   return `<div class="tt"><span class="faint">→</span>${tr.task.workflow ? `<span class="tag eval">⛓ ${esc((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow)}</span>` : `<span class="tag ${esc(tr.task.tag || 'feature')}">${esc(tr.task.tag || 'feature')}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(tr.task.title)}</span><span class="faint">· ${tr.task.workflow ? 'workflow run' : tr.task.agent ? esc(tr.task.agent) : 'whoever matches'}</span></div>`;
 }
 function drawTriggers() {
@@ -2063,12 +2073,12 @@ function drawTriggers() {
         <div class="tw" title="${esc(trigWhat(tr))}">${esc(trigWhat(tr))}</div>
         ${ttRow(tr)}
         ${tr.kind === 'webhook' ? hookBox(tr) : ''}
-        <div class="tmeta">${tr.fired ? `fired ${tr.fired}× · last ${ago(tr.last)} ago${tr.note ? ' · ' + esc(tr.note) : ''}` : 'not fired yet'}${tr.kind === 'schedule' && tr.enabled ? ` · next ${fmtWhen(tr.next)}` : ''}${tr.kind === 'poll' && tr.checked ? ` · checked ${ago(tr.checked.t)} ago, exit ${tr.checked.exit}` : ''}${tr.kind === 'ado' ? (tr.checked ? ` · checked ${ago(tr.checked.t)} ago, ${tr.checked.found} match${tr.checked.found === 1 ? '' : 'es'}, ${tr.picked || 0} picked up in all` : ' · not checked yet') : ''}${tr.kind === 'ado' || tr.kind === 'poll' ? nextCheck(tr) : ''}</div>
-        ${tr.kind === 'ado' && tr.error ? `<div class="tmeta" style="color:var(--red)" title="${esc(tr.error)}">⚠ ${esc(tr.error)}</div>` : ''}
+        <div class="tmeta">${tr.fired ? `fired ${tr.fired}× · last ${ago(tr.last)} ago${tr.note ? ' · ' + esc(tr.note) : ''}` : 'not fired yet'}${tr.kind === 'schedule' && tr.enabled ? ` · next ${fmtWhen(tr.next)}` : ''}${tr.kind === 'poll' && tr.checked ? ` · checked ${ago(tr.checked.t)} ago, exit ${tr.checked.exit}` : ''}${['ado', 'teams', 'pipeline'].includes(tr.kind) ? (tr.checked ? ` · checked ${ago(tr.checked.t)} ago, ${tr.checked.found} new ${({teams: 'message', pipeline: 'run', ado: 'match'})[tr.kind]}${tr.checked.found === 1 ? '' : tr.kind === 'ado' ? 'es' : 's'}, ${tr.picked || 0} picked up in all` : ' · not checked yet') : ''}${['ado', 'poll', 'teams', 'pipeline'].includes(tr.kind) ? nextCheck(tr) : ''}</div>
+        ${['ado', 'teams', 'pipeline'].includes(tr.kind) && tr.error ? `<div class="tmeta" style="color:var(--red)" title="${esc(tr.error)}">⚠ ${esc(tr.error)}</div>` : ''}
       </div>
       <div class="tact">
         <button class="sw ${tr.enabled ? 'on' : ''}" data-tr-toggle="${tr.id}" title="${tr.enabled ? 'On: click to pause' : 'Off: click to turn on'}"><span></span></button>
-        <button class="btn sm" data-tr-run="${tr.id}" title="${tr.kind === 'ado' ? 'Check the board now' : 'Fire once now'}">${tr.kind === 'ado' ? 'Check' : 'Run'}</button>
+        <button class="btn sm" data-tr-run="${tr.id}" title="${({ado: 'Check the board now', teams: 'Check Teams now', pipeline: 'Check for finished runs now'})[tr.kind] || 'Fire once now'}">${['ado', 'teams', 'pipeline'].includes(tr.kind) ? 'Check' : 'Run'}</button>
         <button class="btn sm ghost" data-tr-edit="${tr.id}">Edit</button>
         <button class="iconbtn bin" data-tr-del="${tr.id}" title="Delete trigger" aria-label="Delete trigger">${BIN}</button>
       </div>
@@ -2118,12 +2128,43 @@ function drawTrigForm() {
       ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="ah">${out.total} item${out.total === 1 ? '' : 's'} would start${out.total > 10 ? ' · 10 per check' : ''}${out.total > out.items.length ? ` · showing ${out.items.length}` : ''}</div>` + out.items.map(i => `<div class="ai"><b>AB#${+i.id}</b><span class="t">${esc(i.title)}</span><span class="m">${esc(i.type)} · ${esc(i.state)}</span></div>`).join('') : '<div class="none">No open items carry that tag yet.</div>'}</div>` : ''}
       <div class="thint">Needs the Azure CLI signed in (<code>az login</code>) with <code>az extension add --name azure-devops</code>. Items you tag get picked up, started once each, and marked in Azure DevOps.</div>`;
   }
+  if (k === 'pipeline') {
+    const wfs = S.workflows || [], useAgent = !!sp.agent, out = tv.pipeOut, names = tv.pipeNames || [];
+    spec = `<div><div class="label">Pipelines<span class="faint lc">required; type a name and press Enter</span></div>
+        <div class="pchips">${(sp.pipelines || []).map((n, i) => `<span class="pc">${esc(n)}<button data-pipe-del="${i}" title="Remove" aria-label="Remove ${esc(n)}">✕</button></span>`).join('')}</div>
+        <input class="field mono" id="pipeAdd" list="pipeNames" placeholder="${names.length ? 'e.g. Api.Release' : 'Api.Release'}" spellcheck="false" autocomplete="off" style="margin-top:8px">
+        <datalist id="pipeNames">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>
+      <div class="two" style="grid-template-columns:1fr 160px"><div><div class="label">Organization URL<span class="faint lc">from az devops configure, if set</span></div><input class="field mono" data-s="org" value="${esc(sp.org)}" placeholder="https://dev.azure.com/yourorg" spellcheck="false" autocomplete="off"></div>
+      <div><div class="label">Project</div><input class="field" data-s="project" value="${esc(sp.project)}" spellcheck="false" autocomplete="off"></div></div>
+      <div class="two"><div><div class="label">Fire when a run</div>${seg('s', 'result', [['succeeded', 'succeeds'], ['failed', 'fails'], ['any', 'finishes']], sp.result)}</div>
+      <div><div class="label">Check every (min)</div><input class="field" type="number" min="2" data-s="every" value="${sp.every}"></div></div>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sc="mine" ${sp.mine ? 'checked' : ''} style="margin-top:2px"><span><b>Only runs for me</b>: requested for you, or carrying a work item assigned to you. A release build runs as whoever merged, so its linked work items tell whose work shipped.</span></label>
+      <div><div class="label">Start</div><div class="seg"><button data-ado-target="agent" class="${useAgent ? 'on' : ''}">A single agent</button><button data-ado-target="workflow" class="${useAgent ? '' : 'on'}">A workflow run</button></div>
+        <select class="field" data-s="${useAgent ? 'agent' : 'workflow'}" style="margin-top:8px">${useAgent
+          ? S.agents.map(a => `<option value="${esc(a.name)}" ${sp.agent === a.name ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+          : wfs.map(w => `<option value="${esc(w.id)}" ${sp.workflow === w.id ? 'selected' : ''}>${esc(w.name)}</option>`).join('') || '<option value="">No workflows yet</option>'}</select>
+        <div class="thint">One ${useAgent ? 'task' : 'run'} per finished run, titled <code>pipeline result</code>, with the run link, branch, commit, who it ran for, your work items in it (to update or close) and every linked item.</div></div>
+      <div><button class="btn sm" data-pipe-test ${out?.busy ? 'disabled' : ''}>${out?.busy ? 'Asking Azure DevOps… (up to a minute)' : 'Test: list recent finished runs'}</button><span class="faint" style="font-size:11.5px;margin-left:8px">Read-only: the last 7 days, starts nothing. Reading each run's work items takes a moment.</span></div>
+      ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="ah">${out.total} recent run${out.total === 1 ? '' : 's'} match</div>` + out.items.map(r => `<div class="ai"><b>#${+r.id}</b><span class="t"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.pipeline)}</a> ${esc(r.result)} · for ${esc(r.who || '?')}${r.my_items?.length ? ` · yours: ${esc(r.my_items.join(', '))}` : ''}</span><span class="m">${r.items} item${r.items === 1 ? '' : 's'} · ${ago(r.finished)} ago</span></div>`).join('') : '<div class="none">No finished runs in the last 7 days match.</div>'}</div>` : ''}
+      <div class="thint">Needs the Azure CLI signed in (<code>az login</code>) with the azure-devops extension. Read-only: it never changes a pipeline or a work item; the agent it starts can.</div>`;
+  }
+  if (k === 'teams') {
+    const out = tv.teamsOut;
+    spec = `<div><div class="label">Channel or chat<span class="faint lc">required, as you'd name it to a person</span></div>
+        <input class="field" data-s="where" value="${esc(sp.where)}" placeholder="Platform team > Incidents channel" maxlength="200" autocomplete="off"></div>
+      <div class="two"><div><div class="label">Fire on</div>${seg('s', 'mode', [['mention', '@mentions of me'], ['all', 'every new message']], sp.mode)}</div>
+      <div><div class="label">Check every (min)</div><input class="field" type="number" min="5" data-s="every" value="${sp.every}"></div></div>
+      <div><div class="label">Only about<span class="faint lc">optional</span></div><input class="field" data-s="about" value="${esc(sp.about)}" placeholder="e.g. deployments, outages or bugs in checkout" maxlength="200" autocomplete="off"></div>
+      <div><button class="btn sm" data-teams-test ${out?.busy ? 'disabled' : ''}>${out?.busy ? 'Reading Teams… (up to a minute)' : 'Test: list the last 24 hours'}</button><span class="faint" style="font-size:11.5px;margin-left:8px">Read-only: starts nothing. One short Haiku run.</span></div>
+      ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="ah">${out.total} message${out.total === 1 ? '' : 's'} would start work${out.cost ? ` · this test cost ${money(out.cost)}` : ''}</div>` + out.items.map(i => `<div class="ai"><b>${esc(i.from)}</b><span class="t">${esc(i.title)}</span><span class="m">${i.link ? `<a href="${esc(i.link)}" target="_blank" rel="noopener">open ↗</a>` : esc(i.time)}</span></div>`).join('') : '<div class="none">Nothing in the last 24 hours matches.</div>'}</div>` : ''}
+      <div class="thint">Uses the <b>Microsoft 365</b> connector from your Claude Code. Sign it in once: run <code>claude</code> in a terminal, type <code>/mcp</code> and pick <i>claude.ai Microsoft 365</i>. Read-only: it never posts. Each new message starts one task or run, at most 10 per check.</div>`;
+  }
   if (k === 'webhook') spec = `<div class="thint">Saving creates a URL and a secret token. POST to it from CI, a git hook or a script; the body becomes <code>{payload}</code>. The server only listens on this computer, so remote services need a tunnel.</div>`;
   $('#tmBody').innerHTML = `
     <input class="field" data-f="name" placeholder="${k === 'ado' ? 'Name (optional), e.g. My board' : 'Name, e.g. Daily standup'}" value="${esc(f.name)}" maxlength="60" autocomplete="off">
-    <div><div class="label">Trigger</div><div class="seg">${Object.entries(TRIG_KIND).map(([v, i]) => `<button data-kind="${v}" class="${k === v ? 'on' : ''}">${i.ic} ${i.label}</button>`).join('')}</div><div class="thint">${esc(TRIG_KIND[k].hint)}</div></div>
+    <div><div class="label">Trigger</div><div class="kindsel"><span class="tic k-${k}" aria-hidden="true">${TRIG_KIND[k].ic}</span><select class="field" id="kindSel" aria-label="Trigger type">${Object.entries(TRIG_KIND).map(([v, i]) => `<option value="${v}" ${k === v ? 'selected' : ''}>${i.ic}  ${i.label}</option>`).join('')}</select></div><div class="thint">${esc(TRIG_KIND[k].hint)}</div></div>
     ${spec}
-    ${k === 'ado' ? '' : `<div class="tsep">${BOLT} Creates a task</div>
+    ${k === 'ado' || k === 'pipeline' ? '' : `<div class="tsep">${BOLT} Creates a task</div>
     <input class="field" data-k="title" placeholder="Task title" value="${esc(f.task.title)}" autocomplete="off">
     <textarea class="field" data-k="details" rows="4" placeholder="Details for the agent (optional)">${esc(f.task.details)}</textarea>
     <div class="thint">Placeholders: <code>${TRIG_VARS[k]}</code> <code>{date}</code> <code>{time}</code> <code>{trigger}</code></div>
@@ -2131,11 +2172,25 @@ function drawTrigForm() {
     ${f.task.workflow ? `<div><div class="label">Workflow<span class="faint lc">the title becomes the run's goal</span></div>${seg('k', 'workflow', (S.workflows || []).map(w => [w.id, w.name]), f.task.workflow)}</div>` : `
     <div><div class="label">Tag</div>${seg('k', 'tag', [['', 'feature'], ...S.tags.filter(t => t !== 'feature').map(t => [t, t])], f.task.tag)}</div>
     <div><div class="label">Give it to</div>${seg('k', 'agent', [['', 'whoever matches the tag'], ...S.agents.map(a => [a.name, a.name])], f.task.agent)}</div>`}`}`;
-  if (k === 'ado' && !tv.defTried) {  // prefill from `az devops configure --list`; quietly nothing if az isn't set up
+  if (k === 'pipeline') {
+    const add = $('#pipeAdd');
+    const push = () => { const v = add.value.trim(); if (!v) return; const l = tv.f.spec.pipelines || (tv.f.spec.pipelines = []); if (!l.some(x => x.toLowerCase() === v.toLowerCase())) l.push(v); add.value = ''; drawTrigForm(); $('#pipeAdd')?.focus(); };
+    add.onkeydown = e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); push(); } };
+    add.onchange = () => { if ((tv.pipeNames || []).includes(add.value.trim())) push(); };  // picked from the list
+    if (!tv.pipeNamesTried && sp.org && sp.project) {
+      tv.pipeNamesTried = true; const mine = tv;
+      fetch('/api/ado', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'pipelines', spec: {org: sp.org, project: sp.project}})}).then(r => r.json()).then(d => {
+        if (tv === mine && d.names) { tv.pipeNames = d.names; if (tv.f.kind === 'pipeline' && document.activeElement?.id !== 'pipeAdd') drawTrigForm(); }
+      }).catch(() => {});
+    }
+  }
+  if ((k === 'ado' || k === 'pipeline') && !tv.defTried) {  // prefill from `az devops configure --list`; quietly nothing if az isn't set up
     tv.defTried = true;
+    const kb = /^(https?:\/\/[^/]+\/[^/]+)\/([^/]+)\/_workitems\//.exec(S.ado_base || '');  // or the board Crew already links to
+    if (kb && !sp.org && !sp.project) { sp.org = kb[1]; sp.project = decodeURIComponent(kb[2]); setTimeout(drawTrigForm); }
     const mine = tv;
     if (!sp.org || !sp.project) fetch('/api/ado', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'defaults'})}).then(r => r.json()).then(d => {
-      if (tv !== mine || tv.mode !== 'form' || tv.f.kind !== 'ado' || d.error) return;
+      if (tv !== mine || tv.mode !== 'form' || !['ado', 'pipeline'].includes(tv.f.kind) || d.error) return;
       for (const x of ['org', 'project']) if (!tv.f.spec[x] && d[x]) tv.f.spec[x] = d[x];
       drawTrigForm();
     }).catch(() => {});
@@ -2143,6 +2198,18 @@ function drawTrigForm() {
   $('#tmFoot').innerHTML = `<button class="btn ghost" data-tr-back>Back</button><button class="btn primary" data-tr-save>${tv.id ? 'Save' : 'Create trigger'}</button>`;
 }
 $('#trigBtn').onclick = openTriggers;
+const TEAMS_TASK = {title: '{title}', details: 'Teams message from {from} in {where} ({when}):\n\n{text}\n\n{link}'};
+function setTrigKind(kind) {
+  const f = tv.f, was = f.kind;
+  if (['ado', 'pipeline'].includes(kind) || ['ado', 'pipeline'].includes(was)) { f.spec.tag = ''; f.spec.agent = ''; }  // event triggers use these names too
+  if (kind === 'ado' && !f.spec.workflow) f.spec.workflow = S.workflows?.[0]?.id || '';
+  if (kind === 'pipeline' && !f.spec.workflow) f.spec.agent = (S.agents.find(a => /qa|verif/i.test(a.name)) || S.agents[0])?.name || '';
+  if (was === 'teams' && f.task.title === TEAMS_TASK.title && f.task.details === TEAMS_TASK.details) Object.assign(f.task, {title: '', details: ''});
+  if (kind === 'teams' && !f.task.title) Object.assign(f.task, TEAMS_TASK);
+  f.kind = kind; f.spec.every = kind === 'poll' || kind === 'ado' || kind === 'pipeline' ? 5 : kind === 'watch' || kind === 'teams' ? 10 : f.spec.every;
+  drawTrigForm();
+}
+$('#trigModal').addEventListener('change', e => { if (e.target.id === 'kindSel') setTrigKind(e.target.value); });
 $('#trigModal').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b || b.hasAttribute('data-close')) return;
   const d = b.dataset, find = id => S.triggers.find(t => t.id === id);
@@ -2150,7 +2217,20 @@ $('#trigModal').addEventListener('click', async e => {
   if (d.trPreset) { tv = presetForm(+d.trPreset); return drawTriggers(); }
   if (d.trEdit) return editTrig(find(d.trEdit));
   if (d.trToggle) { const tr = find(d.trToggle); return act('trigger_update', {id: tr.id, enabled: !tr.enabled}); }
-  if (d.trRun) { const r = await act('trigger_run', {id: d.trRun}); if (r.ok) toast(`${find(d.trRun)?.name}: ${find(d.trRun)?.kind === 'ado' ? 'checking the board' : 'fired once'}`, 'var(--amber)'); return; }
+  if (d.trRun) { const r = await act('trigger_run', {id: d.trRun}); if (r.ok) toast(`${find(d.trRun)?.name}: ${({ado: 'checking the board', teams: 'checking Teams'})[find(d.trRun)?.kind] || 'fired once'}`, 'var(--amber)'); return; }
+  if (d.pipeDel) { tv.f.spec.pipelines.splice(+d.pipeDel, 1); return drawTrigForm(); }
+  if ('pipeTest' in d) {
+    const mine = tv; tv.pipeOut = {busy: true}; drawTrigForm();
+    const j = await fetch('/api/ado', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'pipeline_test', spec: tv.f.spec})}).then(r => r.json()).catch(() => ({error: 'could not reach Crew'}));
+    if (tv === mine) { tv.pipeOut = j; drawTrigForm(); }
+    return;
+  }
+  if ('teamsTest' in d) {
+    const mine = tv; tv.teamsOut = {busy: true}; drawTrigForm();
+    const j = await fetch('/api/teams', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'test', spec: tv.f.spec})}).then(r => r.json()).catch(() => ({error: 'could not reach Crew'}));
+    if (tv === mine) { tv.teamsOut = j; drawTrigForm(); }
+    return;
+  }
   if ('adoTest' in d) {
     const mine = tv; tv.adoOut = {busy: true}; drawTrigForm();
     const j = await fetch('/api/ado', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'test', spec: tv.f.spec})}).then(r => r.json()).catch(() => ({error: 'could not reach Crew'}));
@@ -2174,11 +2254,7 @@ $('#trigModal').addEventListener('click', async e => {
     return save();
   }
   if (d.copy) { try { await navigator.clipboard.writeText(d.copy); toast('Copied', 'var(--green)'); } catch { toast('Copy failed: select the text instead', 'var(--red)'); } return; }
-  if (d.kind) {
-    if (d.kind === 'ado' || tv.f.kind === 'ado') { tv.f.spec.tag = ''; tv.f.spec.agent = ''; }  // event triggers use these names too
-    if (d.kind === 'ado' && !tv.f.spec.workflow) tv.f.spec.workflow = S.workflows?.[0]?.id || '';
-    tv.f.kind = d.kind; tv.f.spec.every = d.kind === 'poll' || d.kind === 'ado' ? 5 : d.kind === 'watch' ? 10 : tv.f.spec.every; return drawTrigForm();
-  }
+  if (d.kind) return setTrigKind(d.kind);
   if (d.cron) { tv.f.spec.cron = d.cron; return drawTrigForm(); }
   if (d.target) { tv.f.task.workflow = d.target === 'workflow' ? (tv.f.task.workflow || S.workflows?.[0]?.id || '') : ''; return drawTrigForm(); }
   if (d.s) { tv.f.spec[d.s] = d.v; return drawTrigForm(); }

@@ -29,6 +29,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from datetime import datetime
 from urllib.parse import parse_qs, quote, urlsplit
 
 __version__ = "0.2.0"
@@ -288,7 +289,7 @@ def local_mcp_servers(project: Path) -> dict:
 
 
 # ---- triggers: cron, templates ---------------------------------------------------
-TRIGGER_KINDS = ["schedule", "event", "watch", "poll", "webhook", "ado"]
+TRIGGER_KINDS = ["schedule", "event", "watch", "poll", "webhook", "ado", "teams", "pipeline"]
 EVENT_ON = ["review", "done", "error"]
 POLL_WHEN = ["change", "fail", "output"]
 PR_URL = re.compile(r"https://(?:github\.com/[\w.-]+/[\w.-]+/pull/\d+|dev\.azure\.com/[\w%.-]+/[\w%.-]+/_git/[\w%.-]+/pullrequest/\d+)")
@@ -416,6 +417,103 @@ def ado_query(sp: dict) -> list[dict]:
         out.append({"id": wid, "title": str(f.get("System.Title") or ""), "type": str(f.get("System.WorkItemType") or ""),
                     "state": str(f.get("System.State") or ""), "tags": str(f.get("System.Tags") or "")})
     return out
+
+
+# ---- Pipeline trigger --------------------------------------------------------------------------
+# Azure Pipelines runs through the az CLI you are signed in with. A finished run of a named pipeline starts one task or
+# workflow run, once. "Only mine" keeps runs requested for you, or that carry a work item assigned to you: a release
+# build is requested for whoever merged, but its linked work items say whose work shipped.
+PIPE_RESULTS = {"succeeded": ("succeeded",), "failed": ("failed", "partiallySucceeded"),
+                "any": ("succeeded", "failed", "partiallySucceeded", "canceled")}
+PIPE_MAX = 10  # runs started per check
+
+
+def pipe_spec(sp: dict) -> tuple[str | None, dict]:
+    raw = sp.get("pipelines") or []
+    names = raw if isinstance(raw, list) else re.split(r"[,\n]", str(raw))
+    names = list(dict.fromkeys(n for n in (" ".join(str(x).split()) for x in names) if n))[:20]
+    if not names:
+        return "add at least one pipeline name", {}
+    if any(len(n) > 200 or _AZ_UNSAFE.search(n) for n in names):
+        return "a pipeline name has a character that can't be used", {}
+    org = str(sp.get("org") or "").strip().rstrip("/")
+    project = str(sp.get("project") or "").strip()
+    if not org or not project:
+        return "the organization URL and project are needed to read pipelines", {}
+    if not org.startswith(("https://", "http://")) or _AZ_UNSAFE.search(org) or _AZ_UNSAFE.search(project):
+        return "the organization URL looks like https://dev.azure.com/yourorg", {}
+    try:
+        every = max(2, int(sp.get("every") or 5))
+    except (TypeError, ValueError):
+        return "numbers only for intervals", {}
+    return None, {"pipelines": names, "org": org, "project": project, "every": every,
+                  "result": sp.get("result") if sp.get("result") in PIPE_RESULTS else "any", "mine": bool(sp.get("mine"))}
+
+
+def pipe_ids(sp: dict) -> dict[str, int]:
+    """Pipeline name -> id, case-insensitive. Raises AzError naming the ones that don't exist."""
+    have = {str(p.get("name") or "").lower(): int(p["id"]) for p in az("pipelines", "list", "--org", sp["org"], "--project", sp["project"],
+                                                                         "--top", "2000", "--output", "json") or [] if p.get("id")}
+    missing = [n for n in sp["pipelines"] if n.lower() not in have]
+    if missing:
+        raise AzError("no pipeline called " + ", ".join(missing) + " in " + sp["project"])
+    return {n: have[n.lower()] for n in sp["pipelines"]}
+
+
+def iso_ts(s) -> float:
+    m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(\.\d+)?(Z|[+-]\d\d:?\d\d)?", str(s or ""))
+    if not m:
+        return 0.0
+    tz = (m.group(3) or "Z").replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(m.group(1) + (m.group(2) or "")[:7] + tz).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def pipe_runs(sp: dict, ids: list[int], top: int = 40) -> list[dict]:
+    """Finished runs of these pipelines, newest first."""
+    out = []
+    for r in az("pipelines", "runs", "list", "--org", sp["org"], "--project", sp["project"], "--status", "completed",
+                "--query-order", "FinishTimeDesc", "--top", str(top), "--pipeline-ids", *map(str, ids), "--output", "json") or []:
+        req, ti = r.get("requestedFor") or {}, r.get("triggerInfo") or {}
+        out.append({"id": int(r["id"]), "pipeline": str((r.get("definition") or {}).get("name") or ""), "result": str(r.get("result") or ""),
+                    "finished": iso_ts(r.get("finishTime")), "branch": str(r.get("sourceBranch") or "").removeprefix("refs/heads/"),
+                    "commit": str(r.get("sourceVersion") or "")[:12], "message": str(ti.get("ci.message") or ti.get("pr.title") or "")[:300],
+                    "who": str(req.get("displayName") or ""), "who_id": str(req.get("uniqueName") or "").lower(), "reason": str(r.get("reason") or ""),
+                    "url": f"{sp['org']}/{quote(sp['project'])}/_build/results?buildId={int(r['id'])}"})
+    return out
+
+
+def pipe_items(sp: dict, run_id: int) -> list[int]:
+    """Work items linked to a run (the PRs and commits it built)."""
+    ids = az("devops", "invoke", "--org", sp["org"], "--area", "build", "--resource", "workitems", "--route-parameters",
+             f"project={sp['project']}", f"buildId={run_id}", "--api-version", "7.1", "--query", "value[].id", "--output", "json") or []
+    return [int(x) for x in ids if str(x).isdigit()][:200]
+
+
+def pipe_my_items(sp: dict, ids: list[int]) -> list[dict]:
+    """Of these work items, the ones assigned to you (the az sign-in), with title and state."""
+    if not ids:
+        return []
+    wiql = ("SELECT [System.Id], [System.Title], [System.State] FROM WorkItems WHERE [System.Id] IN ("
+            + ", ".join(map(str, ids[:200])) + ") AND [System.AssignedTo] = @Me")
+    out = []
+    for it in az("boards", "query", "--wiql", wiql, "--org", sp["org"], "--project", sp["project"], "--output", "json") or []:
+        f = it.get("fields") or {}
+        out.append({"id": int(it.get("id") or f.get("System.Id")), "title": str(f.get("System.Title") or ""), "state": str(f.get("System.State") or "")})
+    return out
+
+
+_me: str | None = None
+
+
+def az_me() -> str:
+    """The az sign-in's user name, lower case (compared locally with who a run was requested for, never sent anywhere)."""
+    global _me
+    if _me is None:
+        _me = str(az("account", "show", "--query", "user.name", "--output", "tsv", raw=True) or "").strip().lower()
+    return _me
 
 
 def html_text(s: str) -> str:
@@ -1089,7 +1187,8 @@ class Crew:
                     f"The crew: {team}. You do not write code yourself: you plan, delegate and coordinate through the crew "
                     "tools (crew_status, create_task, assign_task, message_agent, stop_agent, run_workflow, add_agent, "
                     "update_agent, save_workflow, add_trigger). Call crew_status before acting. Prefer existing agents and "
-                    "workflows; add or change them only when the request needs it. Keep replies short: what you did, "
+                    "workflows; add or change them only when the request needs it. Give tasks and runs short titles people "
+                    "can scan: about 6 plain words saying what to do, details in details. Keep replies short: what you did, "
                     "task numbers, and what the user should approve next. Read files only to understand the project.")
         else:
             role = (f"You are '{a['name']}', one of {len(self.agents)} Claude Code agents working in parallel on this project. "
@@ -1755,7 +1854,7 @@ class Crew:
     def _public_triggers(self) -> list[dict]:
         out = [{k: v for k, v in tr.items() if not k.startswith("_")} for tr in self.triggers]
         for pub, tr in zip(out, self.triggers):
-            if tr["kind"] in ("poll", "ado"):  # same rule as tick_triggers: never checked means due now
+            if tr["kind"] in ("poll", "ado", "teams", "pipeline"):  # same rule as tick_triggers: never checked means due now
                 pub["next"] = tr.get("_checked", 0) + tr["spec"]["every"] * 60 if tr["enabled"] else None
                 pub["checking"] = bool(tr.get("_running"))
         return out
@@ -2058,9 +2157,10 @@ class Crew:
                 elif kind == "watch" and now() - tr.get("_checked", 0) >= sp["every"]:
                     tr["_checked"] = now()
                     fired |= self._check_watch(tr)
-                elif kind in ("poll", "ado") and not tr.get("_running") and now() - tr.get("_checked", 0) >= sp["every"] * 60:
+                elif kind in ("poll", "ado", "teams", "pipeline") and not tr.get("_running") and now() - tr.get("_checked", 0) >= sp["every"] * 60:
                     tr["_checked"], tr["_running"] = now(), True
-                    threading.Thread(target=self._run_poll if kind == "poll" else self._run_ado, args=(tr,), daemon=True).start()
+                    run = {"poll": self._run_poll, "ado": self._run_ado, "teams": self._run_teams, "pipeline": self._run_pipeline}[kind]
+                    threading.Thread(target=run, args=(tr,), daemon=True).start()
         if fired:
             self.touch()
 
@@ -2115,6 +2215,116 @@ class Crew:
                 self._fire(tr, {"output": out, "exit": code}, f"exit {code}")
         self.touch()
 
+    def _run_teams(self, tr: dict) -> None:
+        """One check of a Teams trigger. Runs in a thread; claude never runs while the lock is held."""
+        sp, started, err, found, picked, cost = tr["spec"], now(), None, 0, 0, 0.0
+        since = tr.get("since") or started - sp["every"] * 60
+        try:
+            msgs, cost = teams_check(self.claude, sp, since - 120)  # a little overlap: ids keep it from firing twice
+            found = len(msgs)
+            with self.lock:
+                if tr not in self.triggers:
+                    return
+                seen = list(tr.get("seen") or [])
+                for m in [m for m in msgs if m["id"] not in seen][:TEAMS_MAX]:
+                    self._fire(tr, {"title": m["title"], "from": m["from"], "text": m["text"], "link": m["link"],
+                                    "when": m["time"], "where": sp["where"]}, f"message from {m['from']}")
+                    seen.append(m["id"])
+                    picked += 1
+                tr["seen"], tr["since"] = seen[-TEAMS_SEEN_MAX:], started
+                tr["picked"] = tr.get("picked", 0) + picked
+        except TeamsError as e:
+            err = str(e)
+        except Exception as e:  # a bug here must not leave the trigger stuck as running
+            err = f"unexpected: {e}"
+        with self.lock:
+            tr["_running"] = False
+            self._charge(None, cost)
+            if tr not in self.triggers:
+                return
+            tr["error"] = err
+            tr["checked"] = {"t": now(), "found": found, "picked": picked, "cost": round(cost, 4)}
+            if err:
+                self.raise_alert(f"Trigger {tr['name']} check failed", "warning", err, key=f"trigger:{tr['id']}")
+            else:
+                self.resolve_alert(f"trigger:{tr['id']}", "the next check worked")
+        self.touch()
+
+    def _pipe_start(self, tr: dict, run: dict, items: list[int], mine: list[dict]) -> str:
+        """One task or workflow run for a finished pipeline run. Caller holds the lock."""
+        sp = tr["spec"]
+        base = f"{sp['org']}/{quote(sp['project'])}/_workitems/edit/"
+        first = (mine[0]["id"] if mine else items[0]) if items else None
+        ado = {"id": first, "url": base + str(first)} if first else None
+        title = f"{run['pipeline']} {run['result']}"[:200]
+        lines = [f"Pipeline {run['pipeline']} finished: {run['result']}.", f"Run: {run['url']}",
+                 f"Branch {run['branch'] or '?'} · commit {run['commit'] or '?'}" + (f" · {run['message']}" if run["message"] else ""),
+                 f"Requested for {run['who'] or 'unknown'} ({run['reason'] or 'manual'})."]
+        if mine:
+            lines += ["", "Your work items in this run (update or close these):"] + [f"- AB#{x['id']} {x['title']} ({x['state']})" for x in mine]
+        if items:
+            lines += ["", f"All {len(items)} linked work item{'s' if len(items) != 1 else ''}: " + ", ".join(f"AB#{i}" for i in items[:60])
+                      + (" …" if len(items) > 60 else "")]
+        details = "\n".join(lines)
+        source = {"trigger": tr["id"], "name": tr["name"], "kind": "pipeline", "run": run["id"], "url": run["url"]} | ({"ado": ado} if ado else {})
+        if (w := self._workflow(sp.get("workflow"))) is not None:
+            r = self._start_run(w, title, details, source=source)
+            self.event("trigger", f"⚡ {tr['name']} → ⛓ {w['name']}: {title}")
+            return f"{w['name']}, run #{r['id'].lstrip('r')}"
+        who = sp.get("agent") if sp.get("agent") in self.agents else None
+        tag = "deploy" if "deploy" in self._all_tags() else "ops" if "ops" in self._all_tags() else "feature"
+        t = {"id": self.next_id, "title": title, "details": details[:8000], "tag": tag, "col": "backlog", "who": who, "pinned": who,
+             "created": now(), "depth": 0, "source": source} | ({"ado": ado} if ado else {})
+        self.next_id += 1
+        self.tasks.append(t)
+        self.event("trigger", f"⚡ {tr['name']} → #{t['id']} {title}" + (f" → {who}" if who else ""), who)
+        return f"task #{t['id']}"
+
+    def _run_pipeline(self, tr: dict) -> None:
+        """One check of a pipeline trigger. Runs in a thread; az never runs while the lock is held."""
+        sp, started, err, found, picked = tr["spec"], now(), None, 0, 0
+        since = tr.get("since") or started - sp["every"] * 60
+        try:
+            if tr.get("_ids_for") != sp["pipelines"]:
+                tr["_ids"], tr["_ids_for"] = list(pipe_ids(sp).values()), list(sp["pipelines"])
+            with self.lock:
+                seen = set(tr.get("seen") or [])
+            runs = [r for r in pipe_runs(sp, tr["_ids"]) if r["finished"] >= since - 120 and r["id"] not in seen
+                    and r["result"] in PIPE_RESULTS[sp["result"]]]
+            found = len(runs)
+            me = az_me() if sp["mine"] else ""
+            for run in sorted(runs, key=lambda r: r["finished"])[:PIPE_MAX]:
+                items = pipe_items(sp, run["id"])
+                mine = pipe_my_items(sp, items)
+                keep = not sp["mine"] or run["who_id"] == me or bool(mine)
+                with self.lock:
+                    if tr not in self.triggers:
+                        return
+                    tr["seen"] = ([i for i in tr.get("seen") or [] if i != run["id"]] + [run["id"]])[-ADO_SEEN_MAX:]
+                    if keep:
+                        label = self._pipe_start(tr, run, items, mine)
+                        tr["fired"], tr["last"], tr["note"] = tr.get("fired", 0) + 1, now(), f"{run['pipeline']} #{run['id']} → {label}"[:200]
+                        tr["picked"] = tr.get("picked", 0) + 1
+                        picked += 1
+                self.touch()
+            with self.lock:
+                tr["since"] = started
+        except AzError as e:
+            err = str(e)
+        except Exception as e:  # a bug here must not leave the trigger stuck as running
+            err = f"unexpected: {e}"
+        with self.lock:
+            tr["_running"] = False
+            if tr not in self.triggers:
+                return
+            tr["error"] = err
+            tr["checked"] = {"t": now(), "found": found, "picked": picked}
+            if err:
+                self.raise_alert(f"Trigger {tr['name']} check failed", "warning", err, key=f"trigger:{tr['id']}")
+            else:
+                self.resolve_alert(f"trigger:{tr['id']}", "the next check worked")
+        self.touch()
+
     def _ado_live(self) -> set[int]:
         """Work item ids that a running run or an open task already carries."""
         ids = {(r.get("ado") or {}).get("id") for r in self.runs if r["status"] == "running"}
@@ -2125,8 +2335,8 @@ class Crew:
         """Start the workflow run (or create the task) for one work item. Caller holds the lock. Returns what to call it."""
         sp = tr["spec"]
         ado = {"id": item["id"], "url": item["url"]}
-        title = f"AB#{item['id']} {item['title']}"[:200]
-        details = f"{item['type']} · {item['state']}\n{item['url']}" + (f"\n\n{item['description']}" if item["description"] else "")
+        title = f"AB#{item['id']} {short_title(item['title'])}"  # the full title leads the details
+        details = f"{item['title']}\n{item['type']} · {item['state']}\n{item['url']}" + (f"\n\n{item['description']}" if item["description"] else "")
         source = {"trigger": tr["id"], "name": tr["name"], "ado": ado}
         if (w := self._workflow(sp.get("workflow"))) is not None:
             run = self._start_run(w, title, details, source=source)
@@ -2205,8 +2415,20 @@ class Crew:
         name = str(p.get("name") or "").strip()[:60]
         task = p.get("task") or {}
         sp = p.get("spec") or {}
-        if not name and kind != "ado":
+        if not name and kind not in ("ado", "pipeline"):
             return "name the trigger", {}
+        if kind == "pipeline":
+            err, spec = pipe_spec(sp)
+            if err:
+                return err, {}
+            if sp.get("workflow") and not self._workflow(sp["workflow"]):
+                return f"no workflow {sp['workflow']}", {}
+            if not sp.get("workflow") and sp.get("agent") not in self.agents:
+                return "pick a workflow or an agent to start", {}
+            spec |= {"workflow": sp.get("workflow") or "", "agent": "" if sp.get("workflow") else sp["agent"]}
+            name = name or f"Pipeline: {spec['pipelines'][0]}"[:60]
+            return None, {"name": name, "kind": kind, "enabled": bool(p.get("enabled", True)), "spec": spec,
+                          "task": {"title": "{pipeline} {result}", "details": "", "tag": "", "agent": spec["agent"], "workflow": spec["workflow"]}}
         if kind == "ado":
             err, spec = ado_spec(sp)
             if err:
@@ -2244,6 +2466,10 @@ class Crew:
                     return "watch a pattern inside the project, e.g. src/**/*.py", {}
                 spec = {"glob": glob[:200], "every": max(5, int(sp.get("every") or 10)),
                         "cooldown": max(0, int(sp.get("cooldown") if sp.get("cooldown") not in (None, "") else 60))}
+            elif kind == "teams":
+                err, spec = teams_spec(sp)
+                if err:
+                    return err, {}
             elif kind == "poll":
                 cmd = str(sp.get("command") or "").strip()
                 if not cmd:
@@ -2425,6 +2651,8 @@ class Crew:
 
     # ---- actions from the UI ---------------------------------------------------
     def act(self, action: str, p: dict, via: str = "ui") -> dict:
+        if via == "mcp" and action in ("add", "handoff", "wf_run") and (why := title_problem(p.get("title"))):
+            return {"error": why}
         if action in GIT_ACTIONS:  # git runs outside the lock
             return self._git_action(action, p)
         with self.lock:
@@ -2821,6 +3049,10 @@ class Crew:
                     return {"error": "poll triggers run shell commands: create them in Crew's Triggers panel, not through the boss or an agent"}
                 if p.get("kind") == "ado" and via != "ui":
                     return {"error": "ado triggers write to Azure DevOps: create them in Crew's Triggers panel, not through the boss or an agent"}
+                if p.get("kind") == "pipeline" and via != "ui":
+                    return {"error": "pipeline triggers read Azure DevOps with your az sign-in: create them in Crew's Triggers panel"}
+                if p.get("kind") == "teams" and via != "ui":
+                    return {"error": "teams triggers read your Teams with your Microsoft 365 sign-in: create them in Crew's Triggers panel"}
                 tr = self._trigger(p.get("id")) if action == "trigger_update" else None
                 if action == "trigger_update" and not tr:
                     return {"error": "unknown trigger"}
@@ -2831,7 +3063,7 @@ class Crew:
                     if err:
                         return {"error": err}
                     if tr:
-                        for k in [k for k in tr if k.startswith("_")] + ["minute", "checked"] + ([] if tr["kind"] == "ado" else ["seen"]):
+                        for k in [k for k in tr if k.startswith("_")] + ["minute", "checked"] + ([] if tr["kind"] in ("ado", "teams", "pipeline") else ["seen"]):
                             tr.pop(k, None)  # new settings, new baseline
                         tr.update(clean)
                     else:
@@ -2842,8 +3074,8 @@ class Crew:
                 self.event("trigger", f"trigger {tr['name']} {'on' if tr['enabled'] else 'off'}")
             elif action == "trigger_delete" and (tr := self._trigger(p.get("id"))):
                 self.triggers.remove(tr)
-            elif action == "trigger_run" and (tr := self._trigger(p.get("id"))) and tr["kind"] == "ado":
-                tr["_checked"] = 0  # "Run" on an ADO trigger means: check the board now
+            elif action == "trigger_run" and (tr := self._trigger(p.get("id"))) and tr["kind"] in ("ado", "teams", "pipeline"):
+                tr["_checked"] = 0  # "Run" on an ADO, Teams or pipeline trigger means: check now
             elif action == "trigger_run" and (tr := self._trigger(p.get("id"))):
                 self._fire(tr, {"payload": "(run by hand)", "output": "(run by hand)", "files": "(run by hand)", "exit": 0},
                            "run by you")
@@ -3035,11 +3267,150 @@ def switch_project(path: str) -> dict:
     return {"ok": True}
 
 
+# ---- Teams trigger -----------------------------------------------------------------------------
+# Crew has no Graph token of its own. Each check is a short headless `claude -p` run on Haiku that may use only the
+# Microsoft 365 connector from your Claude Code (claude.ai connectors load in every session), reads the channel or chat,
+# and answers in JSON. Read-only: it never posts. Every new message starts one task or workflow run.
+TEAMS_TOOLS = "mcp__claude_ai_Microsoft_365"
+TEAMS_MODES = ("mention", "all")
+TEAMS_MAX = 10  # messages that start work per check
+TEAMS_SEEN_MAX = 500
+
+
+def title_problem(title) -> str | None:
+    """Titles from agents and the boss: short enough to read on a card at a glance."""
+    t = " ".join(str(title or "").split())
+    if t and (len(t.split(" ")) > 9 or len(t) > 80 or re.search(r"https?://", t)):
+        return ("title too long: use about 6 plain words saying what to do, no links (AB#123 is fine), "
+                "and put the rest in details")
+    return None
+
+
+class TeamsError(Exception):
+    pass
+
+
+def short_title(s, words: int = 6) -> str:
+    """A card title people can scan: no links, at most `words` words."""
+    w = " ".join(re.sub(r"https?://\S+", "", str(s or "")).split()).split(" ")
+    return (" ".join(w[:words]).rstrip(",.;:") + ("…" if len(w) > words else "")).strip()
+
+
+def teams_spec(sp: dict) -> tuple[str | None, dict]:
+    where = " ".join(str(sp.get("where") or "").split())
+    if not where:
+        return "which channel or chat? e.g. Platform > Incidents", {}
+    try:
+        every = max(5, int(sp.get("every") or 10))
+    except (TypeError, ValueError):
+        return "numbers only for intervals", {}
+    return None, {"where": where[:200], "mode": sp.get("mode") if sp.get("mode") in TEAMS_MODES else "mention",
+                  "about": " ".join(str(sp.get("about") or "").split())[:200], "every": every}
+
+
+def teams_prompt(sp: dict, since_iso: str) -> str:
+    which = ("only messages that @mention me (the signed-in user), or reply to me in a thread" if sp["mode"] == "mention"
+             else "every new message and reply")
+    return (
+        "You check Microsoft Teams for Crew, which turns messages into work for an AI team. Use only the Microsoft 365 "
+        "tools, read-only: never send, post or react.\n"
+        f"Where: {sp['where']} (a team and channel, or a chat).\n"
+        f"Which messages: {which}, posted after {since_iso} (UTC). Skip messages I sent myself."
+        + (f"\nOnly messages about: {sp['about']}." if sp.get("about") else "")
+        + "\nReply with JSON only, no prose, in this shape:\n"
+        '{"messages": [{"id": "the message id", "from": "sender name", "time": "ISO time", "text": "the message, up to 1500 '
+        'characters", "link": "a URL to the message, or empty", "title": "what is being asked, 3 to 6 plain words"}]}\n'
+        'Use {"messages": []} when there is nothing new. If you cannot reach Microsoft 365 (not signed in, no access, '
+        'channel not found), reply {"error": "short reason"}.')
+
+
+def teams_check(claude: list[str], sp: dict, since: float) -> tuple[list[dict], float]:
+    """One read of Teams. Returns (messages, cost in USD). Raises TeamsError with a reason a person can act on."""
+    since_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(since))
+    cmd = [*claude, "-p", teams_prompt(sp, since_iso), "--output-format", "json", "--model", "haiku",
+           "--max-turns", "15", "--allowedTools", TEAMS_TOOLS]
+    WORK_ROOT.mkdir(parents=True, exist_ok=True)
+    try:
+        r = subprocess.run(cmd, cwd=WORK_ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=240, stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        raise TeamsError("the check took over 4 minutes and was stopped") from None
+    except OSError as e:
+        raise TeamsError(f"could not start claude: {e}") from None
+    try:
+        d = json.loads(r.stdout)
+    except json.JSONDecodeError:
+        raise TeamsError("claude failed: " + ((r.stdout + r.stderr).strip()[-300:] or f"exit {r.returncode}")) from None
+    cost = float(d.get("total_cost_usd") or 0)
+    text = str(d.get("result") or "")
+    if d.get("is_error"):
+        raise TeamsError(text[:300] or "claude reported an error")
+    m = re.search(r"\{.*\}", text, re.S)
+    try:
+        out = json.loads(m.group(0)) if m else None
+    except json.JSONDecodeError:
+        out = None
+    if not isinstance(out, dict):
+        raise TeamsError("could not read the answer: " + text[:200])
+    if out.get("error"):
+        why = str(out["error"])[:300]
+        if re.search(r"not available|sign|auth|connect|login|log in", why, re.I):
+            why += ". Sign in the Microsoft 365 connector once: run `claude` in a terminal, type /mcp, pick claude.ai Microsoft 365"
+        raise TeamsError(why)
+    msgs = []
+    for x in out.get("messages") or []:
+        if isinstance(x, dict) and x.get("id"):
+            link = str(x.get("link") or "")
+            msgs.append({"id": str(x["id"])[:200], "from": str(x.get("from") or "someone")[:100], "time": str(x.get("time") or "")[:40],
+                         "text": str(x.get("text") or "")[:2000], "link": link[:600] if link.startswith(("https://", "http://")) else "",
+                         "title": short_title(x.get("title") or x.get("text")) or "Teams message"})
+    return msgs, cost
+
+
+def teams_form(p: dict) -> dict:
+    """POST /api/teams {op: "test", spec}: one read of the last 24 hours. Starts nothing; it is a short paid Haiku run."""
+    if p.get("op") != "test":
+        return {"error": "unknown op"}
+    err, sp = teams_spec(p.get("spec") or {})
+    if err:
+        return {"error": err}
+    try:
+        msgs, cost = teams_check(CREW.claude, sp, now() - 86400)
+    except TeamsError as e:
+        return {"error": str(e)}
+    with CREW.lock:
+        CREW._charge(None, cost)
+    return {"ok": True, "total": len(msgs), "items": msgs[:25], "cost": round(cost, 4)}
+
+
 def ado_form(p: dict) -> dict:
     """POST /api/ado: {op: "defaults"} reads `az devops configure --list`; {op: "test", spec} runs the query and starts nothing."""
     try:
         if p.get("op") == "defaults":
             return ado_defaults()
+        if p.get("op") == "pipelines":  # names for the form's picker
+            sp = p.get("spec") or {}
+            org, project = str(sp.get("org") or "").strip().rstrip("/"), str(sp.get("project") or "").strip()
+            if not org or not project or _AZ_UNSAFE.search(org + project):
+                return {"error": "organization and project first"}
+            names = [str(x.get("name") or "") for x in az("pipelines", "list", "--org", org, "--project", project, "--top", "2000",
+                                                         "--query", "[].{name:name}", "--output", "json") or []]
+            return {"ok": True, "names": sorted(n for n in names if n)}
+        if p.get("op") == "pipeline_test":
+            err, sp = pipe_spec(p.get("spec") or {})
+            if err:
+                return {"error": err}
+            runs = [r for r in pipe_runs(sp, list(pipe_ids(sp).values()), 25) if r["result"] in PIPE_RESULTS[sp["result"]]]
+            runs = [r for r in runs if r["finished"] > now() - 7 * 86400][:10]
+            me = az_me()
+            for r in runs:
+                items = pipe_items(sp, r["id"])
+                mine = pipe_my_items(sp, items) if sp["mine"] else []
+                r.update(items=len(items), my_items=[f"AB#{x['id']}" for x in mine], mine=r["who_id"] == me or bool(mine))
+                r.pop("who_id")
+            if sp["mine"]:
+                runs = [r for r in runs if r["mine"]]
+            return {"ok": True, "total": len(runs), "items": runs}
         if p.get("op") == "test":
             err, sp = ado_spec(p.get("spec") or {})
             if err:
@@ -3273,6 +3644,10 @@ class Handler(BaseHTTPRequestHandler):
             if tier != "ui":
                 return self._json({"error": "not allowed for this caller"}, 403)
             res = ado_form(payload)
+        elif self.path == "/api/teams":  # the Teams trigger form's Test button: one read, starts nothing
+            if tier != "ui":
+                return self._json({"error": "not allowed for this caller"}, 403)
+            res = teams_form(payload)
         elif self.path in ("/api/browse", "/api/project"):
             if tier != "ui":
                 return self._json({"error": "not allowed for this caller"}, 403)

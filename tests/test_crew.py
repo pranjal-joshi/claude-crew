@@ -354,9 +354,135 @@ class PrLinks(TempCrewCase):
 class AdoBase(TempCrewCase):
     def test_board_url_from_a_fetched_item(self):
         server.Crew._ado_dflt = {}
-        self.crew.tasks.append({"id": 99, "title": "x", "col": "done", "ado": {"id": 5, "url": "https://dev.azure.com/acme/AI%20Studio/_workitems/edit/5"}})
-        self.assertEqual(self.crew.snapshot()["ado_base"], "https://dev.azure.com/acme/AI%20Studio/_workitems/edit/")
+        self.crew.tasks.append({"id": 99, "title": "x", "col": "done", "ado": {"id": 5, "url": "https://dev.azure.com/acme/My%20Proj/_workitems/edit/5"}})
+        self.assertEqual(self.crew.snapshot()["ado_base"], "https://dev.azure.com/acme/My%20Proj/_workitems/edit/")
 
     def test_empty_when_unknown(self):
         server.Crew._ado_dflt = {}
         self.assertEqual(self.crew.snapshot()["ado_base"], "")
+
+
+class Titles(TempCrewCase):
+    def test_short_title(self):
+        self.assertEqual(server.short_title("Model Editor: 'Harness Tool Suite completely offline' mid-session after a week"),
+                         "Model Editor: 'Harness Tool Suite completely…")
+        self.assertEqual(server.short_title("see https://x.y/z fix login"), "see fix login")
+
+    def test_agents_must_use_short_titles(self):
+        a = next(iter(self.crew.agents))
+        long = "Investigate why the guardrail service returns a 500 error when the prompt is empty in preprod"
+        self.assertIn("error", self.crew.act("handoff", {"from": a, "to": "auto", "title": long}, via="mcp"))
+        self.assertIn("error", self.crew.act("add", {"title": "Check https://dev.azure.com/x/1"}, via="mcp"))
+        self.assertNotIn("error", self.crew.act("add", {"title": "AB#4321 Fix empty prompt 500"}, via="mcp"))
+        self.assertNotIn("error", self.crew.act("add", {"title": long}))  # yours, typed in the UI: untouched
+
+
+class TeamsTrigger(TempCrewCase):
+    def _fake_claude(self, result, cost=0.004):
+        import subprocess
+        out = json.dumps({"type": "result", "is_error": False, "result": result, "total_cost_usd": cost})
+        self.calls = []
+        def run(cmd, **kw):
+            self.calls.append(cmd)
+            return subprocess.CompletedProcess(cmd, 0, out, "")
+        old = server.subprocess.run
+        server.subprocess.run = run
+        self.addCleanup(setattr, server.subprocess, "run", old)
+
+    def _trigger(self):
+        r = self.crew.act("trigger_add", {"name": "Incidents", "kind": "teams", "spec": {"where": "Platform > Incidents", "mode": "mention"},
+                                          "task": {"title": "{title}", "details": "{from}: {text}\n{link}"}})
+        self.assertTrue(r.get("ok"), r)
+        return self.crew.triggers[-1]
+
+    def test_new_messages_become_tasks_once(self):
+        tr = self._trigger()
+        msgs = {"messages": [{"id": "m1", "from": "Asha", "time": "2026-10-22T09:00:00Z", "text": "@Pranjal prod deploy failed",
+                              "link": "https://teams.microsoft.com/l/message/1", "title": "Check failed prod deploy"}]}
+        self._fake_claude("Here you go:\n" + json.dumps(msgs))
+        self.crew._run_teams(tr)
+        t = self.crew.tasks[-1]
+        self.assertEqual((t["title"], tr["picked"], tr["error"]), ("Check failed prod deploy", 1, None))
+        self.assertIn("https://teams.microsoft.com/l/message/1", t["details"])
+        self.assertIn(server.TEAMS_TOOLS, self.calls[0])  # only the Microsoft 365 tools are allowed
+        n = len(self.crew.tasks)
+        self.crew._run_teams(tr)  # the same message again: nothing new
+        self.assertEqual(len(self.crew.tasks), n)
+
+    def test_errors_raise_an_alert(self):
+        tr = self._trigger()
+        self._fake_claude('{"error": "not signed in to Microsoft 365"}')
+        self.crew._run_teams(tr)
+        self.assertIn("not signed in", tr["error"])
+        self.assertTrue(any(x["key"] == f"trigger:{tr['id']}" for x in self.crew.alerts))
+
+    def test_ui_only_and_validated(self):
+        self.assertIn("error", self.crew.act("trigger_add", {"name": "x", "kind": "teams", "spec": {"where": "a"}, "task": {"title": "t"}}, via="mcp"))
+        self.assertIn("error", self.crew.act("trigger_add", {"name": "x", "kind": "teams", "spec": {"where": " "}, "task": {"title": "t"}}))
+
+
+class PipelineTrigger(TempCrewCase):
+    def setUp(self):
+        super().setUp()
+        self.runs = [
+            {"id": 501, "result": "succeeded", "finishTime": "2099-01-01T10:00:00.1234567Z", "sourceBranch": "refs/heads/release",
+             "sourceVersion": "abc123def4567890abcd", "definition": {"name": "Api.Release"},
+             "requestedFor": {"displayName": "Someone Else", "uniqueName": "someone@x.com"}, "triggerInfo": {"ci.message": "Merge PR #1"}},
+            {"id": 502, "result": "failed", "finishTime": "2099-01-01T11:00:00Z", "sourceBranch": "refs/heads/release",
+             "definition": {"name": "Api.Release"}, "requestedFor": {"displayName": "Other", "uniqueName": "other@x.com"}},
+        ]
+        def fake_az(*args, raw=False, timeout=90):
+            a = " ".join(args)
+            if a.startswith("pipelines list"):
+                return [{"id": 42, "name": "Api.Release"}]
+            if a.startswith("pipelines runs list"):
+                return self.runs
+            if a.startswith("devops invoke"):
+                return [7, 8] if "buildId=501" in a else [9]
+            if a.startswith("boards query"):
+                return [{"id": 8, "fields": {"System.Title": "Fix upload timeout", "System.State": "Resolved"}}] if "IN (7, 8)" in a else []
+            if a.startswith("account show"):
+                return "me@x.com"
+            raise AssertionError(a)
+        old = server.az
+        server.az = fake_az
+        self.addCleanup(setattr, server, "az", old)
+        server._me = None
+        self.qa = list(self.crew.agents)[0]
+
+    def _add(self, **spec):
+        r = self.crew.act("trigger_add", {"kind": "pipeline", "spec": {"pipelines": ["api.release"], "org": "https://dev.azure.com/acme",
+                                                                         "project": "Proj", "agent": self.qa, **spec}})
+        self.assertTrue(r.get("ok"), r)
+        tr = self.crew.triggers[-1]
+        tr["since"] = 1
+        return tr
+
+    def test_only_mine_keeps_runs_with_my_work_items(self):
+        tr = self._add(mine=True, result="any")
+        self.crew._run_pipeline(tr)
+        made = [t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]
+        self.assertEqual(len(made), 1)  # 501 carries AB#8, assigned to me; 502 is someone else's with nothing of mine
+        t = made[0]
+        self.assertEqual((t["title"], t["who"], t["ado"]["id"]), ("Api.Release succeeded", self.qa, 8))
+        self.assertIn("AB#8 Fix upload timeout (Resolved)", t["details"])
+        self.assertIn("buildId=501", t["details"])
+        self.assertEqual(sorted(tr["seen"]), [501, 502])
+        self.crew._run_pipeline(tr)  # seen: nothing fires twice
+        self.assertEqual(len([t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]), 1)
+
+    def test_result_filter(self):
+        tr = self._add(mine=False, result="failed")
+        self.crew._run_pipeline(tr)
+        made = [t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline"]
+        self.assertEqual([t["title"] for t in made], ["Api.Release failed"])
+
+    def test_unknown_pipeline_is_an_error(self):
+        tr = self._add()
+        tr["spec"]["pipelines"] = ["Nope.Release"]
+        self.crew._run_pipeline(tr)
+        self.assertIn("no pipeline called Nope.Release", tr["error"])
+
+    def test_iso_ts(self):
+        self.assertEqual(server.iso_ts("1970-01-01T00:01:00.1234567Z"), 60.123456)
+        self.assertEqual(server.iso_ts(""), 0.0)
