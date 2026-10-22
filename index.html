@@ -463,6 +463,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .seg.tight button{height:26px;padding:0 9px}
 .seg button .hint2{color:var(--faint);font-weight:400;margin-left:4px}
 .dset textarea.field,.dset input.field{font-size:12.5px;padding:7px 10px}
+textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;overflow:auto;line-height:1.55}
 .dset .foot{display:flex;align-items:center;gap:8px}
 .dset .foot .muted{font-size:11.5px}
 .btn.on{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-ink2)}
@@ -836,7 +837,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
     <div class="mh">Add an agent <button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb">
       <input class="field" id="aName" placeholder="Name, e.g. frontend or db-migrator" autocomplete="off" maxlength="24">
-      <textarea class="field" id="aRole" rows="3" placeholder="Role: what this agent is responsible for and how it should work"></textarea>
+      <textarea class="field rolebox" id="aRole" rows="6" placeholder="Role: what this agent is responsible for and how it should work"></textarea>
       <div><div class="label">Picks up tasks tagged</div><div class="seg" id="aTags"></div>
         <input class="field" id="aTagNew" placeholder="Add a new tag and press Enter" style="margin-top:8px" maxlength="20"></div>
       <div><div class="label">Model</div><div class="seg tight" id="aModel"></div></div>
@@ -1291,7 +1292,7 @@ function renderSettings(a) {
     <div class="row2"><span class="k">Context</span><div class="seg tight" data-cfg="context">${[['fresh', 'Fresh per task'], ['keep', 'Keep across tasks']].map(([v, l]) => `<button data-v="${v}" class="${a.context === v ? 'on' : ''}" title="${v === 'fresh' ? 'New Claude session for each task: cheaper, no stale context. Send back still resumes the same session.' : 'One session across tasks: remembers earlier work, but every turn re-reads it.'}">${l}</button>`).join('')}</div></div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Icon</span><div class="iconpick">${['', ...Object.keys(AGENT_ICONS)].map(k => `<button data-icon="${k}" class="${(a.icon || '') === k ? 'on' : ''}" title="${k || 'First letter'}" style="${(a.icon || '') === k ? avCss(a) : ''}">${k ? iconSvg(k, 16) : esc(a.name[0])}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Color</span><div class="swatches">${['', ...AGENT_COLORS].map(c => `<button data-color="${c}" class="${(a.color || '') === c ? 'on' : ''}" title="${c || 'Default'}" style="${c ? `background:${c};color:${inkOn(c)}` : ''}">${(a.color || '') === c ? '✓' : c ? '' : '∅'}</button>`).join('')}</div></div>
-    <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Role</span><textarea class="field" id="cfgRole" rows="2">${esc(a.role)}</textarea></div>
+    <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Role</span><textarea class="field rolebox" id="cfgRole" rows="6" title="Enter saves · Shift+Enter for a new line · drag the corner to resize">${esc(a.role)}</textarea></div>
     <div class="row2"><span class="k">Tags</span><input class="field" id="cfgTags" value="${esc(a.tags.join(', '))}" placeholder="comma separated"></div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:6px">Triggers</span>${agentTriggers(a)}</div>
     <div class="foot"><span class="muted">${busy ? 'Applies after the current turn. ' : ''}${a.context === 'fresh' ? 'Each task starts a new session.' : 'One session across tasks.'}</span>
@@ -1303,6 +1304,7 @@ function renderSettings(a) {
   box.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => pick('icon', b.dataset.icon));
   box.querySelectorAll('[data-color]').forEach(b => b.onclick = () => pick('color', b.dataset.color));
   const role = $('#cfgRole'), tags = $('#cfgTags');
+  fitRole(role); role.oninput = () => fitRole(role);
   role.onblur = () => { if (role.value.trim() !== a.role) save('role', role.value); };
   role.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); role.blur(); } };
   tags.onblur = () => { if (tags.value !== a.tags.join(', ')) save('tags', tags.value); };
@@ -1310,10 +1312,11 @@ function renderSettings(a) {
 }
 
 // add-agent modal
+$('#aRole').oninput = e => fitRole(e.target);
 const newAgent = {tags: [], model: 'sonnet', effort: ''};
 function openAgentModal() {
   Object.assign(newAgent, {tags: [], model: 'sonnet', effort: ''});
-  $('#aName').value = ''; $('#aRole').value = ''; $('#aTagNew').value = '';
+  $('#aName').value = ''; $('#aRole').value = ''; fitRole($('#aRole')); $('#aTagNew').value = '';
   drawAgentModal(); $('#agentModal').classList.add('on'); setTimeout(() => $('#aName').focus(), 0);
 }
 function drawAgentModal() {
@@ -1512,6 +1515,8 @@ function renderFeed() {
   view.seenFeed = Math.max(view.seenFeed || 0, last) || Date.now() / 1000;
 }
 
+// role boxes grow to fit their text (up to the CSS max-height), so a long role reads without scrolling a 2-line box
+function fitRole(t) { t.style.height = 'auto'; t.style.height = Math.max(120, t.scrollHeight + 2) + 'px'; }
 function autosize(e) { const t = e.target; t.style.height = 'auto'; t.style.height = Math.min(160, t.scrollHeight) + 'px'; }
 
 async function sendMsg() {
