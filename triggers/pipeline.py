@@ -69,6 +69,7 @@ def pipe_runs(sp: dict, ids: list[int], top: int = 40) -> list[dict]:
                 "--query-order", "FinishTimeDesc", "--top", str(top), "--pipeline-ids", *map(str, ids), "--output", "json") or []:
         req, ti = r.get("requestedFor") or {}, r.get("triggerInfo") or {}
         out.append({"id": int(r["id"]), "pipeline": str((r.get("definition") or {}).get("name") or ""), "result": str(r.get("result") or ""),
+                    "number": str(r.get("buildNumber") or "")[:60],
                     "finished": iso_ts(r.get("finishTime")), "branch": str(r.get("sourceBranch") or "").removeprefix("refs/heads/"),
                     "commit": str(r.get("sourceVersion") or "")[:12], "message": str(ti.get("ci.message") or ti.get("pr.title") or "")[:300],
                     "who": str(req.get("displayName") or ""), "who_id": str(req.get("uniqueName") or "").lower(), "reason": str(r.get("reason") or ""),
@@ -152,9 +153,13 @@ class Pipeline(Trigger):
         ado = {"id": first, "url": base + str(first)} if first else None
         said = "partially succeeded" if run["result"] == "partiallySucceeded" else run["result"]
         title = f"{run['pipeline']} {said}"[:200]
-        lines = [f"Pipeline {run['pipeline']} finished: {said}." + (" Some steps failed or had warnings; check them." if said != run["result"] else ""), f"Run: {run['url']}",
+        lines = [f"Pipeline {run['pipeline']} finished: {said}." + (" Some steps failed or had warnings; check them." if said != run["result"] else ""), f"Run {run.get('number') or run['id']}: {run['url']}",
                  f"Branch {run['branch'] or '?'} · commit {run['commit'] or '?'}" + (f" · {run['message']}" if run["message"] else ""),
                  f"Requested for {run['who'] or 'unknown'} ({run['reason'] or 'manual'})."]
+        if run.get("twins"):  # same build number as another run: anything tagged with it (an image, a package) may already exist
+            lines += ["", f"Note: runs {', '.join(map(str, run['twins']))} of this pipeline have the same build number {run['number']}. "
+                          "If a step failed pushing or publishing something tagged with that number, it likely already exists from the "
+                          "earlier run (registries often refuse to overwrite a tag): a version clash, not an outage."]
         if mine:
             lines += ["", "Your work items in this run (update or close these):"] + [f"- AB#{x['id']} {x['title']} ({x['state']})" for x in mine]
         if items:
@@ -184,8 +189,11 @@ class Pipeline(Trigger):
                 tr["_ids"], tr["_ids_for"] = list(pipe_ids(sp).values()), list(sp["pipelines"])
             with crew.lock:
                 seen = set(tr.get("seen") or [])
-            runs = [r for r in pipe_runs(sp, tr["_ids"]) if r["finished"] >= since - 120 and r["id"] not in seen
+            every = pipe_runs(sp, tr["_ids"])
+            runs = [r for r in every if r["finished"] >= since - 120 and r["id"] not in seen
                     and r["result"] in PIPE_RESULTS[sp["result"]]]
+            for r in runs:
+                r["twins"] = [o["id"] for o in every if r["number"] and o["id"] != r["id"] and (o["pipeline"], o["number"]) == (r["pipeline"], r["number"])]
             found = len(runs)
             me = azure.az_me() if sp["mine"] else ""
             for run in sorted(runs, key=lambda r: r["finished"])[:PIPE_MAX]:

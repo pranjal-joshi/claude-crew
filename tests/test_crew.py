@@ -488,6 +488,15 @@ class PipelineTrigger(TempCrewCase):
         self.assertEqual([t["title"] for t in made], ["Api.Release partially succeeded"])
         self.assertIn("finished: partially succeeded.", made[0]["details"])
 
+    def test_same_build_number_is_flagged(self):
+        for r in self.runs:
+            r["buildNumber"] = "1.0.7"
+        tr = self._add(mine=False, result="failed")
+        triggers.get("pipeline").check(self.crew, tr)
+        t = next(t for t in self.crew.tasks if (t.get("source") or {}).get("kind") == "pipeline")
+        self.assertIn("Run 1.0.7:", t["details"])
+        self.assertIn("runs 501 of this pipeline have the same build number 1.0.7", t["details"])
+
     def test_unknown_pipeline_is_an_error(self):
         tr = self._add()
         tr["spec"]["pipelines"] = ["Nope.Release"]
