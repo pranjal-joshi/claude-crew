@@ -390,6 +390,14 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .lc{text-transform:none;letter-spacing:0;font-weight:400;margin-left:6px}
 .srcl{display:flex;align-items:center;gap:5px;font:10.5px var(--mono);color:var(--amber);margin-bottom:5px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .modal .mf{padding:12px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+.iolist{display:flex;flex-direction:column;gap:4px;max-height:min(52vh,460px);overflow:auto;margin:0 -4px;padding:0 4px}
+.iorow{display:grid;grid-template-columns:18px 30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--bg2);cursor:pointer}
+.iorow:hover{background:var(--hover)}.iorow.off{opacity:.55}.iorow .av{width:28px;height:28px;font-size:12px}
+.iorow b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iorow .r{font-size:11.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iobar{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}.iobar .lk{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font:inherit}
+.iodrop{border:1.5px dashed var(--line2);border-radius:12px;padding:28px 16px;text-align:center;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.iodrop.over{border-color:var(--accent);background:var(--accent-soft)}
 .pal input{border:0;outline:0;background:transparent;width:100%;padding:15px 16px;font-size:14px;border-bottom:1px solid var(--line)}
 .pal .list{max-height:360px;overflow:auto;padding:6px}
 .pal .it{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--muted)}
@@ -878,6 +886,15 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
     </div>
     <div class="mf"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="rStart">Start run</button></div>
   </div>
+</div>
+
+<div class="scrim" id="ioModal">
+  <div class="modal" role="dialog" aria-labelledby="ioTitle">
+    <div class="mh"><span id="ioTitle">Agents</span><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
+    <div class="mb" id="ioBody"></div>
+    <div class="mf" id="ioFoot"></div>
+  </div>
+  <input type="file" id="ioFile" accept=".json,application/json" hidden>
 </div>
 
 <div class="scrim" id="lanModal">
@@ -2368,12 +2385,122 @@ function applyTheme() {
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', light ? '#F6EEDD' : '#18191f');
 }
 mqLight.addEventListener('change', applyTheme);
+// ---- export / import agents ------------------------------------------------------------
+// A file holds each agent's settings only (name, role, tags, model, effort, context, icon, colour): no sessions,
+// logs, costs or worktrees, so it is safe to share and to keep as a backup.
+const AGENT_KEYS = ['name', 'role', 'tags', 'model', 'effort', 'context', 'icon', 'color'];
+let io = {mode: 'export', items: [], sel: new Set(), existing: 'skip', file: '', busy: false};
+function agentSpec(a) {  // keep only known keys with safe values: a shared file is untrusted input
+  const o = {};
+  for (const k of AGENT_KEYS) if (a[k] != null && a[k] !== '' && !(Array.isArray(a[k]) && !a[k].length)) o[k] = a[k];
+  o.name = String(o.name || '').trim();
+  if (o.role) o.role = String(o.role).slice(0, 500);
+  o.tags = (Array.isArray(o.tags) ? o.tags : String(o.tags || '').split(',')).map(t => String(t).trim()).filter(Boolean);
+  if (!o.tags.length) delete o.tags;
+  if (o.icon && !AGENT_ICONS[o.icon]) delete o.icon;
+  if (o.color && !/^#[0-9a-f]{6}$/i.test(o.color)) delete o.color;
+  if (o.context && !['fresh', 'keep'].includes(o.context)) delete o.context;
+  for (const [k, ok] of [['model', S.models], ['effort', S.efforts]]) if (o[k] && !ok.includes(o[k])) o.bad = `unknown ${k} ${o[k]}`;
+  if (!/^[A-Za-z0-9-]{1,24}$/.test(o.name)) o.bad = 'name: 1-24 letters, digits or dashes';
+  return o;
+}
+function openIO(mode) {
+  io = {mode, items: mode === 'export' ? S.agents.map(agentSpec) : [], sel: new Set(), existing: 'skip', file: '', busy: false};
+  if (mode === 'export') io.items.forEach(a => io.sel.add(a.name));
+  drawIO(); $('#ioModal').classList.add('on');
+}
+const ioExists = n => S.agents.some(a => a.name.toLowerCase() === n.toLowerCase());
+function drawIO() {
+  const exp = io.mode === 'export', n = io.items.filter(a => io.sel.has(a.name) && !a.bad && (exp || io.existing === 'update' || !ioExists(a.name))).length;
+  $('#ioTitle').textContent = exp ? 'Export agents' : 'Import agents';
+  const rows = io.items.map(a => {
+    const on = io.sel.has(a.name) && !a.bad;
+    const badge = a.bad ? `<span class="tag incident" title="${esc(a.bad)}">invalid</span>`
+      : exp ? '' : ioExists(a.name) ? `<span class="tag ${io.existing === 'update' ? 'review' : 'research'}">${io.existing === 'update' ? 'will update' : 'exists · skip'}</span>` : '<span class="tag test">new</span>';
+    const sub = [a.model || 'default model', a.effort ? a.effort + ' effort' : '', (a.tags || []).join(', ')].filter(Boolean).join(' · ');
+    return `<label class="iorow ${on ? '' : 'off'}" title="${esc(a.role || '')}"><input type="checkbox" data-io-pick="${esc(a.name)}" ${on ? 'checked' : ''} ${a.bad ? 'disabled' : ''}>
+      <div class="av" ${avPaint(a)}>${avFace(a, 15)}</div><div style="min-width:0"><b>${esc(a.name)}</b><div class="r">${esc(sub)}${a.role ? ' — ' + esc(a.role) : ''}</div></div>${badge}</label>`;
+  }).join('');
+  const all = `<button class="lk" data-io-all>Select all</button><button class="lk" data-io-none>None</button>`;
+  if (exp) {
+    $('#ioBody').innerHTML = `<div class="iobar">${n} of ${io.items.length} selected · ${all}<span class="faint" style="margin-left:auto">Settings only: no chats, sessions or costs</span></div><div class="iolist">${rows}</div>`;
+    $('#ioFoot').innerHTML = `<button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-io-download ${n ? '' : 'disabled'}>Download ${n} agent${n === 1 ? '' : 's'}</button>`;
+    return;
+  }
+  if (!io.items.length) {
+    $('#ioBody').innerHTML = `<div class="iodrop" id="ioDrop"><div>Drop a Crew agents file here, or</div><button class="btn" data-io-choose>Choose a JSON file…</button><div class="faint" style="font-size:12px">An export from Crew, or a crew.json. Its agents are listed first; nothing is added until you press Import.</div></div>`;
+    $('#ioFoot').innerHTML = `<button class="btn ghost" data-close>Cancel</button>`;
+    return;
+  }
+  const clash = io.items.some(a => !a.bad && ioExists(a.name));
+  $('#ioBody').innerHTML = `<div class="iobar"><span class="mono" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px" title="${esc(io.file)}">${esc(io.file)}</span> · ${n} of ${io.items.length} selected · ${all}</div>` +
+    (clash ? `<div class="iobar">Agents that already exist: <div class="seg tight" data-io-existing><button data-v="skip" class="${io.existing === 'skip' ? 'on' : ''}">Skip them</button><button data-v="update" class="${io.existing === 'update' ? 'on' : ''}">Update their settings</button></div></div>` : '') +
+    `<div class="iolist">${rows}</div>`;
+  $('#ioFoot').innerHTML = `<button class="btn ghost" data-io-choose style="margin-right:auto">Choose another file…</button><button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-io-import ${n && !io.busy ? '' : 'disabled'}>${io.busy ? 'Importing…' : `Import ${n} agent${n === 1 ? '' : 's'}`}</button>`;
+}
+async function ioLoad(f) {
+  if (!f) return;
+  if (f.size > 1_000_000) return toast('That file is over 1 MB: not an agents file', 'var(--red)');
+  let j;
+  try { j = JSON.parse(await f.text()); } catch { return toast(`${f.name} is not valid JSON`, 'var(--red)'); }
+  const list = Array.isArray(j) ? j : Array.isArray(j?.agents) ? j.agents : null;
+  if (!list?.length) return toast(`No agents found in ${f.name}`, 'var(--red)');
+  const seen = new Set();
+  io.items = list.filter(a => a && typeof a === 'object').map(agentSpec)
+    .filter(a => !seen.has(a.name.toLowerCase()) && seen.add(a.name.toLowerCase()));
+  io.sel = new Set(io.items.filter(a => !a.bad).map(a => a.name)); io.file = f.name; drawIO();
+}
+function ioDownload() {
+  const agents = io.items.filter(a => io.sel.has(a.name)).map(({bad, ...a}) => a);
+  const body = {crew_agents: 1, app_version: S.app_version || '', exported: new Date().toISOString(), agents};
+  const proj = (S.project.split(/[\\/]/).filter(Boolean).pop() || 'crew').replace(/[^\w.-]+/g, '-');
+  const url = URL.createObjectURL(new Blob([JSON.stringify(body, null, 2) + '\n'], {type: 'application/json'}));
+  const link = Object.assign(document.createElement('a'), {href: url, download: `crew-agents-${proj}-${new Date().toISOString().slice(0, 10)}.json`});
+  document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  closeModals(); toast(`Exported ${agents.length} agent${agents.length === 1 ? '' : 's'}`, 'var(--green)');
+}
+async function ioImport() {
+  const agents = io.items.filter(a => io.sel.has(a.name) && !a.bad).map(({bad, ...a}) => a);
+  io.busy = true; drawIO();
+  const r = await act('import_agents', {agents, existing: io.existing});
+  io.busy = false;
+  if (!r.ok) return drawIO();
+  closeModals();
+  const done = [r.added.length && `${r.added.length} added`, r.updated.length && `${r.updated.length} updated`, r.skipped.length && `${r.skipped.length} skipped`].filter(Boolean).join(', ');
+  toast(`Import: ${done || 'nothing to do'}`, r.added.length || r.updated.length ? 'var(--green)' : 'var(--amber)');
+  if (r.skipped.length) toast('Skipped ' + r.skipped.map(x => `${x.name} (${x.why})`).join(', '), 'var(--amber)', {label: 'OK', ms: 9000, fn: () => {}});
+}
+$('#ioModal').addEventListener('click', e => {
+  const b = e.target.closest('[data-io-all],[data-io-none],[data-io-choose],[data-io-download],[data-io-import],[data-io-existing] button');
+  if (!b) return;
+  const d = b.dataset;
+  if ('ioAll' in d) { io.items.forEach(a => !a.bad && io.sel.add(a.name)); drawIO(); }
+  else if ('ioNone' in d) { io.sel.clear(); drawIO(); }
+  else if ('ioChoose' in d) { $('#ioFile').value = ''; $('#ioFile').click(); }
+  else if ('ioDownload' in d) ioDownload();
+  else if ('ioImport' in d) ioImport();
+  else if (d.v) { io.existing = d.v; drawIO(); }
+});
+$('#ioModal').addEventListener('change', e => {
+  const c = e.target.closest('[data-io-pick]'); if (!c) return;
+  c.checked ? io.sel.add(c.dataset.ioPick) : io.sel.delete(c.dataset.ioPick); drawIO();
+});
+$('#ioFile').addEventListener('change', e => ioLoad(e.target.files[0]));
+for (const ev of ['dragenter', 'dragover']) $('#ioModal').addEventListener(ev, e => {
+  if (io.mode !== 'import' || !e.dataTransfer?.types.includes('Files')) return;
+  e.preventDefault(); $('#ioDrop')?.classList.add('over');
+});
+$('#ioModal').addEventListener('dragleave', e => { if (e.target.id === 'ioDrop') e.target.classList.remove('over'); });
+$('#ioModal').addEventListener('drop', e => { if (io.mode !== 'import') return; e.preventDefault(); ioLoad(e.dataTransfer.files[0]); });
+
 const REPO = 'https://github.com/pranjal-joshi/claude-crew';
 $('#hMenu').onclick = e => {
   e.stopPropagation(); MENU_ACTIONS = [];
   const go = u => () => window.open(u, '_blank', 'noopener');
   let h = '';
   if (['localhost', '127.0.0.1'].includes(location.hostname)) h += item('Open on phone…', openLan, {sub: 'Scan a code from a phone on the same Wi-Fi'}) + '<div class="sep"></div>';
+  h += '<div class="mh">Agents</div>' + item('Export agents…', () => openIO('export'), {sub: 'Save all or some agents as a JSON file'}) +
+    item('Import agents…', () => openIO('import'), {sub: 'Add agents from an exported file'}) + '<div class="sep"></div>';
   h += '<div class="mh">Theme</div>' + [['system', 'System'], ['dark', 'Dark'], ['light', 'Light']].map(([v, l]) => item(l, () => { try { localStorage.setItem('crew.theme', v); } catch {} applyTheme(); }, {cls: themePref() === v ? 'cur' : ''})).join('') + '<div class="sep"></div>';
   h += `<div class="note">Crew${S?.app_version ? ' v' + esc(S.app_version) : ''}</div>`;
   h += item('GitHub repository', go(REPO)) + item('Releases and changelog', go(REPO + '/releases'));

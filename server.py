@@ -2355,6 +2355,11 @@ class Crew:
                 self._attach_worktree(self.agents[name])
                 self._save_config()
                 self.event("agent", f"+ {name} joined the crew", name)
+            elif action == "import_agents":
+                res = self._import_agents(p.get("agents"), update=p.get("existing") == "update")
+                if "error" not in res:
+                    self.touch()
+                return res
             elif action == "rename_agent" and a:
                 old, new = a["name"], (p.get("name") or "").strip()
                 if new == old:
@@ -2670,6 +2675,52 @@ class Crew:
                 return {"error": f"bad action {action}"}
         self.touch()
         return {"ok": True}
+
+    def _import_agents(self, specs, update: bool) -> dict:
+        """Add agents from an exported file (lock held). A name that already exists is updated or skipped."""
+        if not isinstance(specs, list) or not specs:
+            return {"error": "no agents in the file"}
+        if len(specs) > 100:
+            return {"error": "at most 100 agents per import"}
+        added, updated, skipped = [], [], []
+        have = {n.lower(): n for n in self.agents}
+        for spec in specs:
+            name = str(spec.get("name") or "").strip() if isinstance(spec, dict) else ""
+            if not isinstance(spec, dict) or not NAME_RE.fullmatch(name):
+                skipped.append({"name": name or "?", "why": "name: 1-24 letters, digits or dashes"})
+                continue
+            if name.lower() in RESERVED:
+                skipped.append({"name": name, "why": "reserved name"})
+                continue
+            if spec.get("model") and spec["model"] not in MODELS or spec.get("effort") and spec["effort"] not in EFFORTS:
+                skipped.append({"name": name, "why": "unknown model or effort"})
+                continue
+            fields = {"role": str(spec.get("role") or "").strip()[:500], "tags": clean_tags(spec.get("tags") or []),
+                      "model": spec.get("model") or None, "effort": spec.get("effort") or None}
+            for k, rx in (("icon", ICON_RE), ("color", COLOR_RE)):
+                fields[k] = spec.get(k) if rx.fullmatch(str(spec.get(k) or "")) else None
+            if spec.get("context") in CONTEXTS:
+                fields["context"] = spec["context"]
+            if name.lower() in have:
+                if not update:
+                    skipped.append({"name": have[name.lower()], "why": "already exists"})
+                    continue
+                a = self.agents[have[name.lower()]]
+                a.update(fields)
+                if a["status"] != "running" and self._alive(a["name"]) and tuple(a.get("launched") or ()) != self._launch_key(a):
+                    self._kill_proc(a["name"])  # restarts with the new settings on its next task (session kept)
+                updated.append(a["name"])
+            else:
+                self.agents[name] = self._new_agent({"name": name, **fields})
+                self._attach_worktree(self.agents[name])
+                have[name.lower()] = name
+                added.append(name)
+        if added or updated:
+            self._save_config()
+            self.event("agent", "imported " + ", ".join(
+                x for x in (f"{len(added)} new" if added else "", f"{len(updated)} updated" if updated else "") if x)
+                + f" agent{'s' if len(added) + len(updated) > 1 else ''}")
+        return {"ok": True, "added": added, "updated": updated, "skipped": skipped}
 
     def shutdown(self) -> None:
         for n in list(self.procs):  # includes the boss

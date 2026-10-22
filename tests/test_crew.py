@@ -125,3 +125,35 @@ class Actions(TempCrewCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ImportAgents(TempCrewCase):
+    def test_import_adds_skips_and_updates(self):
+        first = next(iter(self.crew.agents))
+        specs = [{"name": "Docwriter", "role": "Reviews diffs.", "tags": ["review"], "model": "sonnet", "icon": "code",
+                  "color": "#3e63dd", "context": "keep"},
+                 {"name": first.upper(), "role": "Imported role."},
+                 {"name": "bad name!"}, {"name": "x", "model": "gpt-9"}, {"name": "boss"}, "not an object"]
+        r = self.crew.act("import_agents", {"agents": specs})
+        self.assertEqual(r["added"], ["Docwriter"])
+        self.assertEqual(r["updated"], [])
+        self.assertEqual({s["why"] for s in r["skipped"]} >= {"already exists", "reserved name", "unknown model or effort"}, True)
+        a = self.crew.agents["Docwriter"]
+        self.assertEqual((a["model"], a["icon"], a["color"], a["context"], a["tags"]), ("sonnet", "code", "#3e63dd", "keep", ["review"]))
+        saved = {x["name"] for x in json.loads(self.cfg_path.read_text(encoding="utf-8"))["agents"]}
+        self.assertIn("Docwriter", saved)
+        r = self.crew.act("import_agents", {"agents": specs[1:2], "existing": "update"})  # case-insensitive match
+        self.assertEqual(r["updated"], [first])
+        self.assertEqual(self.crew.agents[first]["role"], "Imported role.")
+
+    def test_import_drops_unsafe_icon_and_color(self):
+        self.crew.act("import_agents", {"agents": [{"name": "Odd", "icon": "<svg>", "color": "red;x:y"}]})
+        self.assertEqual((self.crew.agents["Odd"]["icon"], self.crew.agents["Odd"]["color"]), (None, None))
+
+    def test_import_rejects_empty_or_huge(self):
+        self.assertIn("error", self.crew.act("import_agents", {"agents": []}))
+        self.assertIn("error", self.crew.act("import_agents", {"agents": "nope"}))
+        self.assertIn("error", self.crew.act("import_agents", {"agents": [{"name": f"a{i}"} for i in range(101)]}))
+
+    def test_import_is_ui_only(self):
+        self.assertNotIn("import_agents", server.MCP_ACTIONS)
