@@ -419,6 +419,10 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .sw{width:34px;height:20px;border-radius:999px;border:1px solid var(--line2);background:var(--raised);position:relative;cursor:pointer;flex:none;transition:background .15s}
 .sw span{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--faint);transition:transform .15s,background .15s}
 .sw.on{background:color-mix(in srgb,var(--amber) 18%,transparent);border-color:color-mix(in srgb,var(--amber) 45%,transparent)}.sw.on span{transform:translateX(14px);background:var(--amber)}
+.sw.mini{width:28px;height:16px}.sw.mini span{width:10px;height:10px}.sw.mini.on span{transform:translateX(12px)}
+.sw.go.on{background:color-mix(in srgb,var(--green) 18%,transparent);border-color:color-mix(in srgb,var(--green) 45%,transparent)}.sw.go.on span{background:var(--green)}
+.agent.off,.wf.off{opacity:.55}.agent.off:hover,.wf.off:hover{opacity:.85}
+.offtag{font:600 10px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--faint);border:1px solid var(--line2);border-radius:999px;padding:1px 7px}
 .hook{display:flex;gap:8px;align-items:center;margin-top:4px;min-width:0}
 .hook code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px var(--mono);color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
 .presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
@@ -1185,11 +1189,12 @@ function renderRail() {
       const t = a.task ? task(a.task) : null;
       const sel = view.drawer?.agent === a.name;
       const live = a.status === 'running';
-      return `<div class="agent ${sel ? 'sel' : ''}" tabindex="0" data-agent="${a.name}" data-drop-agent="${a.name}" draggable="true" title="Drag to reorder · drop a task here to hand it over">
+      return `<div class="agent ${sel ? 'sel' : ''} ${a.off ? 'off' : ''}" tabindex="0" data-agent="${a.name}" data-drop-agent="${a.name}" draggable="true" title="Drag to reorder · drop a task here to hand it over">
         <div class="row1">
           ${avStat(a)}
           <div style="min-width:0"><div class="name" title="${esc(a.name)}">${esc(a.name)}</div><div class="role">${esc(a.role)}</div></div>
-          <span class="pill ${a.status}"><span class="dot" style="background:currentColor"></span>${a.status}</span>
+          ${a.off && a.status !== 'running' ? '<span class="offtag">off</span>' : ''}
+          ${offSw('agent', a.name, a.off)}
           <div class="tools">
             ${a.status === 'killed' || a.status === 'error'
               ? `<button class="iconbtn" data-respawn="${a.name}" title="Respawn" aria-label="Respawn ${a.name}">↻</button>`
@@ -1198,7 +1203,7 @@ function renderRail() {
           </div>
           <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, delete…" aria-label="More actions for ${a.name}" aria-haspopup="menu">⋮</button>
         </div>
-        <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : `waiting for work${lastActive(a) ? ` · active ${agoText(lastActive(a))}` : ''}`}</span>`}</div>
+        <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : a.off ? 'turned off · takes no new work' : `waiting for work${lastActive(a) ? ` · active ${agoText(lastActive(a))}` : ''}`}</span>`}</div>
         ${a.activity ? `<div class="act ${live ? 'live' : ''}">› ${esc(a.activity)}</div>` : ''}
         ${subChips(a)}
         <div class="meta" style="align-items:center">${modelChip(a.model)}${effortBars(a.effort)}<span style="margin-left:auto;white-space:nowrap">${live ? `<span data-since="${a.since}" title="Running for">${ago(a.since)}</span> · ` : ''}<span class="tok" title="Tokens this session: in ${fmtTok(a.tokens?.in)} · cache ${fmtTok(a.tokens?.cache)} · out ${fmtTok(a.tokens?.out)}">${fmtTok(tokTotal(a))}</span>${showCost ? ` · <span title="Cost this session">${money(a.cost)}</span>` : ''}</span></div>
@@ -1413,7 +1418,7 @@ function renderAgentDrawer(d, a) {
   $('#dh').innerHTML = `<div class="row ahead">
       ${avStat(a)}
       <div class="atxt"><h3 title="${esc(a.name)}">${esc(a.name)}</h3>
-        <div class="ameta ${a.status}" title="${said}"><b>${AST[a.status] || esc(a.status)}</b><span>· ${said}${a.status === 'running' && a.since ? ` · <span data-since="${a.since}">${ago(a.since)}</span>` : ''}</span></div></div>
+        <div class="ameta ${a.status}" title="${said}"><b>${a.off && a.status !== 'running' ? 'Off' : AST[a.status] || esc(a.status)}</b><span>· ${said}${a.status === 'running' && a.since ? ` · <span data-since="${a.since}">${ago(a.since)}</span>` : ''}</span></div></div>
       ${dead ? `<button class="btn sm" data-respawn="${a.name}" title="Respawn, keeping its session">↻ <span class="lbl">Respawn</span></button><button class="btn sm ghost" data-respawn-fresh="${a.name}" title="Respawn with a fresh session">Fresh</button>`
         : a.status === 'running' ? `<button class="btn sm danger" data-stop="${a.name}" title="End this run now. The session is kept and the task waits on hold.">■ <span class="lbl">Stop</span></button>`
         : a.status === 'paused' ? `<button class="btn sm" data-resume="${a.name}" style="color:var(--amber)">▶ <span class="lbl">Resume</span></button>` : ''}
@@ -1952,6 +1957,22 @@ function openTaskMenu(id, anchor) {
     async () => { if (task(id)?.col === 'doing') await act('move', {task: id, col: 'backlog'}); act('delete', {task: id}); }, true), {cls: 'danger'});
   showMenu(anchor, h);
 }
+// On/off switches for agents and workflows. Off: an agent takes no new work (a running task finishes, queued tasks
+// wait); a workflow can't be run, and triggers that start it pause until it is back on.
+function offSw(kind, id, off) {
+  const what = kind === 'agent' ? (off ? 'Off: takes no new work. Click to turn on' : 'On: click to turn off (takes no new work)')
+    : (off ? 'Off: cannot run, its triggers wait. Click to turn on' : 'On: click to turn off (no new runs, its triggers wait)');
+  return `<button class="sw mini go ${off ? '' : 'on'}" data-off-${kind}="${esc(id)}" title="${what}" aria-label="${esc(id)}: ${off ? 'off' : 'on'}" aria-pressed="${!off}"><span></span></button>`;
+}
+function toggleOff(kind, id) {
+  if (kind === 'agent') { const a = agent(id); return a && act('configure', {agent: id, off: !a.off}); }
+  const w = S.workflows.find(x => x.id === id); return w && act('wf_toggle', {id, off: !w.off});
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-off-agent],[data-off-workflow]'); if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  toggleOff(b.dataset.offAgent ? 'agent' : 'workflow', b.dataset.offAgent || b.dataset.offWorkflow);
+}, true);
 function openAgentMenu(n, anchor) {
   const a = agent(n); if (!a) return;
   MENU_ACTIONS = [];
@@ -1967,6 +1988,7 @@ function openAgentMenu(n, anchor) {
   if (a.status === 'paused') h += item('▶ Resume', () => act('resume', {agent: n}));
   if (a.status === 'killed' || a.status === 'error') h += item('↻ Respawn', () => act('respawn', {agent: n}));
   else h += item('Kill…', () => killAgent(n), {sub: 'disable until respawned', cls: 'danger'});
+  h += item(a.off ? 'Turn on' : 'Turn off', () => toggleOff('agent', n), {sub: a.off ? 'picks up work again' : 'takes no new work; a running task finishes'});
   h += item('Delete agent', () => removeAgent(n), {cls: 'danger'});
   showMenu(anchor, h);
 }
@@ -2422,9 +2444,9 @@ function renderFlows() {
     <div><h3>Workflows <span class="faint">Run agents in a fixed order. ✋ Waits for your approval · ⚡ Continues automatically.</span>
       <button class="btn sm primary" data-wf-new style="margin-left:auto">＋ New workflow</button></h3></div>
     <div class="wfgrid">${flows.map(w => `
-      <div class="wf">
-        <div class="wh"><b>${esc(w.name)}</b><span class="faint" style="font:11px var(--mono)">${w.steps.length} steps</span>
-          <span class="wact">${wfTrigChip(w)}<button class="btn sm run" data-wf-run="${w.id}"><i>▶</i>Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="kebab" data-wf-menu="${w.id}" title="More actions" aria-label="More actions for workflow ${esc(w.name)}" aria-haspopup="menu">⋮</button></span></div>
+      <div class="wf ${w.off ? 'off' : ''}">
+        <div class="wh">${offSw('workflow', w.id, w.off)}<b>${esc(w.name)}</b>${w.off ? '<span class="offtag">off</span>' : ''}<span class="faint" style="font:11px var(--mono)">${w.steps.length} steps</span>
+          <span class="wact">${wfTrigChip(w)}<button class="btn sm run" data-wf-run="${w.id}" ${w.off ? 'disabled title="Turned off: turn it on to run it"' : ''}><i>▶</i>Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="kebab" data-wf-menu="${w.id}" title="More actions" aria-label="More actions for workflow ${esc(w.name)}" aria-haspopup="menu">⋮</button></span></div>
         ${w.description ? `<div class="wd">${esc(w.description)}</div>` : ''}
         <div class="chain">${chainHtml(w.steps)}</div>
       </div>`).join('') || '<div class="empty">No workflows yet.</div>'}</div>`;
@@ -2474,7 +2496,8 @@ $('#flows').addEventListener('click', async e => {
   if (d.wfEdit) return openWfEditor(wf(d.wfEdit));
   if (d.wfMenu) {
     e.stopPropagation(); MENU_ACTIONS = []; const w = wf(d.wfMenu); if (!w) return;
-    return showMenu(el, `<div class="mh">${esc(w.name)}</div>` + item('Run…', () => openRun(w)) + item('Edit', () => openWfEditor(w)) + '<div class="sep"></div>' +
+    return showMenu(el, `<div class="mh">${esc(w.name)}</div>` + item('Run…', () => openRun(w), {disabled: !!w.off, sub: w.off ? 'turned off' : ''}) + item('Edit', () => openWfEditor(w)) + '<div class="sep"></div>' +
+      item(w.off ? 'Turn on' : 'Turn off', () => toggleOff('workflow', w.id), {sub: w.off ? 'can run again; its triggers resume' : 'no new runs; its triggers wait'}) +
       item('Delete…', () => askConfirm('Delete workflow?', `<b>${esc(w.name)}</b> is removed. Runs already started keep going.`, 'Delete', () => act('wf_delete', {id: w.id}), true), {cls: 'danger'}));
   }
   if (d.runStop) return askConfirm('Stop this run?', 'No more steps are created. The current step\'s task stays on the board.', 'Stop run', () => act('run_stop', {id: d.runStop}), true);

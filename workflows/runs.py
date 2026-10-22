@@ -135,6 +135,10 @@ def output(crew, run: dict) -> None:
             threading.Thread(target=post, daemon=True).start()
             run["output"] = "webhook sent"
         elif kind == "workflow" and (nxt := find(crew, o.get("workflow"))):
+            if nxt.get("off"):
+                crew.event("workflow", f"⛓ {run['name']} did not start {nxt['name']}: it is turned off")
+                run["output"] = f"{nxt['name']} is off"
+                return
             if run.get("depth", 0) >= crew.MAX_CHAIN:
                 crew.event("error", f"⛓ {run['name']} did not start {nxt['name']}: too many chained workflows")
                 return

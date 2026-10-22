@@ -90,14 +90,14 @@ def status() -> str:
         return d["error"]
     lines = ["Agents:"]
     for a in d["agents"]:
-        lines.append(f"- {a['name']} [{a['status']}] tags={','.join(a['tags'])} model={a['model'] or 'default'}"
+        lines.append(f"- {a['name']} [{'OFF, takes no new work' if a.get('off') else a['status']}] tags={','.join(a['tags'])} model={a['model'] or 'default'}"
                      f"{' task #' + str(a['task']) if a.get('task') else ''}: {a['role'][:160]}")
     lines.append("Tasks:")
     for t in d["tasks"][-60:]:
         lines.append(f"- #{t['id']} [{t['col']}{', on hold' if t.get('hold') else ''}] {t['title']} (tag {t['tag']}, {t.get('who') or 'unassigned'})")
     lines.append("Workflows:")
     for w in d.get("workflows", []):
-        lines.append(f"- {w['id']} {w['name']}: " + " -> ".join(f"{s['agent']}({s['gate']})" for s in w["steps"]))
+        lines.append(f"- {w['id']} {w['name']}{' [OFF, cannot run]' if w.get('off') else ''}: " + " -> ".join(f"{s['agent']}({s['gate']})" for s in w["steps"]))
     for r in d.get("runs", [])[-10:]:
         lines.append(f"- run {r['id']} {r['name']} [{r['status']}] step {r['step'] + 1}/{len(r['steps'])}: {r['title']}")
     lines.append("Triggers:")

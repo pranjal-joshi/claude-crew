@@ -893,7 +893,7 @@ class Crew:
             moved = self._roll_day() | self._check_writers()
             if not self._day_blocked():  # a spent daily budget dispatches nothing until tomorrow or a higher budget
                 for a in self.agents.values():
-                    if a["status"] != "idle" or self._git_busy(a["name"]):
+                    if a["status"] != "idle" or a.get("off") or self._git_busy(a["name"]):
                         continue
                     t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and not self._over_task(t) and
                               (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"]))), None)
@@ -1226,7 +1226,7 @@ class Crew:
             minute = int(now() // 60)
             lt = time.localtime()
             for tr in self.triggers:
-                if tr["enabled"] and (trig := triggers.get(tr["kind"])):
+                if tr["enabled"] and not self._target_off(tr) and (trig := triggers.get(tr["kind"])):
                     fired |= trig.tick(self, tr, minute, lt)
         if fired:
             self.touch()
@@ -1238,6 +1238,8 @@ class Crew:
                 return {"error": "unknown hook or bad token"}
             if not tr["enabled"]:
                 return {"error": "trigger is off"}
+            if self._target_off(tr):
+                return {"error": "the workflow this trigger starts is turned off"}
             t = self._fire(tr, {"payload": body[:6000]}, "webhook")
         self.touch()
         return {"ok": True, "task": t["id"]}
@@ -1246,6 +1248,12 @@ class Crew:
         if not (trig := triggers.get(p.get("kind"))):
             return "pick a trigger type", {}
         return trig.clean(self, p, old)
+
+    def _target_off(self, tr: dict) -> bool:
+        """Does this trigger start a workflow that is turned off? Then it is not checked, so nothing is lost: items wait
+        until the workflow is back on."""
+        wid = (tr.get("spec") or {}).get("workflow") or (tr.get("task") or {}).get("workflow")
+        return bool(wid and (w := self._workflow(wid)) and w.get("off"))
 
     # ---- workflows: see workflows/ ----------------------------------------------------
     def _workflow(self, wid) -> dict | None:
@@ -1436,6 +1444,8 @@ class Crew:
                     return {"error": f"no agent called {to}; use one of {', '.join(self.agents)} or 'auto'"}
                 if to == (src or {}).get("name"):
                     return {"error": "hand off to someone else"}
+                if to in self.agents and self.agents[to].get("off"):
+                    return {"error": f"{to} is turned off; hand off to someone else or 'auto'"}
                 parent = self._task(src["task"]) if src and src.get("task") else None
                 depth = (parent or {}).get("depth", 0) + 1
                 if depth > MAX_CHAIN:
@@ -1544,6 +1554,12 @@ class Crew:
                            "run by you")
             elif action == "wf_save":
                 return workflows.definitions.save(self, p)
+            elif action == "wf_toggle" and (w := self._workflow(p.get("id"))):
+                w["off"] = bool(p.get("off"))
+                if not w["off"]:
+                    w.pop("off")
+                self._save_config()
+                self.event("config", f"⛓ {w['name']} turned {'off: no new runs' if p.get('off') else 'on'}")
             elif action == "wf_delete" and self._workflow(p.get("id")):
                 workflows.definitions.delete(self, p)
             elif action == "wf_run" and (w := self._workflow(p.get("id"))):

@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Turn agents and workflows on and off:** a switch on every agent card and workflow card, also in their ⋮ menus. An agent that is off takes no new work: a task it is running finishes, tasks for it wait, and hand-offs to it are refused. A workflow that is off can't be run, and triggers that start it pause, so nothing they would pick up is lost. Agent cards no longer show a status pill; the avatar ring shows the status.
 - **Ticketer agent and Request to ticket workflow:** a new built-in agent turns a request from anywhere (a Teams message or mention, an alert, a failed pipeline, a webhook, an earlier step) into a Bug or PBI, or links an open duplicate, then shares the link where the request came from. Point a Teams trigger at it, or use it as a step in any workflow.
 - **Formatted replies:** the boss chat and agent logs render Markdown (headings, lists, tables, code blocks, links) plus a few plain HTML tags. Anything else, such as scripts or attributes, stays as text.
 - **Agent status at a glance**: every agent avatar carries a status ring (none when idle, a spinning arc while running, blue to review, amber paused, red on error) and a small time tag: how long it has been running, or since it was last active. The agent panel's header is one row: avatar, name, a status line ("To review · #14 is done, needs you", "waiting for work · last active 4 min ago"), Stop/Resume/Respawn when they apply, an Edit | delete toolbar, ⋮ and close.

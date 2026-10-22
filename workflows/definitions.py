@@ -59,6 +59,8 @@ def delete(crew, p: dict) -> dict | None:
 
 def run(crew, p: dict) -> dict | None:
     w = find(crew, p.get("id"))
+    if w.get("off"):
+        return {"error": f"{w['name']} is turned off: turn it on to run it"}
     title = (p.get("title") or "").strip()
     if not title:
         return {"error": "what should this run work on?"}
