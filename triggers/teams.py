@@ -100,7 +100,8 @@ def thread_text(th) -> str:
     if not isinstance(th, dict) or not str(th.get("text") or "").strip():
         return ""
     subject = str(th.get("subject") or "").strip()[:200]
-    out = (f"\n\nThis is a reply in the thread {f'"{subject}" ' if subject else ''}started by {str(th.get('from') or 'someone')[:100]}:\n"
+    quoted = f'"{subject}" ' if subject else ""
+    out = (f"\n\nThis is a reply in the thread {quoted}started by {str(th.get('from') or 'someone')[:100]}:\n"
            + str(th["text"]).strip()[:2000])
     if replies := str(th.get("replies") or "").strip():
         out += "\n\nEarlier replies:\n" + replies[:1000]
