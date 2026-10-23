@@ -32,6 +32,22 @@ class StepSessions(TempCrewCase):
         self.assertIsNone(self.a["session"])
 
 
+    def test_after_a_restart_a_new_task_does_not_resume_the_last_steps_session(self):
+        self.a.update(context="fresh", session="step-session", last_task=None)  # last_task is not saved; the session is
+        self.crew._task_session(self.a, {"id": 53, "title": "Bump the SDK"})
+        self.assertIsNone(self.a["session"])
+
+    def test_load_gives_a_shared_session_back_to_the_task_that_made_it(self):
+        n = self.a["name"]
+        self.crew.tasks[:] = [{"id": 1, "title": "Step", "col": "done", "created": 10, "started": 99, "run": {"id": "r1", "step": 0},
+                               "sessions": {n: "s1"}},
+                              {"id": 2, "title": "Later", "col": "review", "created": 20, "started": 21, "sessions": {n: "s1"}},
+                              {"id": 3, "title": "Own", "col": "review", "created": 30, "sessions": {n: "s3"}}]
+        self.crew._save()
+        crew = type(self.crew)(self.project, self.crew.config, ["claude-not-used"])
+        self.assertEqual([t.get("sessions") for t in crew.tasks], [{n: "s1"}, {}, {n: "s3"}])
+
+
 class LongSummaries(TempCrewCase):
     """A step's whole summary reaches the next step: ADO comment blocks past 3000 characters were being cut off."""
 

@@ -61,6 +61,23 @@ class ParallelSteps(TempCrewCase):
         self.assertEqual(plan["title"], f"Plan from {self.n[0]}, {self.n[1]}")
         self.assertTrue(plan["details"].startswith(f"{self.n[0]}:\nAAA\n\n{self.n[1]}:\nBBB"))
 
+    def test_an_earlier_steps_block_reaches_a_later_step_whole(self):
+        """#77: step 2 drafted an ADO comment, step 4 was to post it, and an excerpt cut it mid-sentence."""
+        w = {"id": "wl", "name": "Triage", "steps": [{"agent": self.n[i % 3], "title": f"S{i}: {{input}}", "gate": "auto"} for i in range(4)]}
+        block = "ADO comment for AB#1:\n" + "x" * 6000 + "\nEND OF BLOCK"
+        with self.crew.lock:
+            run = self.crew._start_run(w, "x")
+            for s in ("one", block, "three"):
+                self.finish(self.crew.tasks[-1], s)
+        self.assertEqual(run["step"], 3)
+        self.assertIn("END OF BLOCK", self.crew.tasks[-1]["details"])
+
+    def test_a_cut_says_so(self):
+        from workflows.runs import cut
+        self.assertEqual(cut("short", 10, 5), "short")
+        out = cut("a" * 30, 10, 5)
+        self.assertTrue(out.startswith("a" * 10) and "20 more characters" in out and "task #5" in out and "Never act" in out)
+
     def test_clean_keeps_par_but_not_on_the_first_step(self):
         p = {"name": "P", "steps": [dict(s) for s in self.w["steps"]]}
         p["steps"][0]["par"] = True

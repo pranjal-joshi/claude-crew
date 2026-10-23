@@ -52,6 +52,7 @@ def new_agent(crew, spec: dict) -> dict:
         "cwd": str(crew.project), "branch": None, "error": None, "launched": None,
         "tokens": {"in": 0, "out": 0, "cache": 0}, "last_msg": None, "mcp": [], "skills": 0,
         "subs": {},  # live subagents: tool_use id -> {label, type, since}
+        "bg": {},    # background shells and monitors in its Claude process: tool_use id -> {id, cmd, kind, since, task, out}
         # fresh: a new Claude session per task (send-back keeps it). keep: one session across tasks.
         "context": spec.get("context") if spec.get("context") in CONTEXTS else crew.config.get("context", "fresh"),
         "last_task": None,

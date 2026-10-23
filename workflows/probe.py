@@ -23,7 +23,7 @@ READS = {
 }
 WRITE_FLAGS = {"-X", "--method", "-f", "-F", "--field", "--raw-field", "--input"}  # gh api writes with these
 AZ_UNSAFE = re.compile(r'[%^&|<>"!`\x00-\x1f]')  # az is a .cmd file on Windows: cmd.exe would read these
-SHELL = re.compile(r"[;&|<>`\n\r]|\$\(")
+OPS = set(";&|<>")  # shell operators: refused only outside quotes, since a jq filter's | is just an argument
 OUT_MAX, TIMEOUT = 1500, 60
 WATCH_EVERY = 2  # minutes between watch runs: cheap, no model, so CI results arrive quickly
 
@@ -33,12 +33,15 @@ def parse(cmd: str) -> tuple[str | None, list[str]]:
     cmd = " ".join(str(cmd or "").split())
     if not cmd:
         return "give a command", []
-    if SHELL.search(cmd):
-        return "one command, no pipes or redirects: trim with gh --jq or az --query", []
     try:
         argv = shlex.split(cmd)
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        bare = [w for w in lex if w and set(w) <= OPS]
     except ValueError as e:
         return f"cannot read the command: {e}", []
+    if bare:
+        return "one command, no pipes or redirects outside quotes: trim with gh --jq or az --query", []
     tool, rest = argv[0], argv[1:]
     words = [w for w in rest if not w.startswith("-")]
     if tool not in READS or not any(tuple(words[:len(p)]) == p for p in READS[tool]):
@@ -74,7 +77,10 @@ def set_watch(crew, p: dict) -> dict:
     """Crew tool `watch`: the running agent puts a command on its ⟳ step; an empty command removes it."""
     src = crew.agents.get(p.get("from") or "")
     t = crew._task(src["task"]) if src and src.get("task") else None
-    if not t or t["col"] != "doing" or not crew._until_step(t):
+    if not t and src and src["status"] == "running":  # a turn you started on its waiting step: a message, Address review
+        t = next((x for x in (crew._task(src.get("addressing")), crew._task(src.get("last_task")))
+                  if x and x["col"] in ("backlog", "doing") and x.get("who") == src["name"] and x.get("wait")), None)
+    if not t or t["col"] not in ("doing", "backlog") or not crew._until_step(t):
         return {"error": "watch works on a ⟳ (check until done) workflow step you are running now"}
     w = t.setdefault("wait", {"checks": 0})
     if not str(p.get("command") or "").strip():
@@ -128,6 +134,8 @@ def _probe(crew, t: dict) -> None:
         h, first = digest(out), "seen" not in pr
         hit = bool(pr["done"] and re.search(pr["done"], out))
         failed = bool(pr.get("fail") and re.search(pr["fail"], out)) and h != pr.get("failed")
+        if failed and first and "failed" not in pr:  # set at the end of the agent's turn: what fails now, it just saw
+            pr["failed"], failed = h, False
         changed = not first and h != pr["seen"] and not pr.get("fail")  # with a fail pattern, progress alone wakes nobody
         over = time.time() - pr.setdefault("since", time.time()) >= step["checks"] * step["every"] * 60
         pr.update(seen=h, ran=time.time(), out=out[:OUT_MAX])

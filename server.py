@@ -20,12 +20,13 @@ import socket
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 try:  # installed as claude_crew; from a clone the folders sit next to this file
     from . import agents, triggers, workflows
@@ -36,7 +37,7 @@ except ImportError:
     import workflows
     from triggers import azure
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the
@@ -87,6 +88,8 @@ TRIGGER_KINDS = triggers.kinds()  # one module per kind in triggers/: see trigge
 PR_URL = re.compile(r"https://(?:github\.com/[\w.-]+/[\w.-]+/pull/\d+|dev\.azure\.com/[\w%.-]+/[\w%.-]+/_git/[\w%.-]+/pullrequest/\d+)")
 # "PR #123", "draft PR #123", "pull request #123": a PR named by number only, linked through the project's origin remote
 PR_REF = re.compile(r"\b(?:PR|pull request)\s*#(\d{1,7})\b", re.I)
+# an Azure DevOps work item: "AB#123" or its link
+ADO_REF = re.compile(r"\bAB#\d{1,7}\b|/_workitems/edit/\d")
 
 
 def pr_base(remote: str) -> str:
@@ -172,6 +175,8 @@ class Crew:
         self.lock = threading.RLock()
         self.changed = threading.Condition(self.lock)
         self.version = 0
+        self._pr_mine: dict[str, bool] = {}  # PR link -> yours (opened by your gh/az sign-in or from an agent's branch)
+        self._pr_wait: dict[str, set[int]] = {}  # PR link -> tasks that mentioned it, while its owner is being read
         self.tasks: list[dict] = []
         self.feed: list[dict] = []
         self.next_id = 1
@@ -187,6 +192,7 @@ class Crew:
         self.pid_file = WORK_ROOT / "pids" / f"{self.key}.json"
         self._busy: dict[int, str] = {}  # task id -> the git action running outside the lock
         self._jobs: list[tuple] = []     # git work queued by event handlers, run outside the lock (see _run_jobs)
+        self._draining = False           # one thread runs the queue, in order: a card's diff finishes before its auto-approve
         self.git_mutex = threading.Lock()  # one merge / push at a time in the project folder
         self.next_denial = 1
         self.day, self.day_spend, self.day_hit = today(), 0.0, None  # today's spend across agents and the boss
@@ -264,14 +270,21 @@ class Crew:
         if data.get("day") == today():  # the day's spend survives a restart; a new day starts at zero
             self.day, self.day_spend, self.day_hit = data["day"], float(data.get("day_spend") or 0), data.get("day_hit")
         self.tasks = data.get("tasks", [])
-        for tk in self.tasks:  # PR links in work that finished before Crew read them
-            self._note_prs(tk, tk.get("details"), tk.get("summary"))
+        owner: dict[str, int] = {}  # one session, one task: a later task that picked up another's session starts fresh
+        for tk in sorted(self.tasks, key=lambda x: x.get("created") or 0):
+            ss = tk.get("sessions") or {}
+            for n, sid in list(ss.items()):
+                if owner.setdefault(sid, tk["id"]) != tk["id"]:
+                    del ss[n]
+        for tk in self.tasks:  # PR links in work that finished before Crew read them; earlier links are checked again
+            self._note_prs(tk, tk.get("details"), tk.get("summary"), " ".join(tk.pop("prs", None) or []))
         self.next_id = data.get("next_id", len(self.tasks) + 1)
         for t in self.tasks:  # nothing is running after a restart
             if (t.get("diff") or {}).get("pending"):
                 t.pop("diff")  # its collection never finished: the review sheet's refresh button collects it again
             if t["col"] == "doing":
-                t["col"] = "backlog"
+                t["col"] = t.pop("reviewing_from", None) or "backlog"  # an /address-review turn goes back where it was
+                t.pop("reviewing", None)
             if t["col"] == "backlog" and t.get("who") and t["who"] not in self.agents:
                 t["who"] = t["pinned"] = None  # its agent left the roster; let the tags route it
         if b := data.get("boss"):
@@ -281,6 +294,9 @@ class Crew:
                 self.agents[name].update({k: saved[k] for k in ("session", "kept", "cost", "log", "tokens", "mcp", "skills", "skill_names", "plugins", "commands") if k in saved})
                 if self.agents[name]["status"] != "idle":
                     self.agents[name]["status"] = "idle"
+        for t in sorted(self.tasks, key=lambda x: x.get("finished") or 0):  # work waiting for you keeps its agent:
+            if t["col"] == "review" and (w := self.agents.get(t.get("who") or "")):  # approving commits its worktree
+                w.update(status="review", task=t["id"])
 
     def _save(self) -> None:
         data = {"project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
@@ -519,6 +535,8 @@ class Crew:
         with self.lock:
             if self.procs.get(a["name"]) is p:
                 self.procs.pop(a["name"], None)
+                a["bg"] = {}  # background jobs end with the process
+                self._addressed(a)
                 if a["status"] in ("running",):
                     a["status"], a["error"] = "error", "claude exited unexpectedly"
                     self.log(a, "error", a["error"])
@@ -566,6 +584,12 @@ class Crew:
                     inp = b.get("input") or {}
                     hint = inp.get("file_path") or inp.get("command") or inp.get("pattern") or inp.get("url") or inp.get("description") or ""
                     hint = str(hint).replace(str(a["cwd"]), ".")[:160]
+                    if (b.get("name") == "Bash" and inp.get("run_in_background")) or b.get("name") == "Monitor":
+                        a.setdefault("bg", {})[b.get("id") or str(now())] = {  # its tool_result says the job's id
+                            "id": None, "kind": b["name"], "since": now(), "task": a["task"] or a.get("addressing"),
+                            "cmd": str(inp.get("command") or inp.get("description") or "")[:500], "out": None}
+                    if b.get("name") in ("TaskStop", "KillShell", "KillBash"):
+                        a["bg_kill"] = str(inp.get("task_id") or inp.get("shell_id") or inp.get("bash_id") or "")
                     if b.get("name") in ("Agent", "Task"):  # a subagent starts; its tool_result ends it
                         label = str(inp.get("description") or inp.get("subagent_type") or "subagent")[:80]
                         a["subs"][b.get("id") or label] = {"label": label, "type": inp.get("subagent_type") or "", "since": now()}
@@ -577,6 +601,7 @@ class Crew:
                         self.log(a, "tool", b.get("name", "tool"), detail=hint, sub=sub)
                     a["activity"] = (f"↳ {sub}: " if sub else "") + f"{b.get('name')} {hint}".strip()[:120]
         elif t == "user":
+            self._note_bg(a, d)
             for b in (d.get("message", {}).get("content") or []):
                 if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("tool_use_id") in a["subs"]:
                     done = a["subs"].pop(b["tool_use_id"])
@@ -590,6 +615,60 @@ class Crew:
             self._on_result(a, d, st)
             self._check_budgets(a, tid)
 
+    BG_ID = re.compile(r"(?:background with ID|Monitor started \(task)[: ]+([\w-]+)")
+    BG_OUT = re.compile(r"(?:written to|output file)[: ]+(\S+?\.output)\b")
+    BG_END = re.compile(r"<task-id>([\w-]+)</task-id>.*?<status>(\w+)</status>", re.S)
+
+    def _note_bg(self, a: dict, d: dict) -> None:
+        """Background jobs (Bash run_in_background, Monitor) live in the agent's Claude process past the end of its turn.
+        Their start is the tool_result of the call; their end a task-notification, a TaskStop, or the process exiting."""
+        bg = a.setdefault("bg", {})
+        content = d.get("message", {}).get("content") or []
+        text = content if isinstance(content, str) else json.dumps(content)
+        for b in content if isinstance(content, list) else []:
+            if not isinstance(b, dict) or b.get("type") != "tool_result":
+                continue
+            c = b.get("content")
+            txt = c if isinstance(c, str) else " ".join(x.get("text", "") for x in c or [] if isinstance(x, dict))
+            if (j := bg.get(b.get("tool_use_id"))) and not j["id"]:
+                m = self.BG_ID.search(txt or "")
+                if b.get("is_error") or not m:
+                    bg.pop(b["tool_use_id"])
+                else:
+                    j["id"] = m.group(1)
+                    if o := self.BG_OUT.search(txt):
+                        j["out"] = o.group(1)
+            elif (k := a.pop("bg_kill", None)) and not b.get("is_error"):
+                for u in [u for u, j in bg.items() if j["id"] == k]:
+                    bg.pop(u)
+        for jid, status in self.BG_END.findall(text.replace("\\n", "\n")):
+            if status.lower() not in ("running", "started"):
+                for u in [u for u, j in bg.items() if j["id"] == jid]:
+                    bg.pop(u)
+
+    def _bg_read(self, a: dict, j: dict) -> str:
+        """The last part of a background job's output file. Only files Claude Code made, under the temp folder."""
+        p = Path(j.get("out") or "")
+        base = Path(tempfile.gettempdir()).resolve() / "claude"
+        try:
+            p = p.resolve()
+            if p.suffix != ".output" or not p.is_relative_to(base):
+                return "(Crew has no output file for this job)"
+            with open(p, "rb") as f:
+                f.seek(0, 2)
+                f.seek(max(0, f.tell() - 6000))
+                return f.read().decode("utf-8", "replace") or "(no output yet)"
+        except OSError as e:
+            return f"(cannot read the output: {e})"
+
+    def _addressed(self, a: dict) -> None:
+        """End an /address-review turn: however it ended (done, failed, stopped), its task leaves In progress for the
+        column it was in when you pressed the button. Lock held."""
+        if (rt := a.pop("addressing", None)) and (tk := self._task(rt)):
+            tk.pop("reviewing", None)
+            if (back := tk.pop("reviewing_from", None)) and tk["col"] == "doing":
+                tk["col"] = back
+
     def _on_result(self, a: dict, d: dict, st) -> None:
         """A turn ended: cost, refused tool calls, then the task moves to review (or back, on an error)."""
         a["subs"] = {}
@@ -602,8 +681,7 @@ class Crew:
         task = self._task(a["task"]) if a["task"] else None
         if task:
             self._note_prs(task, d.get("result"))
-        if (rt := a.pop("addressing", None)) and (tk := self._task(rt)):
-            tk.pop("reviewing", None)  # the /address-review turn is over
+        self._addressed(a)  # an /address-review turn is over: its task goes back to Review or Done
         self._charge(task, delta)
         self._note_denials(a, d.get("permission_denials"), a["task"])
         if a.get("compacting"):  # a /compact turn: no task changes
@@ -891,6 +969,7 @@ class Crew:
             body = f"Task #{t['id']}: {t['title']}"
             if t.get("details"):
                 body += "\n\n" + t["details"]
+        body += self._ado_hint(t, body)
         self.log(a, "you", body)
         if not self._send(a, body):
             t.update(col="backlog", who=t.get("pinned"))
@@ -915,11 +994,45 @@ class Crew:
 
     def _note_prs(self, t: dict, *texts: str | None) -> None:
         """PRs an agent opened or works on (it runs gh itself), picked out of its task text and summary: full links, or
-        "PR #123" linked through the project's origin remote."""
+        "PR #123" linked through the project's origin remote. Agents also cite other people's PRs (related work, an
+        earlier change), so a link joins the card only once it is known to be yours: Address review and the PR trigger
+        act on it. Owners are read in the background, once per link. Lock held."""
         base = self._pr_base() if any(x and PR_REF.search(x) for x in texts) else ""
         found = [m for x in texts if x for m in [*PR_URL.findall(x), *(base + n for n in PR_REF.findall(x) if base)]]
-        if found:
-            t["prs"] = list(dict.fromkeys([*(t.get("prs") or []), *found]))[-5:]
+        mine = []
+        for u in dict.fromkeys(found):
+            if u == t.get("pr") or self._pr_mine.get(u):
+                mine.append(u)
+            elif u not in self._pr_mine:
+                new = u not in self._pr_wait
+                self._pr_wait.setdefault(u, set()).add(t["id"])
+                if new:
+                    self._bg(self._read_pr_owner, u)
+        if mine:
+            t["prs"] = list(dict.fromkeys([*(t.get("prs") or []), *mine]))[-5:]
+
+    @staticmethod
+    def _bg(fn, *args) -> None:
+        threading.Thread(target=fn, args=args, daemon=True).start()
+
+    def _read_pr_owner(self, url: str) -> None:
+        with self.lock:
+            branches = {a["branch"] for a in self.agents.values() if a.get("branch")}
+        try:
+            yours = triggers.pr.owned(url, branches, self.project)
+        except Exception:  # can't tell now (no CLI, signed out, offline): left off the card, read again when next mentioned
+            with self.lock:
+                self._pr_wait.pop(url, None)
+            return
+        with self.lock:
+            self._pr_mine[url] = yours
+            ids = self._pr_wait.pop(url, set())
+            if yours:
+                for tk in self.tasks:
+                    if tk["id"] in ids:
+                        tk["prs"] = list(dict.fromkeys([*(tk.get("prs") or []), url]))[-5:]
+        if yours and ids:
+            self.touch()
 
     _ado_dflt: dict | None = None  # az devops defaults, read once in the background when nothing else names the board
 
@@ -941,6 +1054,18 @@ class Crew:
         elif d.get("org") and d.get("project"):
             return f"{d['org'].rstrip('/')}/{quote(d['project'])}/_workitems/edit/"
         return ""
+
+    def _ado_hint(self, t: dict, body: str) -> str:
+        """For a task about an Azure DevOps item: the org and project to pass to every azure-devops MCP tool. Without
+        `project`, its comment tools ask the user to pick one, which a headless agent never answers, so the call hangs
+        until it times out. Lock held."""
+        if not (t.get("ado") or (t.get("source") or {}).get("ado") or ADO_REF.search(body)):
+            return ""
+        m = re.match(r"(https://dev\.azure\.com/[^/]+|https://[^/.]+\.visualstudio\.com)/([^/]+)/_workitems/edit/$", self._ado_base())
+        if not m:
+            return ""
+        return (f"\n\nAzure DevOps: organization {m.group(1)}, project \"{unquote(m.group(2))}\". Pass `project` on every "
+                "azure-devops tool call (comments included): without it the tool waits for a project to be picked and times out.")
 
     @staticmethod
     def _read_ado_dflt() -> None:
@@ -1108,8 +1233,9 @@ class Crew:
         t["col"] = "done"
         if (t.get("diff") or {}).get("pending"):
             t.pop("diff")
-        if w:
-            w.update(status="idle", task=None)
+        if w and w["task"] in (t["id"], None):  # after a restart it may be on other work by now: leave that alone
+            if w["task"] == t["id"] or w["status"] == "review":
+                w.update(status="idle", task=None)
             self._end_task_rules(t, w)
         self._drop_denials(t["id"])
         self.event("approve", f"{'auto-' if plan['by'] != 'you' else ''}approved #{t['id']}" + (f" · commit {t.get('commit')} on {w['branch']}" if t.get("commit") and w else ""))
@@ -1248,18 +1374,32 @@ class Crew:
 
     def _run_jobs(self) -> None:
         """Run git work queued by event handlers (diffs, workflow auto-approvals). Call without holding the lock."""
+        with self.lock:
+            if self._draining:  # another reader thread is running the queue and picks up what was just added
+                return
+            self._draining = True
         while True:
             with self.lock:
                 if not self._jobs:
+                    self._draining = False
                     return
                 job = self._jobs.pop(0)
                 t = self._task(job[1])
                 if not t or t["col"] != "review":
                     continue
+                if t["id"] in self._busy:  # you are diffing or approving it from the board: try again in a moment
+                    self._jobs.append(job)
+            if job in self._jobs:
+                time.sleep(0.2)
+                continue
             try:
-                self._git_action(job[0], {"task": t["id"], **({"by": job[2]} if len(job) > 2 else {})})
+                out = self._git_action(job[0], {"task": t["id"], **({"by": job[2]} if len(job) > 2 else {})})
             except Exception as e:  # keep the reader thread alive
+                out = {"error": str(e)}
                 print("crew: background git job failed:", e, file=sys.stderr)
+            if job[0] == "approve" and out.get("error") and t["col"] == "review":
+                with self.lock:
+                    self.event("error", f"⛓ couldn't auto-approve #{t['id']}: {out['error']} · approve it from the board")
 
     def _merge_rebase(self, t: dict) -> dict:
         """After a conflict: ask the owner to merge the base into its branch and resolve. Caller holds the lock."""
@@ -1470,6 +1610,33 @@ class Crew:
                     rt.update(col="doing", started=now())
                     a["activity"] = "working on your message…"
                 self.event("tell", f"→ {a['name']}: {text[:80]}", a["name"])
+            elif action == "bg_output" and a:  # UI only: the tail of a background job's output
+                j = next((j for j in (a.get("bg") or {}).values() if j["id"] == p.get("id")), None)
+                if not j:
+                    return {"error": "that job is no longer running"}
+                return {"ok": True, "text": self._bg_read(a, j)}
+            elif action == "bg_stop" and a:  # UI only: one job (the agent stops it) or all of them (its process ends)
+                jobs = a.get("bg") or {}
+                one = next((j for j in jobs.values() if j["id"] == p.get("id")), None) if p.get("id") else None
+                if p.get("id") and not one:
+                    return {"error": "that job is no longer running"}
+                if not jobs:
+                    return {"error": f"{a['name']} has no background jobs"}
+                if one and (len(jobs) > 1 or a["status"] == "running"):
+                    text = (f"Stop background job {one['id']} now with TaskStop (`{one['cmd'][:120]}`) and don't start it again. "
+                            "Reply in one line.")
+                    if not self._start(a) or not self._send(a, text):
+                        return {"error": a.get("error") or "could not reach the agent"}
+                    self.log(a, "you", text)
+                    if a["status"] in ("idle", "error", "review"):
+                        a.update(status="running", since=now(), activity="stopping a background job…", error=None)
+                    self.event("kill", f"■ {a['name']}: stop background job {one['id']}", a["name"])
+                elif a["status"] == "running":
+                    return {"error": f"{a['name']} is working: ■ Stop ends its background jobs too"}
+                else:  # idle between turns: ending the process ends every job; the session resumes next time
+                    n = len(jobs)
+                    self._kill_proc(a["name"])
+                    self.event("kill", f"■ {a['name']}: stopped {n} background job{'s' if n != 1 else ''} (session kept)", a["name"])
             elif action == "stop" and a:
                 if a["status"] != "running" and not self._alive(a["name"]):
                     return {"error": f"{a['name']} is not running"}
@@ -1498,8 +1665,9 @@ class Crew:
                     gone = len(self.tasks)
                     self.tasks = []
                 else:
-                    gone = sum(1 for x in self.tasks if x["col"] == "done")
-                    self.tasks = [x for x in self.tasks if x["col"] != "done"]
+                    live = {r["id"] for r in self.runs if r["status"] == "running"}  # a running workflow keeps its steps' cards
+                    keep = [x for x in self.tasks if x["col"] != "done" or (x.get("run") or {}).get("id") in live]
+                    gone, self.tasks = len(self.tasks) - len(keep), keep
                 self.event("clear", f"cleared {gone} task{'s' if gone != 1 else ''}" + (" (whole board)" if scope == "all" else " from Done"))
             elif action == "compact" and a:
                 if a["status"] == "running":
@@ -1525,6 +1693,10 @@ class Crew:
                 if to in self.agents and self.agents[to].get("off"):
                     return {"error": f"{to} is turned off; hand off to someone else or 'auto'"}
                 parent = self._task(src["task"]) if src and src.get("task") else None
+                if (parent or {}).get("run"):  # the workflow runs the next step: a hand-off would start the same work twice
+                    return {"error": f"#{parent['id']} is step {parent['run']['step'] + 1} of workflow '{parent['run']['name']}': "
+                                     "don't hand off, the workflow starts the next step itself. Put what comes next in your summary; "
+                                     "the next step reads it. Use decide with stop if the run should end here."}
                 depth = (parent or {}).get("depth", 0) + 1
                 if depth > MAX_CHAIN:
                     return {"error": f"hand-off chain is already {MAX_CHAIN} deep; finish and summarise instead"}
@@ -1581,13 +1753,15 @@ class Crew:
                     w.update(status="error", activity="")
                     return {"error": w["error"]}
                 w.update(status="running", since=now(), activity="addressing PR review…", error=None, addressing=t["id"])
-                t["reviewing"] = now()
+                t["reviewing"], t["reviewing_from"], t["col"] = now(), t["col"], "doing"  # In progress until the turn ends
                 self.event("tell", f"→ {w['name']}: /address-review on #{t['id']}", w["name"])
             elif action == "reject" and t and t["col"] == "review":
                 w = self.agents.get(t["who"])
                 fb = (p.get("text") or "Please revise.").strip()
                 if self._over_task(t):
                     return {"error": f"#{t['id']} reached its budget (${t.get('cost') or 0:.2f} of ${self._budget('budget_task_usd'):.2f}): raise the task budget to send it back"}
+                if w and w["status"] == "running" and w.get("task") not in (None, t["id"]):
+                    return {"error": f"{w['name']} is working on #{w['task']}: send it back when that is done"}
                 if w and w["status"] != "killed":
                     self._task_session(w, t)
                 if not w or w["status"] == "killed" or not self._start(w):
@@ -1610,6 +1784,9 @@ class Crew:
                 if action == "trigger_update" and not tr:
                     return {"error": "unknown trigger"}
                 if tr and set(p) <= {"id", "enabled"}:  # on/off switch
+                    sp = tr.get("spec") or {}
+                    if p.get("enabled") and not tr.get("enabled") and tr["kind"] == "ado" and sp.get("match") == "assigned" and sp.get("existing") == "skip":
+                        tr["baselined"] = False  # back on: what was assigned while it was off is the new baseline, not new work
                     tr["enabled"] = bool(p.get("enabled"))
                 else:
                     err, clean = self._clean_trigger(p, tr)
@@ -1654,6 +1831,19 @@ class Crew:
                         tk.pop("wait", None)
                         tk.update(col="done", decision={"verdict": "stop", "reason": "workflow stopped from the board", "by": "you", "t": now()})
                         self.event("decide", f"⏹ #{tk['id']} stopped with ⛓ {run['name']}")
+            elif action == "run_restart" and (run := self._run(p.get("id"))):  # UI only: from the board's workflow frame
+                err, g0 = workflows.runs.restart_point(self, run, p.get("step"))
+                if err:
+                    return {"error": err}
+                for tk in [x for x in self.tasks if (x.get("run") or {}).get("id") == run["id"] and x["run"]["step"] >= g0]:
+                    if tk["col"] != "done":  # the open step ends; its agent stops working and checking
+                        self._release(tk)
+                        tk.pop("wait", None)
+                        tk.update(col="done", decision={"verdict": "stop", "reason": f"workflow restarted from step {g0 + 1}", "by": "you", "t": now()})
+                    tk["was_run"] = tk.pop("run")  # the earlier attempt leaves the run's frame
+                res = workflows.runs.restart(self, run, g0)
+                self.touch()
+                return res
             elif action == "run_delete" and (run := self._run(p.get("id"))) and (p.get("tasks") or run["status"] != "running"):
                 if p.get("tasks"):  # from the board's stacked card: every step's task goes with the run, running ones stopped
                     for tk in [x for x in self.tasks if (x.get("run") or {}).get("id") == run["id"]]:

@@ -29,6 +29,12 @@ def thread_id(where: str) -> str:
     m = THREAD_RE.search(where or "")
     return m.group(0).replace("%3A", ":").replace("%3a", ":").replace("%40", "@") if m else ""
 
+
+def team_id(where: str) -> str:
+    """The team (group) id a channel link carries. Listing a channel's posts and their replies needs it."""
+    m = re.search(r"[?&]groupId=([0-9A-Fa-f-]{36})", where or "")
+    return m.group(1) if m else ""
+
 class TeamsError(Exception):
     pass
 
@@ -52,11 +58,20 @@ def teams_spec(sp: dict) -> tuple[str | None, dict]:
 def teams_prompt(sp: dict, since_iso: str) -> str:
     which = ("only messages that @mention me (the signed-in user), or reply to me in a thread" if sp["mode"] == "mention"
              else "every new message and reply")
+    team = team_id(sp["where"])
     if sp.get("thread"):
         where = (f"Where: the Teams conversation with thread id {sp['thread']}"
                  + (f" ({sp['name']})" if sp.get("name") else "") + ". Find its messages with the message search tool "
                  f"(chat_message_search, query '*', afterDateTime {since_iso}, every page) and keep only results whose "
                  f"chatId is {sp['thread']}. Don't list teams or channels: that permission is not granted.")
+        if team:
+            # A reply alone ("please look into this") says nothing; the search doesn't say which thread it is in, and
+            # read_resource can't open a reply by its id. Listing the channel's posts and their replies can.
+            where += (f"\nThreads: the search doesn't tell which post a reply belongs to, so find it for every message you "
+                      f"keep. List the channel's top-level posts with teams_list_channel_messages (teamId {team}, channelId "
+                      f"{sp['thread']}); they come newest activity first. Then list the replies of each post from the top "
+                      "(the same tool with parentMessageId) until you find the message's id. Never guess the thread from "
+                      "the sender or the time. Take the link from the webUrl these list results give.")
     else:
         where = (f"Where: {sp['where']} (a team and channel, or a chat). Find it with the message search tool "
                  "(chat_message_search) and the chat list; don't list teams or channels, that permission is usually "
@@ -72,22 +87,37 @@ def teams_prompt(sp: dict, since_iso: str) -> str:
         + (f"\nOnly messages about: {sp['about']}." if sp.get("about") else "")
         + "\nReply with JSON only, no prose, in this shape:\n"
         '{"messages": [{"id": "the message id", "from": "sender name", "time": "ISO time", "text": "the message, up to 1500 '
-        'characters", "link": "a URL to the message, or empty", "title": "what is being asked, 3 to 6 plain words"}]}\n'
+        'characters", "link": "a URL to the message, or empty", "title": "what is being asked, 3 to 6 plain words, '
+        'taken from the thread when the message only points at it", "thread": null or, when the message is a reply, '
+        '{"from": "who started the thread", "subject": "its subject", "text": "the top-level post, up to 1500 characters", '
+        '"replies": "the earlier replies in order, one line each as name: text, up to 800 characters"}}]}\n'
         'Use {"messages": []} when there is nothing new. If you cannot reach Microsoft 365 (not signed in, no access, '
         'channel not found), reply {"error": "short reason"}.')
+
+
+def thread_text(th) -> str:
+    """The thread a reply was posted in, for {text}: the request is usually the post, not the reply that points at it."""
+    if not isinstance(th, dict) or not str(th.get("text") or "").strip():
+        return ""
+    subject = str(th.get("subject") or "").strip()[:200]
+    out = (f"\n\nThis is a reply in the thread {f'"{subject}" ' if subject else ''}started by {str(th.get('from') or 'someone')[:100]}:\n"
+           + str(th["text"]).strip()[:2000])
+    if replies := str(th.get("replies") or "").strip():
+        out += "\n\nEarlier replies:\n" + replies[:1000]
+    return out
 
 
 def teams_check(claude: list[str], sp: dict, since: float, cwd: Path) -> tuple[list[dict], float]:
     """One read of Teams. Returns (messages, cost in USD). Raises TeamsError with a reason a person can act on."""
     since_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(since))
     cmd = [*claude, "-p", teams_prompt(sp, since_iso), "--output-format", "json", "--model", "haiku",
-           "--max-turns", "15", "--allowedTools", TEAMS_TOOLS]
+           "--max-turns", "50", "--allowedTools", TEAMS_TOOLS]  # finding a reply's thread takes a few list calls
     cwd.mkdir(parents=True, exist_ok=True)
     try:
         r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                           timeout=240, stdin=subprocess.DEVNULL)
+                           timeout=360, stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
-        raise TeamsError("the check took over 4 minutes and was stopped") from None
+        raise TeamsError("the check took over 6 minutes and was stopped") from None
     except OSError as e:
         raise TeamsError(f"could not start claude: {e}") from None
     try:
@@ -115,7 +145,8 @@ def teams_check(claude: list[str], sp: dict, since: float, cwd: Path) -> tuple[l
         if isinstance(x, dict) and x.get("id"):
             link = str(x.get("link") or "")
             msgs.append({"id": str(x["id"])[:200], "from": str(x.get("from") or "someone")[:100], "time": str(x.get("time") or "")[:40],
-                         "text": str(x.get("text") or "")[:2000], "link": link[:600] if link.startswith(("https://", "http://")) else "",
+                         "text": str(x.get("text") or "")[:2000] + thread_text(x.get("thread")),
+                         "link": link[:600] if link.startswith(("https://", "http://")) else "",
                          "title": short_title(x.get("title") or x.get("text")) or "Teams message"})
     return msgs, cost
 
@@ -157,7 +188,8 @@ class Teams(Trigger):
                 seen = list(tr.get("seen") or [])
                 for m in [m for m in msgs if m["id"] not in seen][:TEAMS_MAX]:
                     crew._fire(tr, {"title": m["title"], "from": m["from"], "text": m["text"], "link": m["link"],
-                                    "when": m["time"], "where": sp["where"]}, f"message from {m['from']}")
+                                    # the channel's name, not the pasted link: that link points at some other message
+                                    "when": m["time"], "where": sp.get("name") or sp["where"]}, f"message from {m['from']}")
                     seen.append(m["id"])
                     picked += 1
                 tr["seen"], tr["since"] = seen[-TEAMS_SEEN_MAX:], started

@@ -29,6 +29,18 @@ class OnOff(TempCrewCase):
         r = self.crew.act("handoff", {"from": a, "to": b, "title": "Next step"})
         self.assertIn("turned off", r.get("error", ""))
 
+    def test_a_workflow_step_cannot_hand_off(self):
+        a, b = list(self.crew.agents)[:2]
+        step = {"id": 900, "title": "Triage", "col": "doing", "who": a, "run": {"id": "r1", "step": 0, "name": "Feature delivery", "n": 3}}
+        self.crew.tasks.append(step)
+        self.crew.agents[a]["task"] = 900
+        n = len(self.crew.tasks)
+        r = self.crew.act("handoff", {"from": a, "to": b, "title": "Plan the fix"})
+        self.assertIn("workflow starts the next step", r.get("error", ""))
+        self.assertEqual(len(self.crew.tasks), n)
+        step.pop("run")  # outside a workflow, hand-offs still work
+        self.assertTrue(self.crew.act("handoff", {"from": a, "to": b, "title": "Plan the fix"}).get("ok"))
+
     def test_off_workflow_cannot_run_and_pauses_its_triggers(self):
         agent = list(self.crew.agents)[0]
         self.crew.config["workflows"].append({"id": "wz", "name": "Z", "steps": [{"agent": agent, "title": "{input}"}]})

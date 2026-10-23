@@ -117,6 +117,12 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 
 .body{display:grid;grid-template-columns:304px 1fr;min-height:0;position:relative}
 .body.drawer-open{grid-template-columns:304px 1fr var(--dw,440px)}
+/* side panel full screen (⤢ in its header): the rail and the board step aside so a review or a long run gets the whole window */
+.body.drawer-open.drawer-full{grid-template-columns:1fr!important}
+.body.drawer-full>:not(.drawer){display:none!important}
+.body.drawer-full .drawer{position:static!important;width:auto!important;border-left:0;box-shadow:none}
+.iconbtn.fsb svg{width:14px;height:14px;display:block}
+@media (max-width:760px){.iconbtn.fsb{display:none}}
 .dgrip{display:none;position:absolute;top:0;bottom:0;right:calc(var(--dw,440px) - 4px);width:8px;cursor:col-resize;z-index:16;touch-action:none}
 .dgrip::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:2px;background:transparent;transition:background .12s}
 .dgrip:hover::after,.dgrip:focus-visible::after,.body.dresize .dgrip::after{background:var(--accent)}
@@ -423,12 +429,33 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .pchips .pc button{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;padding:0 4px;border-radius:5px}.pchips .pc button:hover{color:var(--red);background:var(--red-soft)}
 .tic.k-pipeline{background:var(--green-soft);color:var(--green)}
 .trow{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--bg2)}
-.trow.off{opacity:.55}
+.trow.off{opacity:.6}.trow.off:hover{opacity:.9}
+.trow.bad{border-color:color-mix(in srgb,var(--red) 40%,var(--line))}
+.tmanual{font-size:12.5px;color:var(--muted);padding:9px 12px;border:1px dashed var(--line2);border-radius:10px}.tmanual b{color:var(--text);font-weight:600}
+.tmanual kbd{font:11px var(--mono);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
+.ttools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ttools:empty{display:none}.ttools .tq{flex:1;min-width:180px;max-width:320px;height:32px}
+.seg button.warn{color:var(--red)}
+.tlist{display:flex;flex-direction:column;gap:16px}
+.tgrp{display:flex;flex-direction:column;gap:8px}
+.tgh{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;padding:0 2px}
+.tgf{display:flex;align-items:center;gap:7px;border:0;background:none;color:var(--text);cursor:pointer;padding:4px 6px 4px 2px;border-radius:7px;font:inherit}.tgf:hover{background:var(--hover)}
+.tgf b{font-size:13px;font-weight:600}.tgf .car{color:var(--faint);font-size:11px;width:10px}
+.tgc{font-size:11.5px;color:var(--faint)}.warnc{color:var(--red)}
+.tgs{font-size:11.5px;color:var(--faint);flex:1;min-width:160px}
+.tgl{display:flex;flex-direction:column;gap:8px}
+.tmain .tn .tk{font-weight:400;font-size:11.5px;color:var(--faint);margin-left:8px}
+.tst{display:inline-flex;align-items:center;gap:5px;margin-left:8px;height:18px;padding:0 7px;border-radius:999px;font-size:10.5px;font-weight:600;vertical-align:1px}
+.tst::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.tst.on{background:var(--green-soft);color:var(--green)}.tst.off{background:var(--raised);color:var(--faint)}
+.tst.err{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red)}.tst.busy{background:var(--blue-soft);color:var(--blue)}
+.terr{font-size:12px;color:var(--red);background:color-mix(in srgb,var(--red) 8%,transparent);border:1px solid color-mix(in srgb,var(--red) 25%,transparent);border-radius:7px;padding:5px 8px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tpre{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg2)}.tpre summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)}
+.tpre[open] summary{margin-bottom:6px}.pgl{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin:10px 0 6px}
 .trow.manual{background:transparent;border-style:dashed}
 .tic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:var(--raised);color:var(--muted)}
 .tic.k-schedule{background:var(--blue-soft);color:var(--blue)}.tic.k-event{background:var(--accent-soft);color:var(--accent-ink)}
 .tic.k-watch{background:var(--teal-soft);color:var(--teal)}.tic.k-poll{background:var(--violet-soft);color:var(--violet)}
-.tic.k-webhook{background:var(--amber-soft);color:var(--amber)}.tic.k-ado{background:var(--blue-soft);color:var(--blue)}.tic.k-teams{background:var(--violet-soft);color:var(--violet)}
+.tic.k-webhook{background:var(--amber-soft);color:var(--amber)}.tic.k-ado{background:var(--blue-soft);color:var(--blue)}.tic.k-teams{background:var(--violet-soft);color:var(--violet)}.tic.k-pr{background:var(--green-soft);color:var(--green)}
 .adochip{font:600 10.5px var(--mono);color:var(--blue);text-decoration:none;border:1px solid var(--line);border-radius:5px;padding:0 5px;background:var(--blue-soft)}
 .adochip:hover{text-decoration:underline}
 .adoout{flex:none;border:1px solid var(--line);border-radius:10px;background:var(--bg2);font-size:12.5px;min-height:96px;max-height:min(420px,46vh);overflow:auto;overscroll-behavior:contain}
@@ -440,9 +467,9 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .chkrow{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px}.chkrow label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .tmain{min-width:0;display:flex;flex-direction:column;gap:4px}
 .tmain .tn{font-weight:600;font-size:13.5px;overflow-wrap:anywhere}
-.tmain .tw{font:12px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tmain .tw{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tmain .tt{font-size:12.5px;display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tmain .tmeta{font:11px var(--mono);color:var(--faint)}
+.tmain .tmeta{font-size:11.5px;color:var(--faint);line-height:1.45}
 .tact{display:flex;align-items:center;gap:6px}
 .sw{width:34px;height:20px;border-radius:999px;border:1px solid var(--line2);background:var(--raised);position:relative;cursor:pointer;flex:none;transition:background .15s}
 .sw span{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--faint);transition:transform .15s,background .15s}
@@ -475,7 +502,7 @@ textarea::placeholder,input::placeholder{color:var(--faint)}
 .sched.busy{border-style:solid;border-color:color-mix(in srgb,var(--amber) 45%,transparent);cursor:default}.sched .spinner{vertical-align:-2px}
 .sched .run{border:0;background:none;color:var(--faint);cursor:pointer;font-size:11px;padding:1px 6px;border-radius:5px;flex:none}.sched .run:hover{color:var(--amber);background:var(--hover)}
 .tag.scheduled{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber)}
-.tag.k-schedule,.tag.k-event,.tag.k-webhook,.tag.k-pipeline,.tag.k-watch,.tag.k-poll,.tag.k-ado,.tag.k-teams{background:var(--tag-neutral);color:var(--tag-neutral-ink)}
+.tag.k-schedule,.tag.k-event,.tag.k-webhook,.tag.k-pipeline,.tag.k-watch,.tag.k-poll,.tag.k-ado,.tag.k-pr,.tag.k-teams{background:var(--tag-neutral);color:var(--tag-neutral-ink)}
 .srcl{display:flex;align-items:center;gap:5px;font:10.5px var(--mono);color:var(--amber);margin-bottom:5px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .modal .mf{padding:12px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
 .alerts{margin:0 18px 4px;border:1px solid color-mix(in srgb,var(--red) 35%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--red) 5%,var(--surface));overflow:hidden}
@@ -924,6 +951,16 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .blocked{margin-top:12px;border:1px solid color-mix(in srgb,var(--amber) 35%,transparent);background:var(--amber-soft);border-radius:10px;padding:8px 10px;max-height:240px;overflow:auto}
 .blocked .bh{font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:6px}
 .den{padding:8px 0;border-top:1px solid color-mix(in srgb,var(--amber) 20%,transparent)}
+.bgchip{font:600 10.5px var(--sans);padding:1px 7px;border-radius:999px;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);cursor:pointer;white-space:nowrap}
+.bgchip:hover{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.bgbox{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;max-height:320px;overflow:auto}
+.bgbox .bh{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:4px}
+.bgj{padding:7px 0;border-top:1px solid var(--line)}
+.bgt{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:4px}
+.bgk{font-weight:600}
+.bgb{margin-left:auto;display:flex;gap:4px}
+.bgo{margin:6px 0 0;max-height:180px;overflow:auto;font:11px/1.45 var(--mono);white-space:pre-wrap;word-break:break-all;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;color:var(--muted)}
+.bgn{font-size:11.5px;margin-top:6px;line-height:1.4}
 .den:first-of-type{border-top:0;padding-top:2px}
 .den .dtop{display:flex;gap:8px;align-items:center;font-size:12px;margin-bottom:4px}
 .den .dtool{font:600 11.5px var(--mono);color:var(--text)}
@@ -1331,7 +1368,7 @@ function renderRail() {
         </div>
         <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : a.off ? 'turned off · takes no new work' : ''}</span>`}</div>
         ${a.activity ? `<div class="act ${live ? 'live' : ''}">› ${esc(a.activity)}</div>` : ''}
-        ${subChips(a)}
+        ${subChips(a)}${bgJobs(a).length ? `<div class="subs">${bgChip(a)}</div>` : ''}
         <div class="meta" style="align-items:center">${modelChip(a.model)}${effortBars(a.effort)}<span style="margin-left:auto;white-space:nowrap">${live ? `<span data-since="${a.since}" title="Running for">${ago(a.since)}</span> · ` : ''}<span class="tok" title="Tokens this session: in ${fmtTok(a.tokens?.in)} · cache ${fmtTok(a.tokens?.cache)} · out ${fmtTok(a.tokens?.out)}">${fmtTok(tokTotal(a))}</span>${showCost ? ` · <span title="Cost this session">${money(a.cost)}</span>` : ''}</span></div>
         ${live ? '<div class="shimmer"></div>' : ''}
       </div>`;
@@ -1345,6 +1382,42 @@ function subChips(a) {
   return `<div class="subs" title="${subs.length} subagent${subs.length > 1 ? 's' : ''} working for ${esc(a.name)}">${subs.map(x =>
     `<span class="subchip"><span class="sd"></span>${SUBI}<span class="sl">${esc(x.type ? `${x.type} · ${x.label}` : x.label)}</span></span>`).join('')}</div>`;
 }
+
+// ---- background jobs: shells and monitors an agent left running in its Claude process ----------
+function bgJobs(a, tid) { return Object.values(a?.bg || {}).filter(j => j.id && (tid == null || j.task === tid)); }
+function bgChip(a, tid) {
+  const js = bgJobs(a, tid);
+  if (!js.length) return '';
+  return `<button class="bgchip" data-bg-open="${esc(a.name)}" title="${js.length} background job${js.length > 1 ? 's' : ''} running in ${esc(a.name)}'s session:&#10;${js.map(j => esc(j.cmd.slice(0, 120))).join('&#10;')}&#10;Click to see the output or stop ${js.length > 1 ? 'them' : 'it'}.">⚙ ${js.length} bg</button>`;
+}
+function bgBox(a) {
+  const js = bgJobs(a);
+  if (!js.length) return '';
+  return `<div class="bgbox" id="bgbox"><div class="bh"><span>Background jobs · ${js.length}</span>${a.status !== 'running' ? `<button class="btn sm ghost" data-bg-stop="${esc(a.name)}" title="End ${esc(a.name)}'s process: every job stops, the session is kept for its next turn">■ Stop all</button>` : ''}</div>
+    ${js.map(j => `<div class="bgj"><div class="bgt"><span class="bgk">${j.kind === 'Monitor' ? '👁 monitor' : '⚙ shell'}</span>${j.task ? `<span class="faint">#${j.task}</span>` : ''}<span class="faint" data-since="${j.since}">${ago(j.since)}</span>
+      <span class="bgb"><button class="btn sm ghost" data-bg-out="${esc(a.name)}:${esc(j.id)}">Output</button><button class="btn sm ghost danger" data-bg-stop="${esc(a.name)}:${esc(j.id)}" title="${esc(a.name)} is asked to stop it">■ Stop</button></span></div>
+      <code class="dcmd">${esc(j.cmd || '(no command)')}</code><pre class="bgo" data-bg-pre="${esc(j.id)}" hidden></pre></div>`).join('')}
+    <div class="faint bgn">These run inside ${esc(a.name)}'s Claude session, outside Crew's task flow: Crew can't wake anyone when they finish. For waiting on CI or a deploy, a workflow ⟳ step with a watch is the tracked way.</div></div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-bg-open],[data-bg-out],[data-bg-stop]');
+  if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  const d = b.dataset;
+  if (d.bgOpen) { view.drawer = {agent: d.bgOpen}; render(); setTimeout(() => $('#bgbox')?.scrollIntoView({block: 'nearest'}), 50); return; }
+  if (d.bgOut) {
+    const [name, id] = d.bgOut.split(':'), pre = document.querySelector(`[data-bg-pre="${CSS.escape(id)}"]`);
+    if (pre && !pre.hidden) { pre.hidden = true; return; }
+    const r = await act('bg_output', {agent: name, id});
+    if (r.ok && pre) { pre.textContent = r.text; pre.hidden = false; pre.scrollTop = pre.scrollHeight; }
+    return;
+  }
+  const [name, id] = d.bgStop.split(':');
+  askConfirm(id ? 'Stop this background job?' : 'Stop all background jobs?',
+    id ? `${esc(name)} is asked to stop it with TaskStop. Its other work goes on.`
+       : `${esc(name)}'s Claude process ends, which stops every job. Its session is kept: the next task or message resumes it.`,
+    'Stop', async () => { const r = await act('bg_stop', {agent: name, ...(id ? {id} : {})}); if (r.ok) toast(id ? `Asked ${name} to stop it` : `Stopped ${name}'s background jobs`, 'var(--amber)'); }, true);
+});
 
 // ---- alerts: raised by agents (crew tool raise_alert) or by Crew; stay on the board until resolved ----------
 const SEV_RANK = {critical: 0, warning: 1, info: 2};
@@ -1422,7 +1495,7 @@ function renderBoard() {
 // soonest first, each tagged "scheduled" and its kind. Click one to edit it; ▶ fires or checks it now. Dragging one
 // to In progress runs it; while it runs (a check, a workflow run or a task it started still in progress) it sits in
 // In progress, then goes back to the backlog.
-const SCHED_TAG = {schedule: 'cron', event: 'event', webhook: 'webhook', pipeline: 'pipeline', watch: 'watch', poll: 'poll', ado: 'ado', teams: 'teams'};
+const SCHED_TAG = {schedule: 'cron', event: 'event', webhook: 'webhook', pipeline: 'pipeline', watch: 'watch', poll: 'poll', ado: 'ado', pr: 'pr', teams: 'teams'};
 const SCHED_ON = {event: 'on event', webhook: 'on POST', watch: 'on change'};
 function schedBusy(tr) {
   if (tr.checking || (view.schedKick?.[tr.id] || 0) > Date.now() - 15000) return true;
@@ -1444,7 +1517,7 @@ function schedCard(tr, busy) {
     const live = busy && (S.tasks.find(t => t.col === 'doing' && t.source?.trigger === tr.id) || (S.runs || []).find(r => r.status === 'running' && r.source?.trigger === tr.id));
     const nx = busy ? `<span class="spinner sm" aria-hidden="true"></span> ${live ? (live.steps ? `run · step ${live.step + 1}/${live.steps.length}` : `#${live.id} · ${esc(live.who || 'queued')}`) : tr.checking ? 'checking' : 'starting'}` : !tr.enabled ? 'off' : tr.checking ? 'checking…' : tr.next ? `<span data-until="${tr.next}">${untilTxt(tr.next)}</span>` : SCHED_ON[tr.kind] || '';
     return `<div class="sched${tr.enabled ? '' : ' off'}${tr.error ? ' err' : ''}${busy ? ' busy' : ''}" data-sched="${esc(tr.id)}" ${busy ? '' : 'draggable="true"'} tabindex="0" title="${esc(trigWhat(tr))}${tr.error ? ' · ⚠ ' + esc(tr.error) : ''}">
-      <div class="th"><span class="ic">${TRIG_KIND[tr.kind]?.ic || '◷'}</span><span class="t">${esc(tr.name)}</span>${tr.enabled && !busy ? `<button class="run" data-sched-run="${esc(tr.id)}" title="${['ado', 'teams', 'pipeline'].includes(tr.kind) ? 'Check now' : 'Fire once now'}" aria-label="Run ${esc(tr.name)} now">▶</button>` : ''}</div>
+      <div class="th"><span class="ic">${TRIG_KIND[tr.kind]?.ic || '◷'}</span><span class="t">${esc(tr.name)}</span>${tr.enabled && !busy ? `<button class="run" data-sched-run="${esc(tr.id)}" title="${['ado', 'pr', 'teams', 'pipeline'].includes(tr.kind) ? 'Check now' : 'Fire once now'}" aria-label="Run ${esc(tr.name)} now">▶</button>` : ''}</div>
       <div class="d">${esc(trigWhat(tr))}</div>
       <div class="f"><span class="tag scheduled">scheduled</span><span class="tag k-${tr.kind}">${SCHED_TAG[tr.kind] || tr.kind}</span><span title="Starts">→ ${esc(target)}</span>${tr.error ? '<span style="color:var(--red)">⚠</span>' : ''}<span class="nx">${nx}</span></div>
     </div>`;
@@ -1452,7 +1525,7 @@ function schedCard(tr, busy) {
 async function schedRun(tr) {
   view.schedKick = {...view.schedKick, [tr.id]: Date.now()};
   const r = await act('trigger_run', {id: tr.id});
-  if (r.ok) toast(`${tr.name}: ${['ado', 'teams', 'pipeline'].includes(tr.kind) ? 'checking now' : 'fired once'}`, 'var(--amber)');
+  if (r.ok) toast(`${tr.name}: ${['ado', 'pr', 'teams', 'pipeline'].includes(tr.kind) ? 'checking now' : 'fired once'}`, 'var(--amber)');
   else delete view.schedKick[tr.id];
   renderBoard(); setTimeout(renderBoard, 15500);
 }
@@ -1497,7 +1570,7 @@ function runGroups() {
 }
 function runGroup(r, head) {
   const n = r.steps.length, folded = view.runFold?.has(r.id);
-  const state = i => { const t = task(r.tasks[i]); return t ? (t.decision?.verdict === 'stop' ? 'stopped' : t.col) : 'wait'; };
+  const state = i => { const t = task(r.tasks[i]); return t ? (t.decision?.verdict === 'stop' ? 'stopped' : t.col) : r.results?.[i] ? 'done' : 'wait'; };  // a finished step whose card was cleared still counts
   const dot = i => { const s = state(i), st = r.steps[i];
     return `<span class="rst ${s}" title="Step ${i + 1}: ${esc(st.agent)} · ${s === 'wait' ? (r.status === 'running' ? 'not started' : 'not run') : s}"><i>${s === 'done' ? '✓' : s === 'stopped' ? '■' : i + 1}</i></span>`; };
   const steps = stepGroups(r.steps).map(g => g.length > 1 ? `<span class="rst ${g.every(i => state(i) === 'done') ? 'done' : ''}" title="Steps ${g.map(i => i + 1).join(' + ')} run at the same time"><span class="rpi">${g.map(dot).join('')}</span></span>` : dot(g[0])).join('');
@@ -1507,11 +1580,12 @@ function runGroup(r, head) {
     if (t && (t.id === head.id || (live.includes(i) && t.col !== 'done'))) return card(t);
     const s = state(i), title = t ? t.title : (st.title || '{input}').replace('{input}', r.title);
     const mark = s === 'done' ? '<span class="ok">✓</span>' : s === 'stopped' ? '<span style="color:var(--red)">■</span>' : '<span class="faint">○</span>';
-    return `<div class="rrow ${t ? '' : 'wait'}" ${t ? `data-card="${t.id}" title="#${t.id} ${esc(t.title)} · open ${esc(st.agent)}"` : ''}>${mark}<span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 10)}</span><span class="rt">${i + 1}.${st.par ? '∥' : ''} ${esc(title)}</span>${t ? `<span class="faint">#${t.id}</span>` : `<span class="rs">${r.status === 'running' ? 'not started' : 'not run'}</span>`}</div>`;
+    return `<div class="rrow ${s === 'wait' ? 'wait' : ''}" ${t ? `data-card="${t.id}" title="#${t.id} ${esc(t.title)} · open ${esc(st.agent)}"` : ''}>${mark}<span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 10)}</span><span class="rt">${i + 1}.${st.par ? '∥' : ''} ${esc(title)}</span>${t ? `<span class="faint">#${t.id}</span>` : s === 'done' ? `<span class="rs" title="${esc(r.results[i].who)} finished it; its card #${r.tasks[i]} was cleared from the board">done · card cleared</span>` : `<span class="rs">${r.status === 'running' ? 'not started' : 'not run'}</span>`}</div>`;
   }).join('');
   const done = r.steps.filter((_, i) => state(i) === 'done').length;
   return `<div class="rgrp" data-run-group="${esc(r.id)}">
     <div class="gh"><span class="gi">⛓</span><b>${esc(r.name)}</b><span class="gs">${r.status === 'running' ? `${stepLbl(r)} of ${n}` : `${esc(r.status)} · ${done}/${n}`}</span>
+      <button class="fold" data-run-restart="${esc(r.id)}" title="Restart the whole workflow, or from a step" aria-label="Restart ⛓ ${esc(r.name)}" aria-haspopup="menu">↻</button>
       <button class="fold" data-run-fold="${esc(r.id)}" title="${folded ? 'Show the steps' : 'Collapse to the header'}" aria-expanded="${!folded}">${folded ? '▸' : '▾'}</button>
       <span class="gg" title="${esc(r.title)}">${esc(r.title)}</span></div>
     <div class="rgsteps">${steps}</div>${rows}</div>`;
@@ -1580,13 +1654,13 @@ const prLink = (t, sz = '') => { const u = prOf(t), n = (/\/pull(?:request)?\/(\
   return `<a class="btn ${sz}" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">Open PR${n ? ' #' + n : ''} ↗</a>`; };
 const addrevOk = t => { const a = agent(t.who); return a && (!a.skill_names?.length || a.skill_names.includes('address-review')); };
 function addrevBtn(t, sz = '') {
-  if (!addrevOk(t) || t.col === 'doing') return '';
+  if (!addrevOk(t) || (t.col === 'doing' && !t.reviewing)) return '';  // In progress only while it addresses the review
   const a = agent(t.who), busy = t.reviewing && a.status === 'running';
   return `<button class="btn ${sz}" data-addrev="${t.id}" ${a.status === 'running' ? 'disabled' : ''} title="${busy ? `${esc(a.name)} is addressing the review` : a.status === 'running' ? `${esc(a.name)} is busy; try when it's done` : `Ask ${esc(a.name)} to run /address-review on ${esc(prOf(t))}: fetch the comments, fix, reply and resolve`}">${busy ? '<span class="spinner sm" aria-hidden="true"></span> Addressing review…' : '↻ Address review'}</button>`;
 }
 async function addressReview(id) {
   const r = await act('address_review', {task: id});
-  if (r.ok) { toast(`${task(id)?.who} is addressing the review on #${id}`, 'var(--accent)'); render(); }
+  if (r.ok) { toast(`${task(id)?.who} is addressing the review on #${id}`, 'var(--accent)'); if (view.drawer?.review === id) view.drawer = {agent: task(id)?.who}; render(); }
 }
 function cardCost(t) {
   const nb = blockedAll().filter(d => d.task === t.id).length;
@@ -1621,14 +1695,20 @@ function card(t) {
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Hand off: forward this task to another agent as a to-do, with this task's summary as context" aria-label="Hand off task #${t.id} to another agent" aria-haspopup="menu">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete" aria-label="More actions for task #${t.id}" aria-haspopup="menu">⋮</button></span></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
-    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado || adoRef(t))}${hand}${subs}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.wait?.probe && t.col === 'backlog' ? `<span class="waitb" title="Watching: ${esc(t.wait.probe.cmd)}${t.wait.probe.done ? ' · done when it matches ' + esc(t.wait.probe.done) : ''}${t.wait.probe.fail ? ' · fix when it matches ' + esc(t.wait.probe.fail) : ''}&#10;Runs every 2 min. Its agent wakes ${t.wait.probe.fail ? 'on the goal or a new failure' : 'only when the output changes'}.&#10;Last output: ${esc((t.wait.probe.out || '').slice(0, 300))}">👁 ${t.wait.checks}${t.wait.wake ? ' · ' + esc(t.wait.wake) : t.wait.next ? ` · next <span data-until="${t.wait.next}">${untilTxt(t.wait.next)}</span>` : ''}</span>`
+    <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado || adoRef(t))}${hand}${subs}${owner ? bgChip(owner, t.id) : ''}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.wait?.probe && t.col === 'backlog' ? `<span class="waitb" title="Watching: ${esc(t.wait.probe.cmd)}${t.wait.probe.done ? ' · done when it matches ' + esc(t.wait.probe.done) : ''}${t.wait.probe.fail ? ' · fix when it matches ' + esc(t.wait.probe.fail) : ''}&#10;Runs every 2 min. Its agent wakes ${t.wait.probe.fail ? 'on the goal or a new failure' : 'only when the output changes'}.&#10;Last output: ${esc((t.wait.probe.out || '').slice(0, 300))}">👁 ${t.wait.checks}${t.wait.wake ? ' · ' + esc(t.wait.wake) : t.wait.next ? ` · next <span data-until="${t.wait.next}">${untilTxt(t.wait.next)}</span>` : ''}</span>`
   : t.wait?.next && t.col === 'backlog' ? `<span class="waitb" title="Waiting for its goal. Last check: ${esc((t.wait.last || '').slice(0, 300))}">⟳ ${t.wait.checks} · next <span data-until="${t.wait.next}">${untilTxt(t.wait.next)}</span></span>` : ''}${t.wait?.over && t.col === 'review' ? '<span class="waitb" title="Checked as many times as the step allows without reaching its goal: over to you">⟳ out of checks</span>' : ''}${t.decision ? `<span class="holdb${t.decision.verdict === 'stop' ? ' red' : ''}" title="${esc(t.decision.by)}: ${esc(t.decision.reason)}">${t.decision.verdict === 'stop' ? '⏹ stopped' : '→ passed'}</span>` : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
   </div>`;
 }
 
+try { view.drawerFull = localStorage.getItem('crew.drawerFull') === '1'; } catch {}
+const FS_ON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg>';
+const FS_OFF = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 6.5h-4v-4M9.5 6.5 14 2M2.5 9.5h4v4M6.5 9.5 2 14"/></svg>';
+const fsBtn = () => `<button class="iconbtn fsb" data-fullscreen title="${view.drawerFull ? 'Exit full screen' : 'Full screen'}" aria-label="${view.drawerFull ? 'Exit full screen' : 'Full screen'}" aria-pressed="${!!view.drawerFull}">${view.drawerFull ? FS_OFF : FS_ON}</button>`;
+function setDrawerFull(on) { view.drawerFull = on; try { localStorage.setItem('crew.drawerFull', on ? '1' : ''); } catch {} render(); }
 function renderDrawer() {
   const d = $('#drawer'), body = $('#body');
+  body.classList.toggle('drawer-full', !!(view.drawer && view.drawerFull));
   if (!view.drawer) { d.hidden = true; body.classList.remove('drawer-open'); return; }
   d.hidden = false; body.classList.add('drawer-open');
   if (view.drawer.agent) return renderAgentDrawer(d, agent(view.drawer.agent));
@@ -1666,8 +1746,8 @@ function renderAgentDrawer(d, a) {
         : a.status === 'paused' ? `<button class="btn sm" data-resume="${a.name}" style="color:var(--amber)">▶ <span class="lbl">Resume</span></button>` : ''}
       <div class="atb"><button class="editb" data-toggle-settings aria-expanded="${!!view.showSettings}" title="Model, effort, role, tags, look and triggers">${PEN}<span class="lbl">${view.showSettings ? 'Done' : 'Edit'}</span></button><button class="bin" data-remove-agent="${a.name}" title="Delete ${esc(a.name)}" aria-label="Delete ${esc(a.name)}">${BIN}</button></div>
       <button class="kebab" data-agent-menu="${a.name}" title="Rename, settings, kill, delete…" aria-label="More actions for ${a.name}" aria-haspopup="menu">⋮</button>
-      <button class="iconbtn" data-close-drawer title="Close" aria-label="Close">✕</button></div>
-    ${ctxRow(a)}${blockedBox(a)}`;
+      ${fsBtn()}<button class="iconbtn" data-close-drawer title="Close" aria-label="Close">✕</button></div>
+    ${ctxRow(a)}${blockedBox(a)}${bgBox(a)}`;
   const inh = $('#dinh'); if (inh) { inh.hidden = !view.showInherit; if (view.showInherit) { const h = inheritHtml(a); if (inh.dataset.sig !== h) { inh.innerHTML = h; inh.dataset.sig = h; } } }
   renderSettings(a);
   const st = $('#stream'), atBottom = st.scrollHeight - st.scrollTop - st.clientHeight < 40;
@@ -2063,7 +2143,7 @@ function renderReviewDrawer(d, t) {
   const add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0), tn = testsNote(t);
   const verdict = files.length ? `<b>${files.length} file${files.length > 1 ? 's' : ''}</b><span class="sep">·</span><span class="ad">+${add}</span><span class="rm">−${del}</span>${tn ? `<span class="sep">·</span><span class="${tn[0]}">${tn[1]}</span>` : ''}` : `<span class="faint">no file changes</span>${tn ? `<span class="sep">·</span><span class="${tn[0]}">${tn[1]}</span>` : ''}`;
   d.innerHTML = `<div data-shell="review" data-key="${key}" style="display:contents">
-    <div class="dh"><div class="row"><span class="tag ${t.tag}">${t.tag}</span><h3 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">#${t.id} ${esc(t.title)}</h3><button class="iconbtn" data-close-drawer aria-label="Close" title="Close" style="margin-left:auto">✕</button></div>
+    <div class="dh"><div class="row"><span class="tag ${t.tag}">${t.tag}</span><h3 style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">#${t.id} ${esc(t.title)}</h3><span style="margin-left:auto"></span>${fsBtn()}<button class="iconbtn" data-close-drawer aria-label="Close" title="Close">✕</button></div>
       <div class="verdict">${verdict}</div>
       <div class="kv"><span>by ${esc(t.who)}</span>${t.tokens ? `<span class="tok">${fmtTok(t.tokens)} tokens</span>` : ''}${t.finished && t.started ? `<span>took ${dur(t.finished - t.started)}</span>` : ''}${agent(t.who)?.branch ? `<span>⎇ ${esc(agent(t.who).branch)}</span>` : ''}</div></div>
     <div class="stream">
@@ -2099,9 +2179,10 @@ async function sendMsg() {
 /* ── interactions ──────────────────────────────────── */
 document.addEventListener('click', async e => {
   if (!e.target.closest('.menu')) closeMenu();
-  const el = e.target.closest('[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-addrev],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-new-task],[data-agent],[data-close],[data-run-stop-card]');
+  const el = e.target.closest('[data-run-restart],[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-addrev],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-fullscreen],[data-new-task],[data-agent],[data-close],[data-run-stop-card]');
   if (!el) return;
   const ds = el.dataset;
+  if (ds.runRestart) { e.stopPropagation(); return openRestartMenu(ds.runRestart, el); }
   if (ds.runStopCard) { e.stopPropagation(); const r = (S.runs || []).find(x => x.id === ds.runStopCard); return askConfirm('Stop workflow?', `<b>⛓ ${esc(r?.name || 'This run')}</b> ends: no more steps start, and its open step's agent stops working and checking. The card moves to Done, marked ⏹ stopped.`, 'Stop workflow', () => act('run_stop', {id: ds.runStopCard, cards: true}), true); }
   if (ds.menu) { e.stopPropagation(); return openTaskMenu(+ds.menu, el); }
   if (ds.fwd) { e.stopPropagation(); return openFwdMenu(+ds.fwd, el); }
@@ -2126,6 +2207,7 @@ document.addEventListener('click', async e => {
   if (ds.backlog) { await act('move', {task: +ds.backlog, col: 'backlog'}); view.drawer = null; return render(); }
   if (ds.refreshDiff) { await act('diff', {task: +ds.refreshDiff}); const d = $('#drawer'); d.innerHTML = ''; return render(); }
   if ('closeDrawer' in ds) { view.drawer = null; return render(); }
+  if ('fullscreen' in ds) return setDrawerFull(!view.drawerFull);
   if ('close' in ds) return closeModals();
   if ('newTask' in ds) return openTask();
   if (ds.agent) { view.drawer = view.drawer?.agent === ds.agent ? null : {agent: ds.agent}; render(); setTimeout(() => $('#msg')?.focus(), 0); }
@@ -2176,6 +2258,29 @@ document.addEventListener('drop', async e => {
   else toast('Drop on an agent to start work, or on Backlog / Done', 'var(--faint)');
   render();
 });
+
+// ↻ on a workflow frame: run it again from the start, or from a step whose earlier steps all finished (they keep
+// their results, which the restarted steps read). Restarted steps are new tasks, so every agent gets a fresh session.
+function openRestartMenu(id, anchor) {
+  const r = (S.runs || []).find(x => x.id === id); if (!r) return;
+  MENU_ACTIONS = [];
+  const n = r.steps.length, live = r.status === 'running';
+  const go = i => askConfirm(i ? `Restart from step ${i + 1}?` : 'Restart workflow?',
+    `<b>⛓ ${esc(r.name)}</b>: ${esc(r.title)}<br><br>` + (i
+      ? `Steps ${i + 1} to ${n} start again as new tasks, each agent on a fresh session. Steps 1 to ${i} keep their results, and step ${i + 1} reads them.`
+      : 'Every step starts again as a new task, each agent on a fresh session, using the workflow’s steps as they are now.')
+    + (live ? ' The step that is open now stops: its agent stops working and checking.' : '') + ' Earlier cards stay in Done.',
+    'Restart', () => act('run_restart', {id: r.id, step: i}));
+  let h = `<div class="mh">Restart ⛓ ${esc(r.name)}</div>` + item('↻ Restart whole workflow', () => go(0), {sub: 'from step 1'});
+  const gs = stepGroups(r.steps).slice(1);
+  if (gs.length) h += '<div class="sep"></div>';
+  for (const g of gs) {
+    const i = g[0], miss = r.steps.slice(0, i).findIndex((_, k) => !(r.results || [])[k]);
+    h += item(`From step ${g.map(k => k + 1).join(' ∥ ')}: ${g.map(k => r.steps[k].agent).join(' + ')}`, () => go(i),
+      {disabled: miss >= 0, sub: miss >= 0 ? `step ${miss + 1} never finished` : ''});
+  }
+  showMenu(anchor, h);
+}
 
 // ── menus ─────────────────────────────────────────────
 let MENU_ACTIONS = [];
@@ -2390,10 +2495,11 @@ const TRIG_KIND = {
   poll: {label: 'Poll command', ic: '⟳', hint: 'Runs a command in the project folder and fires on its result: CI status, queues, APIs.'},
   webhook: {label: 'Webhook', ic: '⇢', hint: 'An HTTP endpoint with a secret token, for CI, git hooks and scripts.'},
   ado: {label: 'ADO board', ic: '⬡', hint: 'Start a workflow when you tag a work item on your Azure DevOps board, or when one is assigned to you. Needs the az CLI, signed in.'},
+  pr: {label: 'Pull request', ic: '⇄', hint: 'Raised: when you open a PR outside Crew (by hand, in your IDE, another tool), start a CI monitor for it; PRs Crew or its agents opened are skipped. Merged: when a PR of yours merges, start a CD workflow. GitHub through gh, Azure Repos through az.'},
   pipeline: {label: 'Pipeline', ic: '▶', hint: 'When an Azure Pipelines run finishes (a CD release, a build). Optionally only runs requested for you or carrying your work items. Needs the az CLI, signed in.'},
   teams: {label: 'Teams', ic: '✉', hint: 'When someone @mentions you, or posts, in a Teams channel or chat. Reads Teams through the Microsoft 365 connector in your Claude Code; each check is a short Haiku run.'},
 };
-const TRIG_VARS = {schedule: '{weekday}', event: '{id} {title} {who} {summary} {branch} {commit} {merge}', watch: '{files}', poll: '{output} {exit}', webhook: '{payload}', ado: '', pipeline: '', teams: '{title} {from} {text} {link} {when} {where}'};
+const TRIG_VARS = {schedule: '{weekday}', event: '{id} {title} {who} {summary} {branch} {commit} {merge}', watch: '{files}', poll: '{output} {exit}', webhook: '{payload}', ado: '', pr: '', pipeline: '', teams: '{title} {from} {text} {link} {when} {where}'};
 const TRIG_PRESETS = [
   {name: 'Daily standup', blurb: 'Weekdays 11:00, the scribe writes your standup report.', kind: 'schedule', spec: {cron: '0 11 * * 1-5'},
    task: {title: 'Standup report for {date}', tag: 'report', agent: 'scribe', details: "Summarise what merged since the last working day, what is in review, and what is blocked. Link every PR and work item. End with 'New on my plate'."}},
@@ -2403,6 +2509,10 @@ const TRIG_PRESETS = [
    task: {title: 'Review #{id}: {title}', tag: 'review', agent: 'reviewer', details: 'Review commit {commit} on {branch}: `git show {commit}`. Report findings by severity; fix only clear defects.\n\nAuthor summary:\n{summary}'}},
   {name: 'Plan, then build', blurb: 'An approved plan becomes a build task for the builder.', kind: 'event', spec: {on: 'done', tag: 'plan'},
    task: {title: 'Build: {title}', tag: 'feature', agent: 'builder', details: 'The plan is on {branch} (commit {commit}). Run `{merge}`, read the plan, and implement its first step.\n\n{summary}'}},
+  {name: 'Monitor PRs I open', blurb: 'A PR you open outside Crew gets a CI monitor that keeps it green until it merges.', kind: 'pr', spec: {every: 5, state: 'raised'},
+   task: {title: '', details: '', tag: '', agent: '', workflow: ''}},
+  {name: 'Deploy what I merge', blurb: 'When a PR of yours merges, a CD workflow deploys it and checks it.', kind: 'pr', spec: {every: 5, state: 'merged'},
+   task: {title: '', details: '', tag: '', agent: '', workflow: ''}},
   {name: 'CI failure watch', blurb: 'Every 10 min, a new failed GitHub Actions run goes to ops.', kind: 'poll',
    spec: {command: 'gh run list --status failure --limit 1 --json displayTitle,headBranch,url,createdAt', every: 10, when: 'output'},
    task: {title: 'CI failed: find the cause', tag: 'incident', agent: 'ops', details: 'Latest failed run:\n{output}\n\nFind the failing step and the cause. Propose a fix; do not push.'}},
@@ -2447,6 +2557,7 @@ function trigWhat(tr) {
     case 'watch': return `When ${sp.glob} changes · checks every ${sp.every}s`;
     case 'poll': return `Every ${sp.every} min: ${sp.command}  →  on ${({change: 'changed output', fail: 'failure', output: 'new output'})[sp.when]}`;
     case 'webhook': return `POST ${location.origin}/api/hook/${tr.id}`;
+    case 'pr': return `PRs I ${sp.state === 'merged' ? 'merge' : 'open'} ${sp.host === 'ado' ? 'in Azure Repos' + (sp.repo ? ' · ' + sp.repo : '') : 'on GitHub' + (sp.repo ? ' · ' + sp.repo : ' in this project')}${sp.drafts && sp.state !== 'merged' ? ' · drafts too' : ''} · every ${sp.every} min · new ${sp.state === 'merged' ? 'merges' : 'PRs'} only, once each`;
     case 'pipeline': return `${cap(pipeRes(sp.result).map(k => PIPE_RES[k]).join(' or '))} runs of ${sp.pipelines.join(', ')}${sp.mine ? ' · only mine' : ''} · every ${sp.every} min`;
     case 'teams': return `${sp.mode === 'all' ? 'New messages' : '@mentions of you'} in ${sp.name || (sp.thread ? 'the linked conversation' : sp.where)}${sp.about ? ` about ${sp.about}` : ''} · every ${sp.every} min`;
     case 'ado': if (sp.match === 'assigned') return `Items newly assigned to me${sp.types?.length ? ' (' + sp.types.join(', ') + ')' : ''} · every ${sp.every} min${sp.existing === 'start' ? ' · incl. ones already assigned' : ''}`;
@@ -2473,7 +2584,7 @@ function renderTrigs() {
 function trigBack(id) { tv = {mode: 'list'}; drawTriggers(); focusSoon(id ? `[data-tr-edit="${id}"]` : '[data-tr-new]'); }
 function blankTrig(kind = 'schedule') {
   return {name: '', kind, enabled: true, spec: {cron: '0 9 * * 1-5', on: 'done', tag: '', agent: '', glob: 'src/**/*', every: kind === 'poll' || kind === 'ado' ? 5 : 10, cooldown: 60, command: '', when: 'change',
-                  org: '', project: '', workflow: '', types: [], after: 'tag_picked', comment: true, where: '', mode: 'mention', about: '', pipelines: [], result: ['any'], mine: true},
+                  org: '', project: '', workflow: '', types: [], after: 'tag_picked', comment: true, where: '', mode: 'mention', about: '', pipelines: [], result: ['any'], mine: true, host: 'github', repo: '', drafts: false, state: 'raised'},
           task: {title: '', details: '', tag: '', agent: '', workflow: ''}};
 }
 function editTrig(tr) {
@@ -2481,9 +2592,12 @@ function editTrig(tr) {
   tv = {mode: 'form', id: tr?.id || null, f: tr ? {...b, name: tr.name, kind: tr.kind, enabled: tr.enabled, spec: {...b.spec, ...tr.spec}, task: {...b.task, ...tr.task}} : b};
   drawTriggers(); focusSoon('#tmBody [data-f="name"]');
 }
+const PR_WF = {raised: /\bci\b|monitor|green/i, merged: /\bcd\b|deploy|release|ship/i};
+const prWorkflow = state => (S.workflows || []).find(w => PR_WF[state === 'merged' ? 'merged' : 'raised'].test(w.name))?.id || S.workflows?.[0]?.id || '';
 function presetForm(i) {
   const pr = TRIG_PRESETS[i], b = blankTrig(pr.kind);
   const task = {...b.task, ...pr.task};
+  if (pr.kind === 'pr') b.spec.workflow = prWorkflow(pr.spec.state);
   if (task.agent && !S.agents.some(a => a.name === task.agent)) task.agent = '';  // roster may differ
   return {mode: 'form', id: null, f: {...b, name: pr.name, kind: pr.kind, spec: {...b.spec, ...pr.spec}, task}};
 }
@@ -2495,39 +2609,106 @@ function nextCheck(tr) {
   return tr.next ? ` · next check ${tr.next * 1000 > Date.now() ? clock(tr.next) + ' ' : ''}(<span data-until="${tr.next}">${untilTxt(tr.next)}</span>)` : '';
 }
 function ttRow(tr) {
-  if (tr.kind === 'ado' || tr.kind === 'pipeline') return `<div class="tt"><span class="faint">→</span><span class="tag eval">${tr.task.workflow ? '⛓' : '⬡'} ${esc(tr.task.workflow ? ((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow) : tr.task.agent)}</span><span>one ${tr.task.workflow ? 'run' : 'task'} per ${tr.kind === 'pipeline' ? 'finished run' : 'item'}</span></div>`;
+  if (['ado', 'pr', 'pipeline'].includes(tr.kind)) return `<div class="tt"><span class="faint">→</span><span class="tag eval">${tr.task.workflow ? '⛓' : '⬡'} ${esc(tr.task.workflow ? ((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow) : tr.task.agent)}</span><span>one ${tr.task.workflow ? 'run' : 'task'} per ${tr.kind === 'pipeline' ? 'finished run' : tr.kind === 'pr' ? 'new PR' : 'item'}</span></div>`;
   return `<div class="tt"><span class="faint">→</span>${tr.task.workflow ? `<span class="tag eval">⛓ ${esc((S.workflows || []).find(w => w.id === tr.task.workflow)?.name || tr.task.workflow)}</span>` : `<span class="tag ${esc(tr.task.tag || 'feature')}">${esc(tr.task.tag || 'feature')}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(tr.task.title)}</span><span class="faint">· ${tr.task.workflow ? 'workflow run' : tr.task.agent ? esc(tr.task.agent) : 'whoever matches'}</span></div>`;
+}
+// The list groups triggers by what they react to; each section folds (remembered per browser) and a toolbar filters.
+const TRIG_GROUPS = [
+  {id: 'work', label: 'Work intake', sub: 'Boards and chats that bring you new work', kinds: ['ado', 'teams']},
+  {id: 'code', label: 'Code & CI/CD', sub: 'Pull requests, pipelines, CI checks and webhooks', kinds: ['pr', 'pipeline', 'poll', 'webhook']},
+  {id: 'time', label: 'Schedules', sub: 'Recurring jobs on a clock', kinds: ['schedule']},
+  {id: 'crew', label: 'Project & crew events', sub: 'File changes and tasks moving on the board', kinds: ['event', 'watch']},
+];
+const trigGroup = kind => TRIG_GROUPS.find(g => g.kinds.includes(kind)) || TRIG_GROUPS[TRIG_GROUPS.length - 1];
+const trigPolled = tr => ['ado', 'pr', 'teams', 'pipeline'].includes(tr.kind);
+let trigFold = (() => { try { return new Set(JSON.parse(localStorage.getItem('crew.trigFold') || '[]')); } catch { return new Set(); } })();
+const trigView = {q: '', show: 'all'};
+function trigState(tr) {
+  if (!tr.enabled) return ['off', 'Off'];
+  if (trigPolled(tr) && tr.error) return ['err', 'Needs attention'];
+  if (tr.checking) return ['busy', 'Checking…'];
+  return ['on', 'On'];
+}
+function trigMeta(tr) {
+  const out = [tr.fired ? `Fired ${tr.fired}× · last ${ago(tr.last)} ago${tr.note ? ` (${esc(tr.note)})` : ''}` : 'Not fired yet'];
+  if (tr.kind === 'schedule' && tr.enabled) out.push(`next ${fmtWhen(tr.next)}`);
+  if (tr.kind === 'poll' && tr.checked) out.push(`checked ${ago(tr.checked.t)} ago, exit ${tr.checked.exit}`);
+  if (trigPolled(tr)) {
+    const what = ({teams: 'message', pipeline: 'run', ado: 'match', pr: 'PR'})[tr.kind], n = tr.checked?.found;
+    out.push(tr.checked ? `checked ${ago(tr.checked.t)} ago: ${n} new ${what}${n === 1 ? '' : tr.kind === 'ado' ? 'es' : 's'}, ${tr.picked || 0} picked up in all` : 'not checked yet');
+  }
+  const nx = ['ado', 'pr', 'poll', 'teams', 'pipeline'].includes(tr.kind) && tr.enabled ? nextCheck(tr).replace(/^ · /, '') : '';
+  return out.join(' · ') + (nx ? ` · ${nx}` : '');
+}
+function trigRow(tr) {
+  const [st, stl] = trigState(tr), K = TRIG_KIND[tr.kind];
+  return `
+    <div class="trow ${tr.enabled ? '' : 'off'} ${st === 'err' ? 'bad' : ''}">
+      <div class="tic k-${tr.kind}" title="${esc(K.label)}">${K.ic}</div>
+      <div class="tmain">
+        <div class="tn">${esc(tr.name)}<span class="tk">${esc(K.label)}</span><span class="tst ${st}">${stl}</span></div>
+        <div class="tw" title="${esc(trigWhat(tr))}">${esc(trigWhat(tr))}</div>
+        ${ttRow(tr)}
+        ${tr.kind === 'webhook' ? hookBox(tr) : ''}
+        ${trigPolled(tr) && tr.error ? `<div class="terr" title="${esc(tr.error)}">⚠ ${esc(tr.error)}</div>` : ''}
+        <div class="tmeta">${trigMeta(tr)}</div>
+      </div>
+      <div class="tact">
+        <button class="sw ${tr.enabled ? 'on' : ''}" data-tr-toggle="${tr.id}" role="switch" aria-checked="${!!tr.enabled}" title="${tr.enabled ? 'On: click to pause' : 'Off: click to turn on'}" aria-label="${tr.enabled ? 'Pause' : 'Turn on'} ${esc(tr.name)}"><span></span></button>
+        <button class="btn sm" data-tr-run="${tr.id}" title="${({ado: 'Check the board now', teams: 'Check Teams now', pipeline: 'Check for finished runs now', pr: 'Check for new PRs now'})[tr.kind] || 'Fire once now'}">${trigPolled(tr) ? 'Check' : 'Run'}</button>
+        <button class="btn sm ghost" data-tr-edit="${tr.id}">Edit</button>
+        <button class="iconbtn bin" data-tr-del="${tr.id}" title="Delete trigger" aria-label="Delete trigger ${esc(tr.name)}">${BIN}</button>
+      </div>
+    </div>`;
 }
 function drawTriggers() {
   if (tv.mode === 'form') return drawTrigForm();
   $('#tmTitle').textContent = 'Triggers'; $('.tsub').hidden = false;
-  const rows = (S.triggers || []).map(tr => `
-    <div class="trow ${tr.enabled ? '' : 'off'}">
-      <div class="tic k-${tr.kind}">${TRIG_KIND[tr.kind].ic}</div>
-      <div class="tmain">
-        <div class="tn">${esc(tr.name)} <span class="faint" style="font-weight:400">· ${TRIG_KIND[tr.kind].label}</span></div>
-        <div class="tw" title="${esc(trigWhat(tr))}">${esc(trigWhat(tr))}</div>
-        ${ttRow(tr)}
-        ${tr.kind === 'webhook' ? hookBox(tr) : ''}
-        <div class="tmeta">${tr.fired ? `fired ${tr.fired}× · last ${ago(tr.last)} ago${tr.note ? ' · ' + esc(tr.note) : ''}` : 'not fired yet'}${tr.kind === 'schedule' && tr.enabled ? ` · next ${fmtWhen(tr.next)}` : ''}${tr.kind === 'poll' && tr.checked ? ` · checked ${ago(tr.checked.t)} ago, exit ${tr.checked.exit}` : ''}${['ado', 'teams', 'pipeline'].includes(tr.kind) ? (tr.checked ? ` · checked ${ago(tr.checked.t)} ago, ${tr.checked.found} new ${({teams: 'message', pipeline: 'run', ado: 'match'})[tr.kind]}${tr.checked.found === 1 ? '' : tr.kind === 'ado' ? 'es' : 's'}, ${tr.picked || 0} picked up in all` : ' · not checked yet') : ''}${['ado', 'poll', 'teams', 'pipeline'].includes(tr.kind) ? nextCheck(tr) : ''}</div>
-        ${['ado', 'teams', 'pipeline'].includes(tr.kind) && tr.error ? `<div class="tmeta" style="color:var(--red)" title="${esc(tr.error)}">⚠ ${esc(tr.error)}</div>` : ''}
-      </div>
-      <div class="tact">
-        <button class="sw ${tr.enabled ? 'on' : ''}" data-tr-toggle="${tr.id}" title="${tr.enabled ? 'On: click to pause' : 'Off: click to turn on'}"><span></span></button>
-        <button class="btn sm" data-tr-run="${tr.id}" title="${({ado: 'Check the board now', teams: 'Check Teams now', pipeline: 'Check for finished runs now'})[tr.kind] || 'Fire once now'}">${['ado', 'teams', 'pipeline'].includes(tr.kind) ? 'Check' : 'Run'}</button>
-        <button class="btn sm ghost" data-tr-edit="${tr.id}">Edit</button>
-        <button class="iconbtn bin" data-tr-del="${tr.id}" title="Delete trigger" aria-label="Delete trigger">${BIN}</button>
-      </div>
-    </div>`).join('');
-  const html = `
-    <div class="trow manual"><div class="tic">✋</div><div class="tmain"><div class="tn">Assign a task <span class="faint" style="font-weight:400">· Manual</span></div>
-      <div class="tw" style="white-space:normal">Drag a card onto an agent, use a card's ⋯ menu, or press N. Always on.</div></div><div></div></div>
-    ${rows || '<div class="empty">No automatic triggers yet. Start from a preset or build your own.</div>'}
-    <div><div class="label">Start from a preset</div><div class="presets">${TRIG_PRESETS.map((pr, i) => `<button class="preset" data-tr-preset="${i}"><b>${TRIG_KIND[pr.kind].ic} ${esc(pr.name)}</b><span>${esc(pr.blurb)}</span></button>`).join('')}</div></div>`;
+  const all = S.triggers || [], q = trigView.q.trim().toLowerCase();
+  const bad = all.filter(tr => trigState(tr)[0] === 'err').length, on = all.filter(tr => tr.enabled).length;
+  if (!$('#trList')) {  // the toolbar is drawn apart from the list, so typing in the search box never loses focus to a redraw
+    $('#tmBody').innerHTML = '<div class="ttools" id="trTools"></div><div class="tlist" id="trList"></div>';
+    trigSig = '';
+  }
+  if (trigView.show === 'err' && !bad) trigView.show = 'all';
+  const shows = [['all', `All ${all.length}`], ['on', `On ${on}`], ['off', `Off ${all.length - on}`], ...(bad ? [['err', `Needs attention ${bad}`]] : [])];
+  const seg = `<div class="seg" role="group" aria-label="Show">${shows.map(([v, l]) => `<button data-tr-show="${v}" class="${trigView.show === v ? 'on' : ''} ${v === 'err' ? 'warn' : ''}">${l}</button>`).join('')}</div>`;
+  const tt = $('#trTools');
+  if (!all.length) tt.innerHTML = '';
+  else {
+    if (!$('#trQ')) tt.innerHTML = `<input class="field tq" id="trQ" type="search" placeholder="Search triggers" aria-label="Search triggers" autocomplete="off"><span id="trSeg"></span>`;
+    if ($('#trQ').value !== trigView.q) $('#trQ').value = trigView.q;
+    if ($('#trSeg').innerHTML !== seg) $('#trSeg').innerHTML = seg;
+  }
+  const keep = tr => (trigView.show === 'all' || (trigView.show === 'on' ? tr.enabled : trigView.show === 'off' ? !tr.enabled : trigState(tr)[0] === 'err'))
+    && (!q || `${tr.name} ${TRIG_KIND[tr.kind].label} ${trigWhat(tr)} ${tr.task.title || ''} ${tr.task.agent || ''}`.toLowerCase().includes(q));
+  const rank = tr => ({err: 0, busy: 1, on: 1, off: 2})[trigState(tr)[0]];
+  const filtering = !!q || trigView.show !== 'all';
+  const sections = TRIG_GROUPS.map(g => {
+    const mine = all.filter(tr => trigGroup(tr.kind) === g), shown = mine.filter(keep).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    if (!mine.length || (filtering && !shown.length)) return '';
+    const folded = trigFold.has(g.id) && !filtering, gon = mine.filter(tr => tr.enabled).length, gbad = mine.filter(tr => trigState(tr)[0] === 'err').length;
+    return `<section class="tgrp">
+      <div class="tgh"><button class="tgf" data-tr-fold="${g.id}" aria-expanded="${!folded}" title="${folded ? 'Show' : 'Hide'} ${esc(g.label)}"><span class="car">${folded ? '▸' : '▾'}</span><b>${esc(g.label)}</b>
+        <span class="tgc">${mine.length} · ${gon} on${gbad ? ` · <span class="warnc">${gbad} need${gbad === 1 ? 's' : ''} attention</span>` : ''}</span></button>
+        <span class="tgs">${esc(g.sub)}</span>
+        <button class="btn sm ghost tga" data-tr-new-kind="${g.kinds[0]}" title="New trigger in ${esc(g.label)}">＋ Add</button></div>
+      ${folded ? '' : `<div class="tgl">${shown.map(trigRow).join('')}</div>`}</section>`;
+  }).join('');
+  const none = !all.length ? '<div class="empty">No automatic triggers yet. Start from a preset below, or build your own with ＋ New trigger.</div>'
+    : !sections ? '<div class="empty">No triggers match. <button class="btn sm ghost" data-tr-clear>Clear the filter</button></div>' : '';
+  const presets = TRIG_GROUPS.map(g => {
+    const ps = TRIG_PRESETS.map((pr, i) => [pr, i]).filter(([pr]) => g.kinds.includes(pr.kind));
+    return ps.length ? `<div class="pgl">${esc(g.label)}</div><div class="presets">${ps.map(([pr, i]) => `<button class="preset" data-tr-preset="${i}"><b>${TRIG_KIND[pr.kind].ic} ${esc(pr.name)}</b><span>${esc(pr.blurb)}</span></button>`).join('')}</div>` : '';
+  }).join('');
+  const open = view.trPresetsOpen ?? !all.length;
+  const html = `<div class="tmanual">✋ <b>Manual</b> is always on: drag a card onto an agent, use a card's ⋯ menu, or press <kbd>N</kbd>.</div>
+    ${sections}${none}
+    <details class="tpre" ${open ? 'open' : ''}><summary>Start from a preset <span class="faint">${TRIG_PRESETS.length}</span></summary>${presets}</details>`;
   if (trigSig === html) return;  // nothing changed: keep focus and scroll where they are
-  const fa = document.activeElement, mine = fa && $('#trigs').contains(fa);  // keep keyboard focus on the same control across a redraw
-  const key = mine ? ['data-tr-edit', 'data-tr-toggle', 'data-tr-run', 'data-tr-del', 'data-tr-new', 'data-tr-preset', 'data-io'].map(k => fa.hasAttribute(k) ? `[${k}="${fa.getAttribute(k)}"]` : '').find(Boolean) : '';
-  trigSig = html; $('#tmBody').innerHTML = html;
+  const fa = document.activeElement, mine = fa && $('#trList').contains(fa);  // keep keyboard focus on the same control across a redraw
+  const key = mine ? ['data-tr-edit', 'data-tr-toggle', 'data-tr-run', 'data-tr-del', 'data-tr-preset', 'data-tr-fold', 'data-tr-new-kind'].map(k => fa.hasAttribute(k) ? `[${k}="${fa.getAttribute(k)}"]` : '').find(Boolean) : '';
+  trigSig = html; $('#trList').innerHTML = html;
   $('#tmIo').innerHTML = `<button class="btn sm ghost" data-io="export-triggers">Export…</button><button class="btn sm ghost" data-io="import-triggers">Import…</button><button class="btn sm primary" data-tr-new>＋ New trigger</button>`;
   $('#tmFoot').innerHTML = '';
   if (key) $(key)?.focus();
@@ -2593,6 +2774,27 @@ function drawTrigForm() {
       ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="ah">${out.total} recent run${out.total === 1 ? '' : 's'} match</div>` + out.items.map(r => `<div class="ai"><b>#${+r.id}</b><span class="t"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.pipeline)}</a> ${esc(r.result)} · for ${esc(r.who || '?')}${r.my_items?.length ? ` · yours: ${esc(r.my_items.join(', '))}` : ''}</span><span class="m">${r.items} item${r.items === 1 ? '' : 's'} · ${ago(r.finished)} ago</span></div>`).join('') : '<div class="none">No finished runs in the last 7 days match.</div>'}</div>` : ''}
       <div class="thint">Needs the Azure CLI signed in (<code>az login</code>) with the azure-devops extension. Read-only: it never changes a pipeline or a work item; the agent it starts can.</div>`;
   }
+  if (k === 'pr') {
+    const wfs = S.workflows || [], useAgent = !!sp.agent, out = tv.prOut, ado = sp.host === 'ado', mg = sp.state === 'merged';
+    spec = `<div class="two"><div><div class="label">Fire when a PR of mine is</div>${seg('s', 'state', [['raised', 'Raised'], ['merged', 'Merged']], mg ? 'merged' : 'raised')}</div>
+      <div><div class="label">Where</div>${seg('s', 'host', [['github', 'GitHub (gh)'], ['ado', 'Azure Repos (az)']], sp.host || 'github')}</div></div>
+      <div class="thint" style="margin-top:-4px">${mg ? 'Merged: a PR of yours that merges after this trigger is created, Crew\'s own included. Good for a CD workflow: deploy, smoke-test, close the work item.' : 'Raised: a PR you open outside Crew after this trigger is created. PRs Crew or its agents opened are skipped. Good for a CI monitor.'}</div>
+      ${ado ? `<div class="two" style="grid-template-columns:1fr 160px"><div><div class="label">Organization URL</div><input class="field mono" data-s="org" value="${esc(sp.org)}" placeholder="https://dev.azure.com/yourorg" spellcheck="false" autocomplete="off"></div>
+        <div><div class="label">Project</div><input class="field" data-s="project" value="${esc(sp.project)}" spellcheck="false" autocomplete="off"></div></div>` : ''}
+      <div><div class="label">Repository<span class="faint lc">${ado ? 'optional: empty means every repo in the project' : 'optional: empty means this project\'s origin'}</span></div>
+        <input class="field mono" data-s="repo" value="${esc(sp.repo || '')}" placeholder="${ado ? 'MyRepo' : 'owner/name'}" spellcheck="false" autocomplete="off"></div>
+      <div><div class="label">Check every (min)</div><input class="field" type="number" min="2" data-s="every" value="${sp.every}" style="max-width:160px"></div>
+      ${mg ? '' : `<label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sc="drafts" ${sp.drafts ? 'checked' : ''} style="margin-top:2px"><span><b>Drafts too</b>. Off: a draft starts once you mark it ready for review.</span></label>`}
+      <div><div class="label">Start</div><div class="seg"><button data-ado-target="workflow" class="${useAgent ? '' : 'on'}">A workflow run</button><button data-ado-target="agent" class="${useAgent ? 'on' : ''}">A single agent</button></div>
+        <select class="field" data-s="${useAgent ? 'agent' : 'workflow'}" style="margin-top:8px">${useAgent
+          ? S.agents.map(a => `<option value="${esc(a.name)}" ${sp.agent === a.name ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
+          : wfs.map(w => `<option value="${esc(w.id)}" ${sp.workflow === w.id ? 'selected' : ''}>${esc(w.name)}</option>`).join('') || '<option value="">No workflows yet</option>'}</select>
+        <div class="thint">${mg ? `Only PRs that merge after this trigger is created, and each one once: one ${useAgent ? 'task' : 'run'} per merge, titled <code>PR #n merged: title</code>, with its link, the branch it merged into and its description. Pick a workflow that deploys and verifies, like a CD or release workflow.`
+          : `Only PRs you open after this trigger is created, and each one once: one ${useAgent ? 'task' : 'run'} per PR, titled <code>PR #n title</code>, with its link, branches and description. Pick a workflow whose step watches CI until the PR merges (a ⟳ step), like <i>PR CI monitor</i>.`}</div></div>
+      <div><button class="btn sm" data-pr-test ${out?.busy ? 'disabled' : ''}>${out?.busy ? 'Listing your PRs…' : mg ? 'Test: list my merged PRs' : 'Test: list my open PRs'}</button><span class="faint" style="font-size:11.5px;margin-left:8px">Read-only: starts nothing.</span></div>
+      ${out && !out.busy ? `<div class="adoout">${out.error ? `<div class="err">${esc(out.error)}</div>` : out.total ? `<div class="ah">${out.total} ${mg ? 'merged' : 'open'} PR${out.total === 1 ? '' : 's'}: ${mg ? 'merged' : 'opened'} before the trigger, so none start; ${mg ? 'merges' : 'PRs you open'} after it do</div>` + out.items.map(i => `<div class="ai"><b>#${+i.number}</b><span class="t"><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a></span><span class="m">${esc(i.why)}</span></div>`).join('') : `<div class="none">You have no ${mg ? 'recently merged' : 'open'} PRs there.</div>`}</div>` : ''}
+      <div class="thint">${ado ? 'Needs the Azure CLI signed in (<code>az login</code>) with the azure-devops extension.' : 'Needs the GitHub CLI signed in (<code>gh auth login</code>); it reads as whichever account gh has active.'} Read-only: the workflow it starts does the work.</div>`;
+  }
   if (k === 'teams') {
     const out = tv.teamsOut;
     spec = `<div><div class="label">Channel or chat<span class="faint lc">required: paste a link to it, or to any message in it</span></div>
@@ -2611,7 +2813,7 @@ function drawTrigForm() {
     <input class="field" data-f="name" placeholder="${k === 'ado' ? 'Name (optional), e.g. My board' : 'Name, e.g. Daily standup'}" value="${esc(f.name)}" maxlength="60" autocomplete="off">
     <div><div class="label">Trigger</div><div class="kindsel"><span class="tic k-${k}" aria-hidden="true">${TRIG_KIND[k].ic}</span><select class="field" id="kindSel" aria-label="Trigger type">${Object.entries(TRIG_KIND).map(([v, i]) => `<option value="${v}" ${k === v ? 'selected' : ''}>${i.ic}  ${i.label}</option>`).join('')}</select></div><div class="thint">${esc(TRIG_KIND[k].hint)}</div></div>
     ${spec}
-    ${k === 'ado' || k === 'pipeline' ? '' : `<div class="tsep">${BOLT} Creates a task</div>
+    ${['ado', 'pr', 'pipeline'].includes(k) ? '' : `<div class="tsep">${BOLT} Creates a task</div>
     <input class="field" data-k="title" placeholder="Task title" value="${esc(f.task.title)}" autocomplete="off">
     <textarea class="field" data-k="details" rows="4" placeholder="Details for the agent (optional)">${esc(f.task.details)}</textarea>
     <div class="thint">Placeholders: <code>${TRIG_VARS[k]}</code> <code>{date}</code> <code>{time}</code> <code>{trigger}</code></div>
@@ -2647,22 +2849,29 @@ function drawTrigForm() {
 const TEAMS_TASK = {title: '{title}', details: 'Teams message from {from} in {where} ({when}):\n\n{text}\n\n{link}'};
 function setTrigKind(kind) {
   const f = tv.f, was = f.kind;
-  if (['ado', 'pipeline'].includes(kind) || ['ado', 'pipeline'].includes(was)) { f.spec.tag = ''; f.spec.agent = ''; }  // event triggers use these names too
-  if (['ado', 'pipeline'].includes(kind) && !f.spec.workflow && !f.spec.agent) {  // opened from a workflow or agent: keep that target
+  if (['ado', 'pr', 'pipeline'].includes(kind) || ['ado', 'pr', 'pipeline'].includes(was)) { f.spec.tag = ''; f.spec.agent = ''; }  // event triggers use these names too
+  if (['ado', 'pr', 'pipeline'].includes(kind) && !f.spec.workflow && !f.spec.agent) {  // opened from a workflow or agent: keep that target
     if (f.task.workflow) f.spec.workflow = f.task.workflow; else if (f.task.agent && kind === 'pipeline') f.spec.agent = f.task.agent;
   }
   if (kind === 'ado' && !f.spec.workflow) f.spec.workflow = S.workflows?.[0]?.id || '';
+  if (kind === 'pr' && !f.spec.workflow && !f.spec.agent) f.spec.workflow = prWorkflow(f.spec.state);
   if (kind === 'pipeline' && !f.spec.workflow && !f.spec.agent) f.spec.agent = (S.agents.find(a => /qa|verif/i.test(a.name)) || S.agents[0])?.name || '';
   if (was === 'teams' && f.task.title === TEAMS_TASK.title && f.task.details === TEAMS_TASK.details) Object.assign(f.task, {title: '', details: ''});
   if (kind === 'teams' && !f.task.title) Object.assign(f.task, TEAMS_TASK);
-  f.kind = kind; f.spec.every = kind === 'poll' || kind === 'ado' || kind === 'pipeline' ? 5 : kind === 'watch' || kind === 'teams' ? 10 : f.spec.every;
+  f.kind = kind; f.spec.every = kind === 'poll' || kind === 'ado' || kind === 'pr' || kind === 'pipeline' ? 5 : kind === 'watch' || kind === 'teams' ? 10 : f.spec.every;
   drawTrigForm();
 }
 $('#trigs').addEventListener('change', e => { if (e.target.id === 'kindSel') setTrigKind(e.target.value); });
+$('#trigs').addEventListener('input', e => { if (e.target.id === 'trQ') { trigView.q = e.target.value; drawTriggers(); } });
+$('#trigs').addEventListener('toggle', e => { if (e.target.matches?.('details.tpre')) view.trPresetsOpen = e.target.open; }, true);
 $('#trigs').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b || b.dataset.io) return;
   const d = b.dataset, find = id => S.triggers.find(t => t.id === id);
   if ('trNew' in d) return editTrig(null);
+  if (d.trNewKind) { editTrig(null); return setTrigKind(d.trNewKind); }
+  if (d.trFold) { trigFold.has(d.trFold) ? trigFold.delete(d.trFold) : trigFold.add(d.trFold); try { localStorage.setItem('crew.trigFold', JSON.stringify([...trigFold])); } catch {} return drawTriggers(); }
+  if (d.trShow) { trigView.show = d.trShow; return drawTriggers(); }
+  if ('trClear' in d) { trigView.q = ''; trigView.show = 'all'; return drawTriggers(); }
   if (d.trPreset) { tv = presetForm(+d.trPreset); drawTriggers(); return focusSoon('#tmBody [data-f="name"]'); }
   if (d.trEdit) return editTrig(find(d.trEdit));
   if (d.trToggle) { const tr = find(d.trToggle); return act('trigger_update', {id: tr.id, enabled: !tr.enabled}); }
@@ -2672,6 +2881,12 @@ $('#trigs').addEventListener('click', async e => {
     const mine = tv; tv.pipeOut = {busy: true}; drawTrigForm();
     const j = await fetch('/api/ado', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'pipeline_test', spec: tv.f.spec})}).then(r => r.json()).catch(() => ({error: 'could not reach Crew'}));
     if (tv === mine) { tv.pipeOut = j; drawTrigForm(); }
+    return;
+  }
+  if ('prTest' in d) {
+    const mine = tv; tv.prOut = {busy: true}; drawTrigForm();
+    const j = await fetch('/api/trigger/pr', {method: 'POST', headers: AUTH, body: JSON.stringify({op: 'test', spec: tv.f.spec})}).then(r => r.json()).catch(() => ({error: 'could not reach Crew'}));
+    if (tv === mine) { tv.prOut = j; drawTrigForm(); }
     return;
   }
   if ('teamsTest' in d) {
@@ -2705,7 +2920,11 @@ $('#trigs').addEventListener('click', async e => {
   if (d.kind) return setTrigKind(d.kind);
   if (d.cron) { tv.f.spec.cron = d.cron; return drawTrigForm(); }
   if (d.target) { tv.f.task.workflow = d.target === 'workflow' ? (tv.f.task.workflow || S.workflows?.[0]?.id || '') : ''; return drawTrigForm(); }
-  if (d.s) { tv.f.spec[d.s] = d.v; return drawTrigForm(); }
+  if (d.s) {
+    const sp = tv.f.spec;
+    if (d.s === 'state' && tv.f.kind === 'pr' && !sp.agent && (!sp.workflow || sp.workflow === prWorkflow(sp.state))) sp.workflow = prWorkflow(d.v);
+    sp[d.s] = d.v; tv.prOut = null; return drawTrigForm();
+  }
   if (d.pres) {
     const cur = pipeRes(tv.f.spec.result).filter(x => x !== 'any');
     tv.f.spec.result = d.pres === 'any' ? ['any'] : pipeRes(cur.includes(d.pres) ? cur.filter(x => x !== d.pres) : [...cur, d.pres]);
@@ -3453,7 +3672,7 @@ function agentTriggers(a) {
     <div><button class="btn sm" data-agent-trig="${esc(a.name)}">⚡ Add trigger</button></div></div>`;
 }
 // ADO and pipeline triggers keep their target in spec (task fields are built from the item or run)
-function ownTarget(t) { return ['ado', 'pipeline'].includes(t.kind); }
+function ownTarget(t) { return ['ado', 'pr', 'pipeline'].includes(t.kind); }
 function trigWf(t) { return (ownTarget(t) ? t.spec?.workflow : t.task?.workflow) || ''; }
 function trigAgent(t) { return ownTarget(t) ? (t.spec?.workflow ? '' : t.spec?.agent || '') : t.task?.workflow ? '' : t.task?.agent || ''; }
 function wfTrigChip(w) {
@@ -3770,7 +3989,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); view.chatOpen = true; renderChat(); return $('#chatIn').focus(); }
   if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return gotoTab('trigs'); }
   if (e.key === 'Escape' && document.querySelector('.menu')) return closeMenu();
-  if (e.key === 'Escape') { if (document.querySelector('.scrim.on')) return closeModals(); if (view.tab === 'trigs' && tv.mode === 'form') return trigBack(tv.id); if (view.drawer) { view.drawer = null; render(); } return; }
+  if (e.key === 'Escape') { if (document.querySelector('.scrim.on')) return closeModals(); if (view.tab === 'trigs' && tv.mode === 'form') return trigBack(tv.id); if (view.drawer && view.drawerFull) return setDrawerFull(false); if (view.drawer) { view.drawer = null; render(); } return; }
   if (/INPUT|TEXTAREA/.test(document.activeElement.tagName) || document.querySelector('.scrim.on')) return;
   if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.isContentEditable && view.drawer?.review && task(view.drawer.review)?.col === 'review') { e.preventDefault(); return approveTask(view.drawer.review); }
   if (e.key.toLowerCase() === 'n') { e.preventDefault(); openTask(); }

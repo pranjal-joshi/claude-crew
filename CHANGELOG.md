@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [0.6.0] - 2026-10-23
+
+### Added
+- **Pull request trigger:** a PR you open outside Crew (by hand, in your IDE, another tool) starts a workflow run, such as a CI monitor, or a task. Only PRs opened after the trigger is created count, each one starts once, and PRs Crew or its agents opened are skipped; drafts wait until they are ready for review unless *Drafts too* is on. GitHub through `gh`, Azure Repos through `az`, read-only. New *Monitor PRs I open* preset, and a *PR CI monitor* workflow template for new crews (a ⟳ step that fixes what the PR broke until it merges). **Fire when: Raised or Merged**: on Merged, a PR of yours that merges after the trigger is created (Crew's included) starts a CD workflow once; new *Deploy what I merge* preset and *PR merged: CD* template (a ⟳ step that follows the deployment and smoke-checks it).
+- **Full screen side panel:** ⤢ in the agent and review panel headers gives the panel the whole window for long reviews and runs; ⤡ or Esc goes back. Remembered per browser.
+- **↻ Restart a workflow from the board:** the workflow frame's ↻ menu restarts the whole run (with the workflow's current steps) or restarts from any step whose earlier steps finished; those keep their results. The open step stops, and every restarted step is a new task with a fresh session. Works on running, stopped and finished runs.
+- **Background jobs show on the board.** A shell an agent starts in the background (or a Monitor) keeps running in its Claude session after its turn ends, where Crew could not see it. Its agent and its card now show a ⚙ chip; the agent drawer lists each job with its command and age, shows its output, and stops it (the agent is asked to stop one; Stop all ends the idle process, keeping the session).
+
+### Changed
+- **Triggers page, grouped:** triggers sit in sections by what they react to (Work intake, Code & CI/CD, Schedules, Project & crew events), each with a count, a fold (remembered) and its own ＋ Add. A search box and On / Off / Needs attention filters sit on top; each trigger shows a status pill, errors stand out in a red box, and the text is easier to read. Presets are grouped the same way, folded away once you have triggers.
+- **↻ Address review moves the card to In progress** while the agent works through the PR's comments, and back to Review or Done when its turn ends, also when it fails, is stopped, or Crew restarts. Pressing it in the review sheet opens the agent's panel so you can follow along.
+
+### Fixed
+- **A card could get stuck In progress after a restart.** Crew came back with every agent idle, also one whose work still waited in Review, so it took new work; approving the older card then cleared the agent's current task, and that task's finished turn was never recorded. Agents now stay on their Review card across a restart, approving a card leaves the agent's other work alone, and sending a card back waits while its agent is on another one.
+- **Auto-gated workflow steps sometimes waited for approval.** When another agent was busy at the same moment, its thread could take the step's auto-approve while the card's diff was still being collected, and the approve was dropped. One thread now runs that queue in order, a card you are diffing waits instead, and a failed auto-approve shows in the feed.
+- **A workflow step got earlier steps' summaries cut short:** only the step right before was passed in full; older ones were cut at 4,000 characters without saying so. A block drafted in step 2 (an ADO comment) reached step 4 cut mid-sentence, and the agent, rightly, refused to post it. Every earlier step now comes in full; only when they pass 60,000 characters together are the oldest shortened, with a note saying how much is missing and which task has the full text.
+- **Teams replies came without their thread:** a reply like "please look into this" was passed on alone, so the agent guessed which thread it meant (and picked the wrong one). The check now finds the reply's thread and passes its post and earlier replies, and links the reply itself. `{where}` is the channel's name instead of the pasted link, which pointed at some other message.
+- **A new task could continue another task's conversation:** an agent's session survived a restart but the task it belonged to didn't, so its next task (a plain one after a workflow step, say) resumed that step's context. Every task now starts on a session of its own (send-back still resumes its own), and on start-up a session found on several tasks stays only with the one that made it.
+- **Other people's PRs on your cards:** every PR an agent mentioned (an earlier change, a colleague's related draft) was linked to its card, so ↻ Address review could run on someone else's PR and the PR trigger took it for Crew's. A mentioned PR is now linked only when `gh` or `az` says you opened it or it comes from an agent's branch; existing cards are checked again on start-up.
+- **Workflow steps handed work off on the side:** a step's agent could call the handoff tool, starting a duplicate of the next step outside the run (a second plan, a second build) that sat in Review with nothing to do with the run. Hand-offs from a workflow step are now refused; the agent puts what comes next in its summary, which the next step reads.
+- **Clearing Done emptied running workflows:** Clear board → Done also removed the finished steps of a workflow still running, and its frame then showed those steps as *not started*. Their cards now stay until the run ends, and a step whose card is gone but whose result the run kept shows as *done · card cleared*.
+- **ADO board, assigned to me: turning it back on started old work:** items assigned to you while the trigger was off started the moment it came back on. Turning it on now takes a new baseline, like creating it does.
+- **⟳ PR watches missed CI failures and Copilot reviews:** the watch command refused any `|`, even inside a quoted `--jq` filter, so Crew's own example (which lists failed checks) was rejected and agents fell back to `state,reviewDecision`, which never changes when CI fails or Copilot comments (its reviews are COMMENTED, not CHANGES_REQUESTED). Only pipes and redirects outside quotes are refused now. The example also lists merge conflicts, Azure Pipelines statuses and every new review (your own replies left out), and what already fails when the watch is set is its baseline, so only something new wakes the agent. An agent can also set its watch from a turn you start on the waiting step (a message, ↻ Address review).
+- **ADO comments timed out:** without a project, the Azure DevOps MCP comment tools ask for one, which a headless agent never answers, so each call hung for a minute and failed. Tasks about a work item now tell the agent its organization and project and to pass `project` on every call.
+
 ## [0.5.0] - 2026-10-23
 
 ### Added
@@ -163,3 +190,5 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 [0.3.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.2.0...v0.3.0
 [0.4.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.3.0...v0.4.0
 [0.5.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.4.0...v0.5.0
+[0.6.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.5.0...v0.6.0
+[Unreleased]: https://github.com/pranjal-joshi/claude-crew/compare/v0.6.0...HEAD

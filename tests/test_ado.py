@@ -243,6 +243,17 @@ class AdoTriggerCase(AdoCase):
 
 
 class AdoHelpersCase(AdoCase):
+    def test_ado_tasks_tell_the_agent_which_project_to_pass(self):
+        base = "https://dev.azure.com/org/My%20Proj/_workitems/edit/"
+        with mock.patch.object(server.Crew, "_ado_base", lambda self: base):
+            hint = self.crew._ado_hint({"ado": {"id": 5}}, "Task #1: x")
+            self.assertIn('organization https://dev.azure.com/org, project "My Proj"', hint)
+            self.assertIn("Pass `project`", hint)
+            self.assertIn("project", self.crew._ado_hint({}, "Update ADO: AB#123 x"))
+            self.assertEqual(self.crew._ado_hint({}, "Fix the login page"), "")
+        with mock.patch.object(server.Crew, "_ado_base", lambda self: ""):
+            self.assertEqual(self.crew._ado_hint({"ado": {"id": 5}}, "x"), "")
+
     def test_default_name_when_blank(self):
         self.crew.act("trigger_add", {"name": "", "kind": "ado", "spec": self.SPEC, "task": {}}, via="ui")
         self.assertEqual(self.crew.triggers[-1]["name"], "ADO: crew")
@@ -329,6 +340,18 @@ class AssignedCase(AdoCase):
         self.assertNotIn("error", res, res)
         self.assertFalse(tr["baselined"])
         self.check(tr, FakeAz([item(1), item(2, type="Product Backlog Item")]))  # the PBI was already assigned: baseline
+        self.assertEqual(self.crew.runs, [])
+        self.check(tr, FakeAz([item(1), item(2), item(3)]))
+        self.assertEqual([r["ado"]["id"] for r in self.crew.runs], [3])
+
+    def test_turning_it_back_on_takes_a_new_baseline(self):
+        tr = self.add(match="assigned", tag="")
+        self.check(tr, FakeAz([item(1)]))
+        self.crew.act("trigger_update", {"id": tr["id"], "enabled": False}, via="ui")
+        self.assertTrue(tr["baselined"])
+        self.crew.act("trigger_update", {"id": tr["id"], "enabled": True}, via="ui")
+        self.assertFalse(tr["baselined"])
+        self.check(tr, FakeAz([item(1), item(2)]))  # assigned while it was off: not new work
         self.assertEqual(self.crew.runs, [])
         self.check(tr, FakeAz([item(1), item(2), item(3)]))
         self.assertEqual([r["ado"]["id"] for r in self.crew.runs], [3])

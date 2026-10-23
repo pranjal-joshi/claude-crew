@@ -1,5 +1,6 @@
 import json
 import unittest
+from unittest import mock
 
 import triggers
 from tests.helpers import TempCrewCase, server
@@ -278,11 +279,26 @@ class AddressReview(TempCrewCase):
         self.assertIn("error", self.crew.act("address_review", {"task": t["id"]}))  # no PR yet
         t.update(col="done", who=a["name"], pr="https://github.com/o/r/pull/7", sessions={a["name"]: "s-7"})
         self.assertNotIn("error", self.crew.act("address_review", {"task": t["id"]}))
-        self.assertEqual((sent[-1], a["session"], a["status"], t["col"]), ("/address-review https://github.com/o/r/pull/7", "s-7", "running", "done"))
+        self.assertEqual((sent[-1], a["session"], a["status"], t["col"]), ("/address-review https://github.com/o/r/pull/7", "s-7", "running", "doing"))
         self.assertIn("error", self.crew.act("address_review", {"task": t["id"]}))  # busy
         self.crew._on_event(a, {"type": "result", "subtype": "success", "result": "fixed 2 comments", "total_cost_usd": 0.1})
         self.assertNotIn("reviewing", t)
-        self.assertEqual(a["status"], "idle")
+        self.assertEqual((a["status"], t["col"]), ("idle", "done"))  # back where it was
+
+    def test_in_progress_while_addressing_and_back_when_stopped(self):
+        a = next(iter(self.crew.agents.values()))
+        self.crew._start = lambda ag: True
+        self.crew._send = lambda ag, text, images=None: True
+        self.crew.act("add", {"title": "Ship it", "tag": "bug"})
+        t = self.crew.tasks[-1]
+        t.update(col="review", who=a["name"], prs=["https://github.com/o/r/pull/8"])
+        self.crew.act("address_review", {"task": t["id"]})
+        self.assertEqual(t["col"], "doing")
+        self.crew.act("stop", {"agent": a["name"]})
+        self.assertEqual((t["col"], "reviewing" in t, "reviewing_from" in t), ("review", False, False))
+        self.crew.act("address_review", {"task": t["id"]})
+        self.crew._on_event(a, {"type": "result", "subtype": "error_during_execution", "result": "boom", "total_cost_usd": 0})
+        self.assertEqual(t["col"], "review")  # a failed turn also puts it back
 
     def test_ui_only(self):
         self.assertNotIn("address_review", server.MCP_ACTIONS)
@@ -337,6 +353,31 @@ class Decide(TempCrewCase):
 
 
 class PrLinks(TempCrewCase):
+    def setUp(self):
+        super().setUp()
+        self.mine = {"https://github.com/o/r/pull/41", "https://github.com/o/r/pull/42", "https://github.com/o/r/pull/123",
+                     "https://github.com/o/r/pull/7"}
+        p = mock.patch.object(triggers.pr, "owned", lambda url, branches, cwd: url in self.mine)
+        p.start()
+        self.addCleanup(p.stop)
+        self.crew._bg = lambda fn, *a: fn(*a)  # owners are read at once
+
+    def test_other_peoples_prs_stay_off_the_card(self):
+        t = {"id": 9001}
+        self.crew.tasks.append(t)
+        self.crew._note_prs(t, "Mine: https://github.com/o/r/pull/41. Related: draft PR https://github.com/o/r/pull/77 by a colleague")
+        self.assertEqual(t["prs"], ["https://github.com/o/r/pull/41"])
+        self.crew._note_prs(t, "https://github.com/o/r/pull/77 again")  # known: not read twice
+        self.assertEqual(t["prs"], ["https://github.com/o/r/pull/41"])
+        with mock.patch.object(triggers.pr, "owned", side_effect=triggers.pr.PrError("offline")):
+            t2 = {"id": 9002}
+            self.crew.tasks.append(t2)
+            self.crew._note_prs(t2, "https://github.com/o/r/pull/9")
+            self.assertNotIn("prs", t2)  # can't tell: left off, read again next time
+        self.mine.add("https://github.com/o/r/pull/9")
+        self.crew._note_prs(t2, "https://github.com/o/r/pull/9")
+        self.assertEqual(t2["prs"], ["https://github.com/o/r/pull/9"])
+
     def test_prs_read_from_summary_and_brief(self):
         a = next(iter(self.crew.agents.values()))
         self.crew._start = lambda ag: True
@@ -355,17 +396,18 @@ class PrLinks(TempCrewCase):
         self.assertEqual(sent[-1], "/address-review https://github.com/o/r/pull/42")  # the latest PR
 
     def test_no_false_matches(self):
-        t = {}
+        t = {"id": 9001}
         self.crew._prb = ""
         self.crew._note_prs(t, "see github.com/o/r/pull/1 and https://github.com/o/r/issues/2")
         self.assertNotIn("prs", t)
 
     def test_pr_named_by_number_links_through_the_remote(self):
-        t = {}
+        t = {"id": 9001}
+        self.crew.tasks.append(t)
         self.crew._prb = "https://github.com/o/r/pull/"
         self.crew._note_prs(t, "Pushed as draft PR #123, then pull request #7 and issue #9")
         self.assertEqual(t["prs"], ["https://github.com/o/r/pull/123", "https://github.com/o/r/pull/7"])
-        t2 = {}
+        t2 = {"id": 9002}
         self.crew._prb = ""  # no GitHub or Azure Repos remote: a bare number can't be linked
         self.crew._note_prs(t2, "PR #12")
         self.assertNotIn("prs", t2)
@@ -436,6 +478,18 @@ class TeamsTrigger(TempCrewCase):
         n = len(self.crew.tasks)
         triggers.get("teams").check(self.crew, tr)  # the same message again: nothing new
         self.assertEqual(len(self.crew.tasks), n)
+
+    def test_a_reply_carries_the_thread_it_points_at(self):
+        tr = self._trigger()
+        msgs = {"messages": [{"id": "r1", "from": "Abhishek", "time": "2026-10-22T18:36:19Z", "text": "please look into this on priority",
+                              "link": "", "title": "Skill scripts do not run",
+                              "thread": {"from": "Kristo", "subject": "Scripts inside skill folder do not run",
+                                         "text": "Scripts in a skill's Scripts folder can't be run by the agent"}}]}
+        self._fake_claude(json.dumps(msgs))
+        triggers.get("teams").check(self.crew, tr)
+        d = self.crew.tasks[-1]["details"]
+        self.assertIn("please look into this on priority\n\nThis is a reply in the thread \"Scripts inside skill folder", d)
+        self.assertIn("Scripts folder can't be run", d)
 
     def test_errors_raise_an_alert(self):
         tr = self._trigger()

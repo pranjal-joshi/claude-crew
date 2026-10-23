@@ -27,6 +27,11 @@ class Parse(unittest.TestCase):
                     "gh pr view 1; git push", 'az repos pr show --id 1 --query %PATH%', ""):
             self.assertIsNotNone(probe.parse(cmd)[0], cmd)
 
+    def test_pipes_inside_a_quoted_filter_are_fine(self):
+        self.assertIsNone(probe.parse(server.workflows.runs.WATCH_EXAMPLE)[0])  # the example Crew gives agents
+        self.assertIsNone(probe.parse("gh pr view 1 --jq '[.a[]|select(.b>1)|.c]'")[0])
+        self.assertIsNotNone(probe.parse("gh pr view 1 --jq '.a' | head")[0])
+
 
 class Watch(TempCrewCase):
     """A ⟳ step's agent sets a watch; Crew polls it and wakes the agent only when the output changes."""
@@ -129,6 +134,22 @@ class Watch(TempCrewCase):
         self.assertIn("last check", self.sent[-1])
         self._end_turn("still open")
         self.assertEqual(self.t["col"], "review")
+
+    def test_a_turn_you_start_on_the_waiting_step_can_set_its_watch(self):
+        self._end_turn()
+        self.ci.update(status="running")  # you sent it a message, or pressed Address review
+        self.assertTrue(self._watch(fail="FAILED").get("ok"))
+        self.assertIn("probe", self.t["wait"])
+
+    def test_what_fails_when_the_watch_is_set_is_the_baseline(self):
+        self.out[0] = "OPEN REVIEW copilot 08:50"  # the review the agent just answered
+        self._watch(done="MERGED", fail="FAILED|REVIEW")
+        self._end_turn()
+        self._poll()
+        self.assertEqual(self.t["col"], "backlog")
+        self.out[0] = "OPEN REVIEW copilot 08:50 REVIEW copilot 09:40"  # a new review
+        self._poll()
+        self.assertEqual(self.t["col"], "doing")
 
     def test_empty_command_removes_the_watch(self):
         self._watch()

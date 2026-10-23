@@ -33,7 +33,7 @@ class Registry(AuthCase):
         self.addCleanup(triggers.REGISTRY.pop, "demo", None)
 
     def test_the_builtin_kinds_in_ui_order(self):
-        self.assertEqual(server.TRIGGER_KINDS, ["schedule", "event", "watch", "poll", "webhook", "ado", "teams", "pipeline"])
+        self.assertEqual(server.TRIGGER_KINDS, ["schedule", "event", "watch", "poll", "webhook", "ado", "pr", "teams", "pipeline"])
         self.assertEqual(triggers.kinds()[-1], "demo")  # unordered kinds go last
 
     def test_a_new_kind_is_validated_and_ui_only(self):

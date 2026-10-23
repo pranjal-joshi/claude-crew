@@ -61,7 +61,8 @@ def start(crew, a: dict) -> bool:
                 "Stay inside it: do not read, create or change files outside this folder unless the task explicitly names a path outside it. "
                 "Never touch other agents' worktrees. "
                 + ("When your finished work clearly needs another specialist next, call the crew handoff tool once "
-                   "(to a teammate's name, or 'auto' with a tag); say what you did and where. " if crew.config.get("auto_handoff", True) else "")
+                   "(to a teammate's name, or 'auto' with a tag); say what you did and where. Not in a workflow step: there the "
+                   "workflow starts the next step, so put what comes next in your summary. " if crew.config.get("auto_handoff", True) else "")
                 + "If you find something failing that a person must see now (a failed deployment, a red pipeline on the main branch, "
                 "an outage, a security problem, a blocked dependency), call the crew raise_alert tool with a short title and the evidence; "
                 "call resolve_alert with the same title once it recovers. Not for your own task's normal progress or failures you are fixing. "
@@ -235,6 +236,8 @@ def kill_proc(crew, name: str, wait: bool = False) -> None:
     a = crew._agent(name)
     if a:
         a["subs"] = {}  # the tree kill ends its subagents too
+        a["bg"] = {}    # and its background jobs
+        crew._addressed(a)  # a stopped /address-review turn: its task goes back to Review or Done
     if w := crew.writers.pop(name, None):
         w.close()
     p = crew.procs.pop(name, None)
@@ -309,8 +312,10 @@ def task_session(crew, a: dict, t: dict) -> None:
             crew._kill_proc(a["name"])
             a["session"] = sid
             crew.log(a, "sys", f"back in #{t['id']}'s session")
-    elif (step or a.get("last_task") not in (None, t["id"])) and (a["session"] or crew._alive(a["name"])):
-        crew._kill_proc(a["name"])  # new task, new session: no paying to re-read old work
+    elif a["session"] or crew._alive(a["name"]):
+        # a task with no session of its own starts a new one: never another task's, a step's or a chat's context (and
+        # no paying to re-read old work). Not keyed on last_task, which a restart forgets while the session survives.
+        crew._kill_proc(a["name"])
         a["session"] = None
         crew.log(a, "sys", f"fresh context for #{t['id']}")
     a["last_task"] = t["id"]

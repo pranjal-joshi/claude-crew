@@ -3,7 +3,7 @@ import unittest
 
 import agents
 from tests.helpers import TempCrewCase
-from triggers.teams import teams_prompt, teams_spec, thread_id
+from triggers.teams import teams_prompt, teams_spec, thread_id, thread_text
 
 PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
@@ -55,6 +55,24 @@ class TeamsLinks(unittest.TestCase):
                 "&teamName=Team%20A&channelName=Internal%20Feedback&createdTime=1")
         _, sp = teams_spec({"where": link})
         self.assertEqual((sp["thread"], sp["name"]), ("19:AbC-1@thread.skype", "Internal Feedback"))
+
+    def test_prompt_finds_the_thread_of_a_reply_when_the_link_names_the_team(self):
+        link = "https://teams.microsoft.com/l/message/19:AbC@thread.skype/1?groupId=1c08f936-b710-4cb0-a125-ced05d60babd"
+        _, sp = teams_spec({"where": link})
+        p = teams_prompt(sp, "2026-01-01T00:00:00Z")
+        self.assertIn("teams_list_channel_messages (teamId 1c08f936-b710-4cb0-a125-ced05d60babd, channelId 19:AbC@thread.skype)", p)
+        self.assertIn('"thread"', p)
+        _, sp = teams_spec({"where": "https://teams.microsoft.com/l/message/19%3aAbC%40thread.skype/1"})
+        self.assertNotIn("teams_list_channel_messages", teams_prompt(sp, "2026-01-01T00:00:00Z"))  # no team id: search only
+
+    def test_thread_text(self):
+        th = {"from": "Kristo", "subject": "Scripts inside skill folder do not run", "text": "Scripts in Scripts/ can't run",
+              "replies": "Abhishek: does skill.md reference them?"}
+        out = thread_text(th)
+        self.assertIn('reply in the thread "Scripts inside skill folder do not run" started by Kristo:\nScripts in Scripts/', out)
+        self.assertIn("Earlier replies:\nAbhishek: does", out)
+        self.assertEqual(thread_text(None), "")
+        self.assertEqual(thread_text({"from": "x", "text": " "}), "")
 
 
 if __name__ == "__main__":

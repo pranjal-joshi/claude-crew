@@ -37,7 +37,7 @@ Crew is pure standard-library Python (3.10 or newer) and installs as a `crew` co
 
 ```bash
 pipx install claude-crew                      # from PyPI, once published
-pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.5.0/claude_crew-0.5.0-py3-none-any.whl   # a release wheel
+pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.6.0/claude_crew-0.6.0-py3-none-any.whl   # a release wheel
 pipx install git+https://github.com/pranjal-joshi/claude-crew   # latest main
 ```
 
@@ -104,6 +104,8 @@ Nine agents, one per stage of the delivery loop. Each owns a few tags, so an una
 ## Workflows
 
 The **Workflows** tab (<kbd>W</kbd>) chains agents in a fixed order. Run one with a goal, and step 1's task is created. When a step is done, the next step's task is created with the earlier steps' summaries and an instruction to merge the previous agent's branch, so each agent builds on real work.
+
+**Restart a run.** ↻ on a workflow's frame on the board restarts the whole run (with the workflow's steps as they are now) or restarts from any step whose earlier steps finished; those keep their results and the restarted step reads them. The open step stops, and every restarted step is a new task, so each agent starts on a fresh session. Earlier cards stay in Done. It works on running, stopped and finished runs.
 
 **Gates: stop or go on.** An agent can decide whether work should go ahead with the crew tool `decide` (continue or stop, with a one-line reason). *Continue* closes its task without review and starts the next workflow step with its summary, unless that step's link is ✋: then it waits for your approval as usual, with the agent's verdict on the review card; *stop* closes it marked ⏹ stopped and ends the run, so nothing else starts. Put a gate agent such as **Picker** first in a workflow that an ADO trigger runs: it checks each new item against the ownership in its role and passes on only what is ours. Outside a workflow, a gate that continues hands the work on with `handoff` first.
 
@@ -172,6 +174,7 @@ Every trigger also shows at the top of the Backlog as a *scheduled* card with it
 | ⟳ **Poll command** | A command's output changes, it starts failing, or it prints something new | `gh run list --status failure --limit 1` every 10 min goes to ops |
 | ⇢ **Webhook** | Something POSTs to the trigger's URL with its secret token | CI posts after a deploy, so ops checks telemetry |
 | ⬡ **ADO tag** | You tag a work item on your Azure DevOps board | Tag a bug `crew`, and the Bug fix workflow starts for it |
+| ⇄ **Pull request** | You open a PR outside Crew (by hand, in your IDE, another tool), or a PR of yours merges | Raised: a CI monitor keeps it green until it merges. Merged: a CD workflow deploys and checks it |
 | ▶ **Pipeline** | An Azure Pipelines run finishes (only yours, if you like) | A CD release succeeds, and ADO-QA checks it and updates your work items |
 | ✉ **Teams** | Someone @mentions you, or posts, in a Teams channel or chat | An @mention in *Platform > Incidents* becomes a task for Ops |
 
@@ -195,6 +198,8 @@ Tag a work item, and Crew starts a workflow for it. No copy and paste.
 **Assigned to me.** In the same form, set *Pick up items* to **assigned to me** instead of a tag: each item newly assigned to your `az` user starts one run, once. Items already assigned when the trigger starts are skipped (remembered on its first check) unless you choose *start them too*. Tags are left alone; the optional comment is still posted.
 
 **Pipeline trigger.** **New trigger**, **Pipeline**: add the pipelines by name (the list offers your project's names), choose *succeeds*, *partially succeeds*, *fails* or *finishes*, and an agent or workflow to start. Each finished run starts work once, titled `pipeline result`, with the run link, branch, commit, who it ran for and the run's linked work items. **Only runs for me** keeps runs requested for you or carrying a work item assigned to you (a release build runs as whoever merged, so its linked items tell whose work shipped); your items are listed first and the card links the first one, so an agent like ADO-QA can update or close them. Uses your `az` sign-in, read-only. **Test** lists matching runs from the last 7 days.
+
+**Pull request trigger.** **New trigger**, **Pull request** (or the *Monitor PRs I open* preset): choose GitHub (through `gh`) or Azure Repos (through `az`), optionally a repository (empty means this project's origin, or every repo in the ADO project), and a workflow or agent to start, such as *PR CI monitor*. Only PRs you open after the trigger is created count, and each starts work once, titled `PR #n title`, with its link, branches and description. PRs Crew or its agents opened (from an agent's branch, or linked from a task) are skipped, and a draft waits until it is marked ready unless **Drafts too** is on. **Fire when** picks **Raised** (the above) or **Merged**: a PR of yours that merges after the trigger is created starts work once, titled `PR #n merged: title`, Crew's own PRs included (the merge is the event), for a workflow such as *PR merged: CD* (the *Deploy what I merge* preset). Read-only. **Test** lists your open (or merged) PRs and which would start.
 
 **Teams trigger.** It reads Teams through the **Microsoft 365** connector in your Claude Code, so Crew needs no tokens of its own. Sign the connector in once (run `claude`, type `/mcp`, pick *claude.ai Microsoft 365*). Then **New trigger**, **Teams**: paste a link to the channel or chat, or to any message in it (in Teams: ⋯ → *Copy link*), choose *@mentions of me* or *every new message*, optionally a topic, and what each message starts. Each check is a short Haiku run (about a cent) allowed only the Microsoft 365 tools, read-only; every new message starts one task titled in about 6 words, with the sender, text and a link. **Test** lists the last 24 hours without starting anything.
 

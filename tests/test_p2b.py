@@ -439,6 +439,27 @@ class GitOutsideTheLock(GitCrewCase):
         self.assertEqual(len(run["tasks"]) and run["tasks"][1] is not None, True)  # the next step exists
         self.assertTrue(all(self.checks))
 
+    def test_auto_gate_waits_for_the_cards_diff_on_another_thread(self):
+        # #91/#92: another agent's reader thread took the approve job while this card's diff still held it busy
+        self.crew.config["workflows"] = [{"id": "w9", "name": "Two", "description": "", "steps": [
+            {"agent": "builder", "title": "One", "details": "", "gate": "auto"}, {"agent": "tester", "title": "Two", "details": "", "gate": "approve"}],
+            "output": {"kind": "board"}}]
+        run = self.crew._start_run(self.crew.config["workflows"][0], "go")
+        t = self.crew._task(run["tasks"][0])
+        t.update(col="doing")
+        self.agent.update(status="running", task=t["id"])
+        with self.crew.lock:
+            self.crew._on_event(self.agent, result(0.1))
+            self.crew._draining = True  # another reader thread is mid-queue
+        self.crew._run_jobs()
+        self.assertEqual(t["col"], "review")  # left for the thread that is draining
+        self.crew._draining = False
+        self.crew._busy[t["id"]] = "diff"  # you are looking at its diff
+        threading.Timer(0.3, lambda: self.crew._busy.pop(t["id"], None)).start()
+        self.crew._run_jobs()
+        self.assertEqual(t["col"], "done")
+        self.assertFalse(self.crew._draining)
+
 
 def run_count(cwd, *args):
     return len(server.git.__wrapped__(Path(cwd), *args).stdout.split()) if hasattr(server.git, "__wrapped__") else len(

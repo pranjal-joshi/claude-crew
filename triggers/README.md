@@ -1,13 +1,13 @@
 # Trigger kinds
 
-Each kind of trigger (schedule, event, watch, poll, webhook, ado, teams, pipeline) is one module in this folder. `server.py` knows none of them by name: it asks the registry in `base.py` for the kind a trigger has, and calls the methods below.
+Each kind of trigger (schedule, event, watch, poll, webhook, ado, pr, teams, pipeline) is one module in this folder. `server.py` knows none of them by name: it asks the registry in `base.py` for the kind a trigger has, and calls the methods below.
 
 | File | Kind |
 |---|---|
 | `base.py` | `Trigger` base class, `@register`, `get(kind)`, `kinds()`, shared `now()`, `short_title()`, `MAX_CHAIN` |
 | `azure.py` | `az` runner shared by `ado` and `pipeline` (argument list, never a shell), `AzError`, `ado_defaults()`, `az_me()` |
 | `schedule.py` `event.py` `watch.py` `poll.py` `webhook.py` | the simple kinds |
-| `ado.py` `pipeline.py` `teams.py` | kinds that start work on their own (their own task or workflow run per item) |
+| `ado.py` `pipeline.py` `pr.py` `teams.py` | kinds that start work on their own (their own task or workflow run per item) |
 
 ## Add a kind
 

@@ -5,12 +5,15 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import server  # noqa: E402
+import triggers  # noqa: E402
+import triggers.pr  # noqa: E402
 
 
 class TempCrewCase(unittest.TestCase):
@@ -29,5 +32,8 @@ class TempCrewCase(unittest.TestCase):
         self.cfg_path = tmp / "crew.json"
         cfg = copy.deepcopy(server.DEFAULT_CONFIG) | {"workflows": copy.deepcopy(server.DEFAULT_WORKFLOWS)}
         self.cfg_path.write_text(json.dumps({"permission_mode": "acceptEdits"}), encoding="utf-8")
+        owner = mock.patch.object(triggers.pr, "owned", side_effect=triggers.pr.PrError("no gh in tests"))  # never shells out
+        owner.start()
+        self.addCleanup(owner.stop)
         self.crew = server.Crew(self.project, cfg, ["claude-not-used"])
         self.crew.config_path = self.cfg_path

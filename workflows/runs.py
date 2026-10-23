@@ -27,10 +27,19 @@ def find_run(crew, rid) -> dict | None:
     return next((r for r in crew.runs if r["id"] == rid), None)
 
 
-# What a step passes on. The previous step's summary goes to the next one in full: it often carries blocks the next
-# agent must copy verbatim (ADO comments, tables), so a cut there loses work. Earlier steps get a shorter excerpt.
+# What a step passes on: every earlier step's summary, in full. Any of them can carry a block a later agent must copy
+# verbatim (an ADO comment drafted in step 2 and posted in step 4), so a silent cut loses work: a later step sees half
+# a block and, rightly, refuses to post it. Only when the earlier steps together pass EARLIER_BUDGET are the oldest ones
+# shortened, and the brief says where and which task holds the full text.
 SUMMARY_MAX = 20000
-EARLIER_MAX = 4000
+EARLIER_BUDGET = 60000
+
+
+def cut(text: str, limit: int, tid) -> str:
+    if len(text) <= limit:
+        return text
+    return (text[:max(0, limit)].rstrip() + f"\n… [cut here: {len(text) - limit} more characters; the full text is on task "
+            f"#{tid}. Never act on a block that is cut: say in your summary what is missing.]")
 
 
 def groups(steps: list) -> list[list[int]]:
@@ -79,7 +88,7 @@ def start_step(crew, run: dict, i: int) -> None:
         return
     gs = groups(run["steps"])
     g = next(k for k, x in enumerate(gs) if i in x)
-    before = [k for x in gs[:g - 1] for k in x] if g else []  # older steps: an excerpt
+    before = [k for x in gs[:g - 1] for k in x] if g else []  # older steps: in full while they fit EARLIER_BUDGET
     last = [k for k in gs[g - 1] if run["results"][k]] if g else []  # the group just finished: in full
     prevs = [run["results"][k] for k in last]
     prev = prevs[0] if len(prevs) == 1 else None
@@ -95,13 +104,18 @@ def start_step(crew, run: dict, i: int) -> None:
                 f"own step{'s' if len(side) > 1 else ''} at the same time: stick to yours." if side else "")]
     if run["details"]:
         brief.append(run["details"])
-    for k in before + last:  # every earlier step, the group just finished in full
+    room = EARLIER_BUDGET  # the group just finished always in full; older steps in full while they fit, newest first
+    texts = {k: run["results"][k]["summary"] for k in last}
+    for k in reversed(before):
+        if r := run["results"][k]:
+            texts[k] = cut(r["summary"], room, run["tasks"][k])
+            room -= len(r["summary"])
+    for k in before + last:
         r = run["results"][k]
         if not r:
             continue
         where = f" on {r['branch']} (commit {r['commit']})" if r.get("commit") else ""
-        text = r["summary"] if k in last else r["summary"][:EARLIER_MAX]
-        brief.append(f"Step {k + 1} by {r['who']}{where}:\n{text}")
+        brief.append(f"Step {k + 1} by {r['who']}{where}:\n{texts[k]}")
     merge = list(dict.fromkeys(r["branch"] for r in prevs if r.get("commit") and r.get("branch")))
     if merge:
         brief.append(f"Run `git merge {' '.join(merge)}` in your worktree first so you build on that work.")
@@ -118,7 +132,13 @@ def start_step(crew, run: dict, i: int) -> None:
     crew.event("workflow", f"⛓ {run['name']} {i + 1}/{n}{' ∥' if len(gs[g]) > 1 else ''} → {a['name']}: {title}", a["name"])
 
 
-WATCH_EXAMPLE = 'gh pr view 123 --json state,reviewDecision,statusCheckRollup --jq \'[.state,.reviewDecision,[.statusCheckRollup[]|select(.conclusion=="FAILURE")|"FAILED \\(.name) \\(.detailsUrl)"]]\''
+# A PR watch that wakes the agent for everything it must act on: a failed check (GitHub check runs and Azure Pipelines
+# statuses), a merge conflict, changes requested, and every new review (Copilot only ever COMMENTs). Its own replies,
+# posted as you, are left out so they don't wake it.
+WATCH_EXAMPLE = ('gh pr view 123 --json state,mergeable,reviewDecision,statusCheckRollup,reviews --jq \'[.state,.mergeable,.reviewDecision,'
+                 '[.statusCheckRollup[]|select((.conclusion//.state//"")|test("FAILURE|ERROR|TIMED_OUT"))|"FAILED \\(.name//.context) \\(.detailsUrl//.targetUrl)"],'
+                 '[.reviews[]|select(.author.login!="YOUR_LOGIN")|"REVIEW \\(.author.login) \\(.state) \\(.submittedAt)"]]\'')
+WATCH_FAIL = "FAILED|CONFLICTING|CHANGES_REQUESTED|REVIEW"
 
 
 def until_brief(step: dict) -> str:
@@ -126,8 +146,10 @@ def until_brief(step: dict) -> str:
             f"Do what you can now. When the goal is reached, call the crew tool `decide` with verdict continue; if it can "
             f"never be reached, call it with verdict stop. Otherwise, before you end your turn with a short status, call the "
             f"crew tool `watch` with one read-only gh, az or git command that prints the state and the link of every failed "
-            f"check (e.g. `{WATCH_EXAMPLE}`; no timestamps or counters that change every run), `done` as a regex for the "
-            f"goal (e.g. MERGED) and `fail` as a regex for what you must act on (e.g. FAILED|CHANGES_REQUESTED). Crew runs it "
+            f"check (for a PR: `{WATCH_EXAMPLE}`, with YOUR_LOGIN replaced by `gh api user --jq .login`, so a failed check, a "
+            f"conflict and every new review, Copilot's included, all show; no counters that change every run), `done` as a "
+            f"regex for the goal (e.g. MERGED) and `fail` as a regex for what you must act on (for a PR: {WATCH_FAIL}). "
+            f"Pipes inside the quoted --jq filter are fine. Crew runs it "
             f"every {probe.WATCH_EVERY} minutes at no cost and wakes you, in this same session, when it matches done, or "
             f"matches fail with a new failure: then fix that failure yourself. Without a watch Crew wakes you every "
             f"{step.get('every', 30)} minutes. Up to {step.get('checks', 96)} checks, then a person takes over.")
@@ -164,7 +186,7 @@ def on_task_event(crew, t: dict, col: str, summary: str | None) -> None:
         crew._jobs.append(("approve", t["id"], "workflow"))  # committed outside the lock; "done" then advances the run
     elif col == "done":
         w = crew.agents.get(t.get("who") or "")
-        run["results"][i] = {"who": t.get("who") or "", "summary": (t.get("summary") or "")[:SUMMARY_MAX],
+        run["results"][i] = {"who": t.get("who") or "", "summary": cut(t.get("summary") or "", SUMMARY_MAX, t["id"]),
                              "branch": w["branch"] if w and w.get("branch") else "", "commit": t.get("commit") or ""}
         run["note"] = ""
         g = group_of(run["steps"], i)
@@ -253,6 +275,40 @@ def decide(crew, p: dict) -> dict | None:
                          f"#{tk['id']}: {reason}", src["name"])
     crew.touch()
     return {"ok": True, "note": "applies when your turn ends: finish with a short summary"}
+
+
+def restart_point(crew, run: dict, i) -> tuple[str | None, int]:
+    """Where a restart from step i begins: the first step of i's parallel group. Every earlier step must have finished,
+    since the restarted steps read their summaries. (error, step index)"""
+    try:
+        i = int(i or 0)
+    except (TypeError, ValueError):
+        return "step: a number", 0
+    if not 0 <= i < len(run["steps"]):
+        return f"step: 1 to {len(run['steps'])}", 0
+    g0 = group_of(run["steps"], i)[0]
+    if missing := [k + 1 for k in range(g0) if not run["results"][k]]:
+        return (f"step{'s' if len(missing) > 1 else ''} {', '.join(map(str, missing))} never finished: restart from "
+                f"step {missing[0]} or from the start"), 0
+    if g0 == 0 and (w := find(crew, run["wf"])) and w.get("off"):
+        return f"{w['name']} is turned off: turn it on to run it again", 0
+    return None, g0
+
+
+def restart(crew, run: dict, g0: int) -> dict:
+    """Run again from step g0 (0: the whole workflow, with its current steps). Earlier steps keep their results; g0 and
+    later start as new tasks, so each gets a fresh session. The caller has closed the run's open cards."""
+    if g0 == 0 and (w := find(crew, run["wf"])):
+        run.update(steps=json.loads(json.dumps(w["steps"])), name=w["name"])
+    n = len(run["steps"])
+    run["tasks"] = (run["tasks"][:g0] + [None] * n)[:n]
+    run["results"] = (run["results"][:g0] + [None] * n)[:n]
+    run.update(status="running", note="", step=g0, restarts=run.get("restarts", 0) + 1)
+    for k in ("ended", "output"):
+        run.pop(k, None)
+    crew.event("workflow", f"⛓ {run['name']} restarted {'from the start' if not g0 else f'from step {g0 + 1}'}: {run['title']}")
+    start_group(crew, run, g0)
+    return {"ok": True, "run": run["id"], "step": g0}
 
 
 def stop(crew, run: dict) -> dict | None:
