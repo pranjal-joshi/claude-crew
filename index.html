@@ -216,6 +216,7 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .node.waiting{border-style:dashed}
 .node.off{opacity:.45}
 .link{display:inline-flex;align-items:center;gap:3px;color:var(--faint);font:10.5px var(--mono);padding:0 2px}
+.pgrp{display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;padding:3px 5px;border:1px dashed var(--line2);border-radius:14px;max-width:100%;min-width:0}
 .link .g{font-size:11px}.link.auto{color:var(--teal)}.link.gate{color:var(--amber)}
 .runs{display:flex;flex-direction:column;gap:8px}
 .run{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:11px 13px}
@@ -258,6 +259,7 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .rgsteps .done i{background:var(--green);color:#0d2117;border-color:var(--green)}.rgsteps .review i{background:var(--blue);color:#0c1730;border-color:var(--blue)}
 .rgsteps .doing i,.rgsteps .backlog i{background:var(--amber);color:#2a1d05;border-color:var(--amber)}.rgsteps .stopped i{background:var(--red);color:#fff;border-color:var(--red)}
 .rgsteps .rst:not(:last-child)::after{content:"";flex:1;height:2px;background:var(--line2);margin:0 3px}.rgsteps .rst.done:not(:last-child)::after{background:var(--green)}
+.rgsteps .rpi{display:flex;flex-direction:column;gap:2px}.rgsteps .rpi .rst{flex:none}.rgsteps .rpi .rst::after{display:none}
 .rrow{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:8px;font-size:12px;color:var(--muted);cursor:pointer}
 .rrow:hover{background:var(--hover)}.rrow .rt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rrow.wait{cursor:default;opacity:.7}.rrow.wait:hover{background:none}
 .rrow .ok{color:var(--green)}.rrow .rs{font-size:10.5px;color:var(--faint);border:1px solid var(--line2);border-radius:999px;padding:0 6px;white-space:nowrap}
@@ -720,8 +722,8 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   .board,.body.drawer-open .board{display:flex!important;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;padding:10px 12px;scrollbar-width:none;overscroll-behavior-x:contain}
   .board::-webkit-scrollbar{display:none}
   .board[hidden],.body.drawer-open .board[hidden]{display:none!important}
-  .board .col{flex:0 0 calc(100vw - 24px);scroll-snap-align:center;min-height:0;display:flex;flex-direction:column}
-  .board .col .cards{overflow:auto;flex:1}
+  .board .col{flex:0 0 calc(100vw - 24px);max-width:calc(100vw - 24px);min-width:0;scroll-snap-align:center;min-height:0;display:flex;flex-direction:column}
+  .board .col .cards{overflow:auto;flex:1;min-width:0}.rgrp{min-width:0}  /* long run titles (links) must not widen the column */
   .flows{padding:12px}
   .trigs{padding:0}.tpg{padding:12px}.tpf{margin:auto -12px 0;padding:10px 12px}.tph h3{font-size:14px}.tph .tsub{display:none}
   .trow{grid-template-columns:30px 1fr}.trow .tact{grid-column:1/-1;justify-content:flex-end}
@@ -853,6 +855,7 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .wfn .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:16px;flex:none;background:var(--amber-soft);border:1px solid color-mix(in srgb,var(--amber) 30%,transparent)}
 .wfn.out .ic{background:var(--violet-soft);border-color:color-mix(in srgb,var(--violet) 30%,transparent)}
 .wfbadge{position:absolute;transform:translate(-50%,-50%);display:flex;gap:4px;z-index:2}
+.wfn .num.par{color:var(--teal);border-color:color-mix(in srgb,var(--teal) 45%,transparent)}
 .wfbadge button{height:22px;min-width:22px;border-radius:999px;border:1px solid var(--line2);background:var(--surface);color:var(--muted);font:500 11px var(--mono);cursor:pointer;display:grid;place-items:center;padding:0 6px;transition:opacity .12s,transform .12s}
 .wfbadge .g.approve{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 45%,transparent)}.wfbadge .g.auto{color:var(--teal);border-color:color-mix(in srgb,var(--teal) 45%,transparent)}
 .wfbadge .plus{opacity:.35}.wfcv:hover .wfbadge .plus{opacity:.85}.wfbadge .plus:hover{color:var(--accent-fg);border-color:var(--accent-fg);opacity:1}
@@ -1484,7 +1487,9 @@ function runGroups() {
   for (const r of S.runs || []) {
     const ids = (r.tasks || []).filter(id => id != null && task(id));
     if (!ids.length) continue;
-    const head = task(r.tasks[r.step]) ? r.tasks[r.step] : ids[ids.length - 1];
+    const cur = curGroup(r).map(i => r.tasks[i]).filter(id => id != null && task(id));
+    const rank = id => ({review: 0, doing: 1, backlog: 2}[boardCol(task(id))] ?? 3);
+    const head = cur.length ? [...cur].sort((a, b) => rank(a) - rank(b))[0] : ids[ids.length - 1];
     at.set(head, r);
     ids.forEach(id => id !== head && hidden.add(id));
   }
@@ -1493,18 +1498,20 @@ function runGroups() {
 function runGroup(r, head) {
   const n = r.steps.length, folded = view.runFold?.has(r.id);
   const state = i => { const t = task(r.tasks[i]); return t ? (t.decision?.verdict === 'stop' ? 'stopped' : t.col) : 'wait'; };
-  const steps = r.steps.map((st, i) => { const s = state(i);
-    return `<span class="rst ${s}" title="Step ${i + 1}: ${esc(st.agent)} · ${s === 'wait' ? (r.status === 'running' ? 'not started' : 'not run') : s}"><i>${s === 'done' ? '✓' : s === 'stopped' ? '■' : i + 1}</i></span>`; }).join('');
+  const dot = i => { const s = state(i), st = r.steps[i];
+    return `<span class="rst ${s}" title="Step ${i + 1}: ${esc(st.agent)} · ${s === 'wait' ? (r.status === 'running' ? 'not started' : 'not run') : s}"><i>${s === 'done' ? '✓' : s === 'stopped' ? '■' : i + 1}</i></span>`; };
+  const steps = stepGroups(r.steps).map(g => g.length > 1 ? `<span class="rst ${g.every(i => state(i) === 'done') ? 'done' : ''}" title="Steps ${g.map(i => i + 1).join(' + ')} run at the same time"><span class="rpi">${g.map(dot).join('')}</span></span>` : dot(g[0])).join('');
+  const live = r.status === 'running' ? curGroup(r) : [];
   const rows = folded ? '' : r.steps.map((st, i) => {
     const t = task(r.tasks[i]);
-    if (t && t.id === head.id) return card(t);
+    if (t && (t.id === head.id || (live.includes(i) && t.col !== 'done'))) return card(t);
     const s = state(i), title = t ? t.title : (st.title || '{input}').replace('{input}', r.title);
     const mark = s === 'done' ? '<span class="ok">✓</span>' : s === 'stopped' ? '<span style="color:var(--red)">■</span>' : '<span class="faint">○</span>';
-    return `<div class="rrow ${t ? '' : 'wait'}" ${t ? `data-card="${t.id}" title="#${t.id} ${esc(t.title)} · open ${esc(st.agent)}"` : ''}>${mark}<span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 10)}</span><span class="rt">${i + 1}. ${esc(title)}</span>${t ? `<span class="faint">#${t.id}</span>` : `<span class="rs">${r.status === 'running' ? 'not started' : 'not run'}</span>`}</div>`;
+    return `<div class="rrow ${t ? '' : 'wait'}" ${t ? `data-card="${t.id}" title="#${t.id} ${esc(t.title)} · open ${esc(st.agent)}"` : ''}>${mark}<span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 10)}</span><span class="rt">${i + 1}.${st.par ? '∥' : ''} ${esc(title)}</span>${t ? `<span class="faint">#${t.id}</span>` : `<span class="rs">${r.status === 'running' ? 'not started' : 'not run'}</span>`}</div>`;
   }).join('');
   const done = r.steps.filter((_, i) => state(i) === 'done').length;
   return `<div class="rgrp" data-run-group="${esc(r.id)}">
-    <div class="gh"><span class="gi">⛓</span><b>${esc(r.name)}</b><span class="gs">${r.status === 'running' ? `step ${Math.min(r.step + 1, n)} of ${n}` : `${esc(r.status)} · ${done}/${n}`}</span>
+    <div class="gh"><span class="gi">⛓</span><b>${esc(r.name)}</b><span class="gs">${r.status === 'running' ? `${stepLbl(r)} of ${n}` : `${esc(r.status)} · ${done}/${n}`}</span>
       <button class="fold" data-run-fold="${esc(r.id)}" title="${folded ? 'Show the steps' : 'Collapse to the header'}" aria-expanded="${!folded}">${folded ? '▸' : '▾'}</button>
       <span class="gg" title="${esc(r.title)}">${esc(r.title)}</span></div>
     <div class="rgsteps">${steps}</div>${rows}</div>`;
@@ -2722,25 +2729,38 @@ $('#trigs').addEventListener('input', e => {
 // ---- workflows ------------------------------------------------------------------
 // Ordered agent steps. Each step's task gets the earlier steps' summaries and branch; a step's gate
 // either waits for your approval or continues on its own when the agent finishes.
+// A step with `par` runs at the same time as the step before it; a group is one step and its parallel steps, and the
+// next group starts once all of them are done. run.step is the current group's first step.
+const stepGroups = steps => steps.reduce((g, st, i) => (i && st.par ? g[g.length - 1].push(i) : g.push([i]), g), []);
+const curGroup = r => stepGroups(r.steps).find(g => g.includes(r.step)) || [r.step];
+const stepLbl = r => { const g = curGroup(r); return g.length > 1 ? `steps ${g.map(i => i + 1).join(' + ')}` : `step ${Math.min(r.step + 1, r.steps.length)}`; };
+const chainTxt = steps => stepGroups(steps).map(g => g.length > 1 ? `(${g.map(i => esc(steps[i].agent)).join(' + ')})` : esc(steps[g[0]].agent)).join(' → ');
 const STEP_STATE = (run, i) => {
   if (run.results[i]) return 'done';
   const t = run.tasks[i] != null ? task(run.tasks[i]) : null;
-  if (!t) return run.status === 'running' && i === run.step ? 'waiting' : '';
+  if (!t) return run.status === 'running' && curGroup(run).includes(i) ? 'waiting' : '';
   return t.col === 'doing' ? 'doing' : t.col === 'review' ? 'review' : t.col === 'done' ? 'done' : 'waiting';
 };
 function chainHtml(steps, run = null) {
-  return steps.map((st, i) => {
-    const state = run ? STEP_STATE(run, i) : '';
+  const node = i => {
+    const st = steps[i], state = run ? STEP_STATE(run, i) : '';
     const a = S.agents.find(x => x.name === st.agent);
-    const node = `<span class="node ${state} ${a ? '' : 'off'}" ${run && run.tasks[i] != null ? `data-open-task="${run.tasks[i]}"` : ''} title="${esc(st.title || '{input}')}${run && run.tasks[i] != null ? ' · click to open' : ''}" style="${run && run.tasks[i] != null ? 'cursor:pointer' : ''}"><span class="mini">${state === 'done' ? '✓' : avFace(st.agent, 11)}</span><span class="et">${esc(st.agent)}</span></span>`;
-    const link = i < steps.length - 1 ? `<span class="link ${st.gate === 'auto' ? 'auto' : st.gate === 'until' ? 'until' : 'gate'}" title="${gateOf(st).tip}"><span class="g" aria-hidden="true">${gateOf(st).ic}</span>→</span>` : '';
-    return node + link;
+    return `<span class="node ${state} ${a ? '' : 'off'}" ${run && run.tasks[i] != null ? `data-open-task="${run.tasks[i]}"` : ''} title="${esc(st.title || '{input}')}${run && run.tasks[i] != null ? ' · click to open' : ''}" style="${run && run.tasks[i] != null ? 'cursor:pointer' : ''}"><span class="mini">${state === 'done' ? '✓' : avFace(st.agent, 11)}</span><span class="et">${esc(st.agent)}</span></span>`;
+  };
+  const gs = stepGroups(steps);
+  return gs.map((g, k) => {
+    const body = g.length > 1 ? `<span class="pgrp" title="These steps run at the same time">${g.map(node).join('')}</span>` : node(g[0]);
+    if (k === gs.length - 1) return body;
+    const gates = [...new Set(g.map(i => GATE[steps[i].gate] ? steps[i].gate : 'approve'))];
+    const cls = gates.length > 1 ? 'gate' : ({auto: 'auto', until: 'until'}[gates[0]] || 'gate');
+    const tip = gates.map(x => GATE[x].tip).join(' · ') + (g.length > 1 ? ' · the next step waits for all of them' : '');
+    return body + `<span class="link ${cls}" title="${tip}"><span class="g" aria-hidden="true">${gates.map(x => GATE[x].ic).join('')}</span>→</span>`;
   }).join('');
 }
 function blockedNote(r) {  // why the current step hasn't started
   if (r.status !== 'running') return '';
-  const t = r.tasks[r.step] != null ? task(r.tasks[r.step]) : null;
-  if (!t || t.col !== 'backlog') return '';
+  const t = curGroup(r).map(i => r.tasks[i] != null ? task(r.tasks[i]) : null).find(x => x && x.col === 'backlog');
+  if (!t) return '';
   const a = S.agents.find(x => x.name === t.who);
   if (!a) return '';
   if (a.status === 'review' && a.task) return ` · <span style="color:var(--amber)">waiting: review ${esc(a.name)}'s #${a.task} first</span>`;
@@ -2754,11 +2774,11 @@ function renderFlows() {
   const tabs = `<div class="ftabs" role="tablist"><button role="tab" data-ftab="workflows" class="${ft === 'workflows' ? 'on' : ''}" aria-selected="${ft === 'workflows'}">Workflows</button><button role="tab" data-ftab="runs" class="${ft === 'runs' ? 'on' : ''}" aria-selected="${ft === 'runs'}">Runs <span class="faint">${runs.length || ''}</span>${live ? `<span class="n">● ${live} running</span>` : ''}</button></div>`;
   if (ft === 'runs') { $('#flows').innerHTML = tabs + runsView(runs); return; }
   $('#flows').innerHTML = `${tabs}
-    <div><h3>Workflows <span class="faint">Run agents in a fixed order. ✋ Waits for your approval · ⚡ Continues automatically.</span>
+    <div><h3>Workflows <span class="faint">Run agents in order, or side by side. ✋ Waits for your approval · ⚡ Continues automatically.</span>
       <span class="wio" style="margin-left:auto;display:inline-flex;gap:6px;flex-wrap:wrap"><button class="btn sm ghost" data-io="export-workflows">Export…</button><button class="btn sm ghost" data-io="import-workflows">Import…</button><button class="btn sm primary" data-wf-new>＋ New workflow</button></span></h3></div>
     <div class="wfgrid">${flows.map(w => `
       <div class="wf ${w.off ? 'off' : ''}">
-        <div class="wh">${offSw('workflow', w.id, w.off)}<b>${esc(w.name)}</b>${w.off ? '<span class="offtag">off</span>' : ''}<span class="faint" style="font:11px var(--mono)">${w.steps.length} steps</span>
+        <div class="wh">${offSw('workflow', w.id, w.off)}<b>${esc(w.name)}</b>${w.off ? '<span class="offtag">off</span>' : ''}<span class="faint" style="font:11px var(--mono)">${w.steps.length} steps${w.steps.some(st => st.par) ? ' · ∥' : ''}</span>
           <span class="wact">${wfTrigChip(w)}<button class="btn sm run" data-wf-run="${w.id}" ${w.off ? 'disabled title="Turned off: turn it on to run it"' : ''}><i>▶</i>Run</button><button class="btn sm ghost" data-wf-edit="${w.id}">Edit</button><button class="kebab" data-wf-menu="${w.id}" title="More actions" aria-label="More actions for workflow ${esc(w.name)}" aria-haspopup="menu">⋮</button></span></div>
         ${w.description ? `<div class="wd">${esc(w.description)}</div>` : ''}
         <div class="chain">${chainHtml(w.steps)}</div>
@@ -2771,18 +2791,19 @@ function runsView(runs) {
   const list = runs.map(r => `<button class="rli ${r === sel ? 'on' : ''}" data-run-sel="${r.id}" aria-pressed="${r === sel}">
       <div class="l1"><span class="rpill ${r.status}">${r.status}</span><b>${esc(r.name)}</b>${adoChip(r.ado)}</div>
       <div class="l2" title="${esc(r.title)}">${esc(r.title)}</div>
-      <div class="l3">${ago(r.started)} ago${r.status === 'running' ? ` · step ${r.step + 1}/${r.steps.length}` : r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}</div></button>`).join('');
+      <div class="l3">${ago(r.started)} ago${r.status === 'running' ? ` · ${stepLbl(r)}/${r.steps.length}` : r.ended ? ` · took ${dur(r.ended - r.started)}` : ''}</div></button>`).join('');
   return `<div class="rview"><div class="rlist" role="list">${list}</div>${runDetail(sel)}</div>`;
 }
 function runDetail(r) {
   const steps = r.steps.map((st, i) => {
     const tid = r.tasks[i], t = tid ? task(tid) : null, res = r.results[i], a = agent(st.agent);
-    const state = res ? 'done' : r.status === 'running' && i === r.step ? 'current' : (r.status === 'stopped' || r.status === 'failed') && i === r.step ? 'stopped' : 'pending';
+    const cur = curGroup(r).includes(i);
+    const state = res ? 'done' : r.status === 'running' && cur ? 'current' : (r.status === 'stopped' || r.status === 'failed') && cur ? 'stopped' : 'pending';
     const title = t?.title || (st.title || '{input}').replace(/\{input\}/g, r.title);
     const what = state === 'done' ? (res.commit ? `committed ${esc(res.commit)}` : 'done') : state === 'current' ? (t?.col === 'review' ? 'waiting for your review' : t?.col === 'backlog' ? 'queued' : 'working') : state === 'stopped' ? (t?.decision?.verdict === 'stop' ? 'stopped here' : 'run ended here') : 'not started';
     const summary = res?.summary || (t?.col === 'done' || t?.col === 'review' ? t.summary : '');
     return `<li class="rs ${state}"><div class="rsh"><span class="num">${state === 'done' ? '✓' : i + 1}</span>
-        <span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 11)}</span><span class="who">${esc(st.agent)}</span>
+        <span class="mini" ${avPaint(st.agent)}>${avFace(st.agent, 11)}</span><span class="who">${esc(st.agent)}</span>${st.par ? `<span class="faint" title="Runs at the same time as step ${i}">∥ ${i}</span>` : ''}
         <span class="stt" title="${esc(title)}">${esc(title)}</span><span class="sst">${gateOf(st).ic} ${what}</span>
         ${tid && t ? `<button class="btn sm ghost" data-open-task="${tid}">#${tid}</button>` : ''}</div>
       ${t?.decision ? `<div class="act">${t.decision.verdict === 'stop' ? '⏹ Stopped' : '→ Passed on'} by ${esc(t.decision.by)}: ${esc(t.decision.reason)}</div>` : ''}
@@ -2826,7 +2847,7 @@ function openRun(w) {
 $('#rStart').onclick = async () => {
   const title = $('#rTitle').value.trim(); if (!title) return $('#rTitle').focus();
   const r = await act('wf_run', {id: runWf.id, title, details: $('#rDetails').value});
-  if (r.ok) { closeModals(); toast(`${runWf.name} started: ${runWf.steps[0].agent} is up first`, 'var(--teal)'); }
+  if (r.ok) { closeModals(); const first = stepGroups(runWf.steps)[0].map(i => runWf.steps[i].agent); toast(`${runWf.name} started: ${first.join(' and ')} ${first.length > 1 ? 'are' : 'is'} up first`, 'var(--teal)'); }
 };
 $('#rTitle').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#rStart').click(); } };
 // ---- workflow canvas: trigger → agent → agent → … → output -------------------------------
@@ -2858,20 +2879,46 @@ function drawWfPal() {
     <div class="ph">Drag onto the canvas, or click to add at the end.</div>`;
 }
 function wfNodes() { return ['trigger', ...wfe.steps.map(st => 's' + st._k), 'output']; }
+// columns of node indexes (into wfNodes): the trigger, each group of steps, the output
+function wfCols() { return [[0], ...stepGroups(wfe.steps).map(g => g.map(i => i + 1)), [wfe.steps.length + 1]]; }
 function wfLayout() {
-  const cv = $('#wfCanvas'), W = cv.clientWidth || 900, n = wfe.steps.length + 2;
-  const v = W < 520, gy = v ? 56 : 84;
-  const per = v ? 1 : Math.max(2, Math.floor((W - PAD * 2 + GX) / (NW + GX)));
-  const cols = Math.min(n, per), gw = v ? NW : cols * (NW + GX) - GX;
-  const w = Math.max(W, gw + PAD * 2), ox = (w - gw) / 2;
-  const pos = Array.from({length: n}, (_, i) => ({x: ox + (i % per) * (NW + GX), y: PAD + Math.floor(i / per) * (NH + gy)}));
-  return {pos, per, v, gy, w, h: PAD * 2 + Math.ceil(n / per) * (NH + gy) - gy};
+  const cv = $('#wfCanvas'), W = cv.clientWidth || 900, cols = wfCols(), GV = 18, GP = 10;
+  const v = W < 520, gy = v ? 56 : 84, pos = [];
+  if (v) {  // a phone: top to bottom, parallel steps side by side and narrower
+    const w = Math.max(W, NW + PAD * 2), avail = Math.max(NW, W - 48);
+    let y = PAD;
+    cols.forEach(c => {
+      const k = c.length, nw = k > 1 ? Math.min(NW, (avail - (k - 1) * GP) / k) : NW, x0 = (w - (k * nw + (k - 1) * GP)) / 2;
+      c.forEach((id, j) => { pos[id] = {x: x0 + j * (nw + GP), y, w: nw, rb: y + NH}; });
+      y += NH + gy;
+    });
+    return {pos, cols, v, gy, w, h: y - gy + PAD};
+  }
+  const per = Math.max(2, Math.floor((W - PAD * 2 + GX) / (NW + GX)));
+  const nc = Math.min(cols.length, per), gw = nc * (NW + GX) - GX, w = Math.max(W, gw + PAD * 2), ox = (w - gw) / 2;
+  let y = PAD;
+  for (let r = 0; r * per < cols.length; r++) {
+    const row = cols.slice(r * per, r * per + per), rh = Math.max(...row.map(c => c.length)) * (NH + GV) - GV;
+    row.forEach((c, j) => {
+      const ch = c.length * (NH + GV) - GV;
+      c.forEach((id, q) => { pos[id] = {x: ox + j * (NW + GX), y: y + (rh - ch) / 2 + q * (NH + GV), w: NW, rb: y + rh}; });
+    });
+    y += rh + gy;
+  }
+  return {pos, cols, v, gy, w, h: y - gy + PAD};
 }
 function wfEdge(a, b, L) {
-  if (L.v) { const x = a.x + NW / 2, y1 = a.y + NH, y2 = b.y; return {d: `M${x} ${y1} V${y2}`, mx: x, my: (y1 + y2) / 2}; }
+  if (L.v) {
+    const x1 = a.x + a.w / 2, y1 = a.y + NH, x2 = b.x + b.w / 2, y2 = b.y, my = (y1 + y2) / 2;
+    return {d: Math.abs(x1 - x2) < 1 ? `M${x1} ${y1} V${y2}` : `M${x1} ${y1} C${x1} ${my} ${x2} ${my} ${x2} ${y2}`, mx: (x1 + x2) / 2, my};
+  }
   const x1 = a.x + NW, y1 = a.y + NH / 2, x2 = b.x, y2 = b.y + NH / 2;
-  if (Math.abs(y1 - y2) < 1) return {d: `M${x1} ${y1} H${x2}`, mx: (x1 + x2) / 2, my: y1};
-  const my = a.y + NH + L.gy / 2, r = 12, xr = x1 + 22, xl = x2 - 22;
+  if (x2 > x1) {  // the same row: straight, or a curve into a parallel step
+    if (Math.abs(y1 - y2) < 1) return {d: `M${x1} ${y1} H${x2}`, mx: (x1 + x2) / 2, my: y1};
+    const mx = (x1 + x2) / 2;
+    return {d: `M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`, mx, my: (y1 + y2) / 2};
+  }
+  const my = a.rb + L.gy / 2, r = 12, xr = x1 + 22, xl = x2 - 22;
   return {d: `M${x1} ${y1} H${xr - r} Q${xr} ${y1} ${xr} ${y1 + r} V${my - r} Q${xr} ${my} ${xr - r} ${my} H${xl + r} Q${xl} ${my} ${xl} ${my + r} V${y2 - r} Q${xl} ${y2} ${xl + r} ${y2} H${x2}`,
     mx: (xr + xl) / 2, my};
 }
@@ -2895,26 +2942,40 @@ function drawWfStage() {
   wfPlace();
 }
 function wfPlace(skip = null) {
+  if (wfe.steps[0]?.par) wfe.steps[0].par = false;  // the first step has nothing to run beside
   const L = wfL = wfLayout(), st = $('#wfStage'), ids = wfNodes();
   st.style.width = L.w + 'px'; st.style.height = L.h + 'px'; st.classList.toggle('v', L.v);
-  ids.forEach((id, i) => { if (id === skip) return; const el = st.querySelector(`[data-n="${id}"]`); if (el) { el.style.left = L.pos[i].x + 'px'; el.style.top = L.pos[i].y + 'px'; const nm = el.querySelector('.num'); if (nm) nm.textContent = i; } });
+  ids.forEach((id, i) => {
+    if (id === skip) return;
+    const el = st.querySelector(`[data-n="${id}"]`); if (!el) return;
+    el.style.left = L.pos[i].x + 'px'; el.style.top = L.pos[i].y + 'px'; el.style.width = L.pos[i].w + 'px';
+    const nm = el.querySelector('.num'), par = i > 1 && wfe.steps[i - 1]?.par;
+    if (nm) { nm.textContent = par ? `${i} ∥` : i; nm.classList.toggle('par', !!par); nm.title = par ? `Runs at the same time as step ${i - 1}` : ''; }
+  });
   const svg = st.querySelector('.wfedges'); svg.setAttribute('width', L.w); svg.setAttribute('height', L.h);
   let paths = '', badges = '';
-  for (let i = 0; i < ids.length - 1; i++) {
-    const e = wfEdge(L.pos[i], L.pos[i + 1], L), step = i >= 1 ? wfe.steps[i - 1] : null;
-    paths += `<path d="${e.d}" class="${step && step.gate !== 'approve' ? step.gate : ''}"/>`;
-    badges += `<div class="wfbadge" data-edge="${i}" style="left:${e.mx}px;top:${e.my}px">${step ? `<button class="g ${gateOf(step).cls}" data-g="${step._k}" aria-label="${gateOf(step).tip}: change" title="Step ${i}: ${gateOf(step).tip} · click to switch (✋ wait for you, ⚡ continue, ⟳ check until done)">${gateOf(step).ic}</button>` : ''}<button class="plus" data-ins="${i}" title="Add a step here" aria-label="Add a step here">＋</button></div>`;
+  for (let c = 0; c < L.cols.length - 1; c++) {
+    const A = L.cols[c], B = L.cols[c + 1], ins = B[0] - 1;  // a step added on this line goes after A's last step
+    A.forEach((ai, q) => {
+      const step = ai >= 1 ? wfe.steps[ai - 1] : null;
+      B.forEach(bi => { paths += `<path d="${wfEdge(L.pos[ai], L.pos[bi], L).d}" class="${step && step.gate !== 'approve' ? step.gate : ''}"/>`; });
+      const e = wfEdge(L.pos[ai], L.pos[B[0]], L);
+      if (!L.v && L.pos[B[0]].x <= L.pos[ai].x) e.mx += (q - (A.length - 1) / 2) * 56;  // wrapped lines share a path: spread their badges
+      badges += `<div class="wfbadge" data-edge="${ins}" style="left:${e.mx}px;top:${e.my}px">${step ? `<button class="g ${gateOf(step).cls}" data-g="${step._k}" aria-label="${gateOf(step).tip}: change" title="Step ${ai}: ${gateOf(step).tip} · click to switch (✋ wait for you, ⚡ continue, ⟳ check until done)">${gateOf(step).ic}</button>` : ''}${q === 0 ? `<button class="plus" data-ins="${ins}" title="Add a step here, or one that runs at the same time" aria-label="Add a step here">＋</button>` : ''}</div>`;
+    });
   }
   svg.innerHTML = paths; st.querySelector('#wfBadges').innerHTML = badges;
 }
-function wfInsert(at, agent) {
+function wfInsert(at, agent, par = at > 0 && !!wfe.steps[at]?.par) {  // dropped inside a parallel group: it joins the group
   if (wfe.steps.length >= 12) return toast('A workflow has at most 12 steps', 'var(--red)');
-  const st = {agent, title: '{input}', details: '', gate: 'approve', _k: ++wfKey};
+  const st = {agent, title: '{input}', details: '', gate: 'approve', _k: ++wfKey, ...(par ? {par: true} : {})};
   wfe.steps.splice(at, 0, st); wfSel = 's' + st._k; drawWfStage(); drawWfIns();
 }
 function wfRemove(k) {
   if (wfe.steps.length === 1) return toast('A workflow needs at least one step', 'var(--red)');
-  wfe.steps.splice(wfStepNode(k), 1); wfSel = null; drawWfStage(); drawWfIns();
+  const i = wfStepNode(k);
+  if (!wfe.steps[i].par && wfe.steps[i + 1]?.par) wfe.steps[i + 1].par = false;  // the next parallel step leads its group now
+  wfe.steps.splice(i, 1); wfSel = null; drawWfStage(); drawWfIns();
 }
 // A step's gate: ✋ waits for you, ⚡ continues, ⟳ asks its agent to check again until it decides (a merge, a deployment).
 const GATE = {approve: {ic: '✋', cls: 'approve', tip: 'Waits for your approval before the next step'},
@@ -2933,6 +2994,8 @@ function drawWfIns() {
       ${a ? `<div class="role">${esc(a.role)}</div>` : '<div class="role" style="color:var(--red)">This agent is not in the crew any more.</div>'}
       ${wfField('Task title', `<input class="field" data-s="title" value="${esc(st.title)}" placeholder="Build: {input}" autocomplete="off">`)}
       ${wfField('Instructions', `<textarea class="field" data-s="details" rows="5" placeholder="Optional. Earlier steps' summaries are added automatically.">${esc(st.details)}</textarea>`)}
+      ${i ? wfField('When it starts', `<div class="wfseg"><button class="${st.par ? '' : 'on'}" data-sp="0">After step ${i}</button><button class="auto ${st.par ? 'on' : ''}" data-sp="1" title="Both run at the same time; the step after them waits for both">∥ With step ${i}</button></div>`) : ''}
+      ${st.par ? `<div class="thint" style="margin-top:-4px">Starts at the same time as step ${i}. The next step waits until every step running together is done, and gets all their summaries.</div>` : ''}
       ${wfField('When this step is done', `<div class="wfseg"><button class="approve ${!['auto', 'until'].includes(st.gate) ? 'on' : ''}" data-sg="approve">✋ Wait for me</button><button class="auto ${st.gate === 'auto' ? 'on' : ''}" data-sg="auto">⚡ Continue</button><button class="until ${st.gate === 'until' ? 'on' : ''}" data-sg="until" title="For a goal that takes time: a PR merging, a deployment landing">⟳ Check until done</button></div>`)}
       ${st.gate === 'until' ? `<div class="thint" style="margin-top:-4px">The agent works, then is asked to check again until it calls <code>decide</code>: continue when the goal is reached, stop if it never will. Each check is a short turn in the same session.</div>
       <div style="display:flex;gap:8px">${wfField('Check every (min)', `<input class="field" type="number" min="5" max="1440" data-s="every" value="${st.every || 30}">`)}${wfField('At most (checks)', `<input class="field" type="number" min="1" max="500" data-s="checks" value="${st.checks || 96}">`)}</div>
@@ -2956,8 +3019,8 @@ function drawWfIns() {
   } else {
     box.innerHTML = `<h4>Workflow</h4>
       ${wfField('What it\'s for', `<textarea class="field" data-w="description" rows="3" placeholder="Optional">${esc(wfe.description || '')}</textarea>`)}
-      <div class="role" style="-webkit-line-clamp:unset">${wfe.steps.length} step${wfe.steps.length > 1 ? 's' : ''}: ${wfe.steps.map(st => esc(st.agent)).join(' → ')}. Each step is a task for one agent; it gets the goal plus every earlier step's summary and merges the previous branch.</div>
-      <div class="thint">Click a block to edit it. ✋ on a line waits for your approval, ⚡ continues on its own; click to switch.</div>`;
+      <div class="role" style="-webkit-line-clamp:unset">${wfe.steps.length} step${wfe.steps.length > 1 ? 's' : ''}: ${chainTxt(wfe.steps)}. Each step is a task for one agent; it gets the goal plus every earlier step's summary and merges the previous branch. Steps in brackets run at the same time, and the next step waits for all of them.</div>
+      <div class="thint">Click a block to edit it. ✋ on a line waits for your approval, ⚡ continues on its own; click to switch. ＋ adds a step after the line, or one that runs at the same time.</div>`;
   }
 }
 async function wfSaveNow(close) {
@@ -2978,10 +3041,13 @@ $('#wfModal').addEventListener('click', async e => {
   if (d.chip) return wfInsert(wfe.steps.length, d.chip);
   if (d.g) { const st = wfe.steps[wfStepNode(+d.g)]; st.gate = {approve: 'auto', auto: 'until', until: 'approve'}[st.gate] || 'auto'; wfPlace(); return drawWfIns(); }
   if (d.ins != null) {
-    MENU_ACTIONS = [];
-    showMenu(b, '<div class="mh">Add a step here</div>' + S.agents.map(a => item(`${esc(a.name)}<span class="faint"> · ${esc(a.tags.join(', '))}</span>`, () => wfInsert(+d.ins, a.name))).join(''));
+    e.stopPropagation(); MENU_ACTIONS = [];  // the page's click handler would close the menu straight away
+    const at = +d.ins, g = at > 0 ? stepGroups(wfe.steps).find(x => x.includes(at - 1)) : null;
+    showMenu(b, '<div class="mh">Add a step here</div>' + S.agents.map(a => item(`${esc(a.name)}<span class="faint"> · ${esc(a.tags.join(', '))}</span>`, () => wfInsert(at, a.name, false))).join('')
+      + (g ? `<div class="sep"></div><div class="mh">At the same time as ${esc(g.map(i => wfe.steps[i].agent).join(' + '))}</div>` + S.agents.map(a => item(`∥ ${esc(a.name)}`, () => wfInsert(at, a.name, true), {sub: 'the next step waits for all of them'})).join('') : ''));
     return;
   }
+  if (d.sp != null) { const st = wfe.steps[wfStepNode(+wfSel.slice(1))]; if (d.sp === '1') st.par = true; else delete st.par; drawWfStage(); return drawWfIns(); }
   if (d.sg) { wfe.steps[wfStepNode(+wfSel.slice(1))].gate = d.sg; wfPlace(); return drawWfIns(); }
   if (d.smv) { const i = wfStepNode(+wfSel.slice(1)), j = i + +d.smv; [wfe.steps[i], wfe.steps[j]] = [wfe.steps[j], wfe.steps[i]]; drawWfStage(); return drawWfIns(); }
   if ('srm' in d) return wfRemove(+wfSel.slice(1));
@@ -2999,7 +3065,7 @@ $('#wfModal').addEventListener('input', e => {
 // drag: reorder steps on the canvas, or drop an agent from the palette between two blocks
 function wfNearest(cx, cy, from, to) {  // index of the slot (in wfL.pos) closest to a point
   let best = from, bd = Infinity;
-  for (let i = from; i <= to; i++) { const p = wfL.pos[i], dd = (p.x + NW / 2 - cx) ** 2 + (p.y + NH / 2 - cy) ** 2; if (dd < bd) { bd = dd; best = i; } }
+  for (let i = from; i <= to; i++) { const p = wfL.pos[i], dd = (p.x + p.w / 2 - cx) ** 2 + (p.y + NH / 2 - cy) ** 2; if (dd < bd) { bd = dd; best = i; } }
   return best;
 }
 $('#wfModal').addEventListener('pointerdown', e => {

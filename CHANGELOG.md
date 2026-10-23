@@ -2,9 +2,10 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.5.0] - 2026-10-23
 
 ### Added
+- **Parallel workflow steps:** steps can run at the same time, e.g. triage and telemetry together, then a planner. On the canvas, ＋ on a line offers *At the same time as …*, or a step's *When it starts* switches to *∥ With step N*. Parallel steps stack in one column and start together; the next step waits until every one of them is done, then gets all their summaries and merges all their branches. Each keeps its own gate (✋ / ⚡ / ⟳). On the board, the run's frame shows every live parallel task as a card and their step dots stacked; the chain on the Workflows page brackets them. Saved as `"par": true` on a step (in `crew.json`, exported files and the boss's `save_workflow`).
 - **Watches fix failed CI:** the crew tool `watch` takes a `fail` regex (e.g. `FAILED|CHANGES_REQUESTED`). When the output matches with a new failure, Crew wakes the same agent with the output (the failed checks and their pipeline links) and asks it to fix the cause on the same branch, push and re-run what failed. The same failure doesn't wake it twice. With `fail` set, progress alone wakes nobody. The ⟳ step brief shows a `gh pr view` command that lists failed checks with their links.
 - **⏹ Stop workflow on board cards:** a workflow card in In progress or Review has a Stop workflow button. It ends the run and its open step: a working agent is stopped, a waiting ⟳ or 👁 step stops checking, and the card moves to Done marked ⏹ stopped. It also ends the step of a run that was already stopped but still checking.
 
@@ -15,6 +16,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Waiting steps show in In progress:** a ⟳ step waiting for its next check, or a 👁 step watching a command, is shown in In progress instead of Backlog.
 
 ### Fixed
+- **Phone board: stacked workflow cards overflowed the column** in In progress, Review and Done when a run's title had a long link (an ADO work item URL), pushing the card off the screen. The column now keeps the screen's width and long titles wrap or shorten.
+- **＋ on a workflow canvas line closed its menu straight away**, so adding a step there did nothing; it opens the menu again.
 - **Phone layout:** the + button floats above the bottom bar so the five tabs share it evenly; Clear board moved to the ⋮ menu; workflow and chat headers fit on one line; card buttons share a row; the ADO trigger form is one column; menus dim the page behind them; toasts line up; a column keeps its scroll position when the board redraws (it jumped to the top whenever an agent reported).
 - **ADO "assigned to me" started old items after an edit:** widening the trigger (say, adding Product Backlog Item to Bug) kept the old baseline, so items already assigned to you that the new filter matched started as if new. Any change to what it matches (types, project, organization, mode, or skip/start) now takes a new baseline on the next check.
 
@@ -159,3 +162,4 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 [0.2.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.1.0...v0.2.0
 [0.3.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.2.0...v0.3.0
 [0.4.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.3.0...v0.4.0
+[0.5.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.4.0...v0.5.0

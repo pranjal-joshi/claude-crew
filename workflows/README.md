@@ -1,6 +1,6 @@
 # Workflows
 
-A workflow is an ordered list of steps, each run by one agent. Running it creates step 1's task; when a step is done (approved by you, or automatically when its gate is `auto`) the next step's task is created with the previous step's summary and branch. Workflows live in `crew.json` under `"workflows"`; a run is a dict in the Crew's `runs` list, with the workflow's id in its `"wf"` key.
+A workflow is an ordered list of steps, each run by one agent. Running it creates step 1's task; when a step is done (approved by you, or automatically when its gate is `auto`) the next step's task is created with the previous step's summary and branch. A step with `"par": true` runs at the same time as the step before it: `groups()` splits the steps into groups that start together, and the next group starts once every step in the group is done, with all their summaries and a `git merge` of all their branches. `run["step"]` is the current group's first step. Workflows live in `crew.json` under `"workflows"`; a run is a dict in the Crew's `runs` list, with the workflow's id in its `"wf"` key.
 
 | File | What it holds |
 |---|---|
@@ -23,4 +23,4 @@ WORKFLOW = {"id": "w6", "name": "Release", "description": "Test, review, write t
                       {"agent": "scribe", "title": "Release notes: {input}", "details": "", "gate": "approve"}]}
 ```
 
-`WORKFLOW` has the shape of a `crew.json` workflow. The `id` is fixed, unique and never reused (runs and triggers refer to it). Step titles and details can use `{input}`, `{details}`, `{step}`, `{steps}`, `{workflow}`, `{prev_summary}`, `{prev_who}`, `{prev_branch}` and `{prev_commit}`. Templates are only the starting set: a `crew.json` that already has workflows is never overwritten. Every `agent` must exist in the crew (the built-in templates use the preset agents).
+`WORKFLOW` has the shape of a `crew.json` workflow. The `id` is fixed, unique and never reused (runs and triggers refer to it). Step titles and details can use `{input}`, `{details}`, `{step}`, `{steps}`, `{workflow}`, `{prev_summary}`, `{prev_who}`, `{prev_branch}` and `{prev_commit}`. After a parallel group, `{prev_summary}` holds every summary (each under its agent's name), `{prev_who}` lists the agents, and `{prev_branch}` / `{prev_commit}` are empty. Templates are only the starting set: a `crew.json` that already has workflows is never overwritten. Every `agent` must exist in the crew (the built-in templates use the preset agents).

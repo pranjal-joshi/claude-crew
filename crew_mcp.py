@@ -19,7 +19,7 @@ TOKEN = os.environ.get("CREW_TOKEN", "")
 S = {"type": "string"}
 I = {"type": "integer"}
 STEP = {"type": "object", "properties": {"agent": S, "title": S, "details": S, "gate": {"type": "string", "enum": ["approve", "auto", "until"]},
-                                          "every": I, "checks": I},
+                                          "every": I, "checks": I, "par": {"type": "boolean"}},
         "required": ["agent", "title"]}
 
 
@@ -68,7 +68,9 @@ TOOLS = [
          {"name": S, "role": S, "tags": {"type": "array", "items": S}, "model": S, "effort": S}, ["name"], boss=True),
     tool("save_workflow", "Create a workflow, or replace one when `id` is given. Steps run in order; gate 'approve' waits for "
          "the user, 'auto' continues when the step is done, 'until' asks the step's agent to check again every `every` minutes "
-         "(at most `checks` times) until it calls decide: for a PR to merge or a deployment to land. Step titles may use {input}. `output` says what happens when a "
+         "(at most `checks` times) until it calls decide: for a PR to merge or a deployment to land. A step with par: true starts "
+         "at the same time as the step before it; the step after them waits until all of them are done and gets every "
+         "summary. Step titles may use {input}. `output` says what happens when a "
          "run finishes: {kind: board} (default), {kind: report, path: folder in the project} (markdown report), "
          "{kind: webhook, url}, or {kind: workflow, workflow: id} (start another workflow with the same goal).",
          {"id": S, "name": S, "description": S, "steps": {"type": "array", "items": STEP}, "output": {"type": "object"}},

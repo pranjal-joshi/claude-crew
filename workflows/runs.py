@@ -33,6 +33,22 @@ SUMMARY_MAX = 20000
 EARLIER_MAX = 4000
 
 
+def groups(steps: list) -> list[list[int]]:
+    """Step indexes in the order they run. A step with "par" runs at the same time as the step before it, so a group is
+    one step and the parallel steps right after it; the next group starts once every step in this one is done."""
+    out = []
+    for i, st in enumerate(steps):
+        if i and st.get("par"):
+            out[-1].append(i)
+        else:
+            out.append([i])
+    return out
+
+
+def group_of(steps: list, i: int) -> list[int]:
+    return next(g for g in groups(steps) if i in g)
+
+
 def start_run(crew, w: dict, title: str, details: str = "", source: dict | None = None) -> dict:
     n = len(w["steps"])
     run = {"id": f"r{crew.next_run}", "wf": w["id"], "name": w["name"], "title": title[:200],
@@ -41,8 +57,17 @@ def start_run(crew, w: dict, title: str, details: str = "", source: dict | None 
            "source": source, "ado": (source or {}).get("ado")}
     crew.next_run += 1
     crew.runs.append(run)
-    start_step(crew, run, 0)
+    start_group(crew, run, 0)
     return run
+
+
+def start_group(crew, run: dict, i: int) -> None:
+    """Start step i and the steps that run alongside it. run["step"] is the group's first step."""
+    for k in group_of(run["steps"], i):
+        start_step(crew, run, k)
+        if run["status"] != "running":
+            return
+    run["step"] = i
 
 
 def start_step(crew, run: dict, i: int) -> None:
@@ -52,23 +77,34 @@ def start_step(crew, run: dict, i: int) -> None:
         run.update(status="failed", note=f"step {i + 1}: no agent called {step['agent']}", ended=now())
         crew.event("error", f"workflow {run['name']} stopped: {step['agent']} is not in the crew")
         return
-    prev = run["results"][i - 1] if i else None
+    gs = groups(run["steps"])
+    g = next(k for k, x in enumerate(gs) if i in x)
+    before = [k for x in gs[:g - 1] for k in x] if g else []  # older steps: an excerpt
+    last = [k for k in gs[g - 1] if run["results"][k]] if g else []  # the group just finished: in full
+    prevs = [run["results"][k] for k in last]
+    prev = prevs[0] if len(prevs) == 1 else None
+    joined = "\n\n".join(f"{r['who']}:\n{r['summary']}" for r in prevs) if len(prevs) > 1 else ""
     ctx = {"input": run["title"], "details": run["details"], "step": i + 1, "steps": n, "workflow": run["name"],
-           "prev_summary": (prev or {}).get("summary", ""), "prev_who": (prev or {}).get("who", ""),
+           "prev_summary": (prev or {}).get("summary", joined), "prev_who": ", ".join(r["who"] for r in prevs),
            "prev_branch": (prev or {}).get("branch", ""), "prev_commit": (prev or {}).get("commit", "")}
     title = fill(step.get("title") or "{input}", ctx).strip()[:200] or run["title"]
     body = fill(step.get("details") or "", ctx).strip()
-    brief = [f"Workflow '{run['name']}', step {i + 1} of {n}. Goal: {run['title']}"]
+    side = [run["steps"][k]["agent"] for k in gs[g] if k != i]
+    brief = [f"Workflow '{run['name']}', step {i + 1} of {n}. Goal: {run['title']}"
+             + (f" {', '.join(side)} {'works' if len(side) == 1 else 'work'} on {'its' if len(side) == 1 else 'their'} "
+                f"own step{'s' if len(side) > 1 else ''} at the same time: stick to yours." if side else "")]
     if run["details"]:
         brief.append(run["details"])
-    for k, r in enumerate(run["results"][:i]):  # every earlier step, newest in full
+    for k in before + last:  # every earlier step, the group just finished in full
+        r = run["results"][k]
         if not r:
             continue
         where = f" on {r['branch']} (commit {r['commit']})" if r.get("commit") else ""
-        text = r["summary"] if k == i - 1 else r["summary"][:EARLIER_MAX]
+        text = r["summary"] if k in last else r["summary"][:EARLIER_MAX]
         brief.append(f"Step {k + 1} by {r['who']}{where}:\n{text}")
-    if prev and prev.get("commit") and prev.get("branch"):
-        brief.append(f"Run `git merge {prev['branch']}` in your worktree first so you build on that work.")
+    merge = list(dict.fromkeys(r["branch"] for r in prevs if r.get("commit") and r.get("branch")))
+    if merge:
+        brief.append(f"Run `git merge {' '.join(merge)}` in your worktree first so you build on that work.")
     if step.get("gate") == "until":
         brief.append(until_brief(step))
     t = {"id": crew.next_id, "title": title, "details": ((body + "\n\n---\n") if body else "") + "\n\n".join(brief),
@@ -78,8 +114,8 @@ def start_step(crew, run: dict, i: int) -> None:
         t["ado"] = run["ado"]
     crew.next_id += 1
     crew.tasks.append(t)
-    run["step"], run["tasks"][i] = i, t["id"]
-    crew.event("workflow", f"⛓ {run['name']} {i + 1}/{n} → {a['name']}: {title}", a["name"])
+    run["tasks"][i] = t["id"]
+    crew.event("workflow", f"⛓ {run['name']} {i + 1}/{n}{' ∥' if len(gs[g]) > 1 else ''} → {a['name']}: {title}", a["name"])
 
 
 WATCH_EXAMPLE = 'gh pr view 123 --json state,reviewDecision,statusCheckRollup --jq \'[.state,.reviewDecision,[.statusCheckRollup[]|select(.conclusion=="FAILURE")|"FAILED \\(.name) \\(.detailsUrl)"]]\''
@@ -131,8 +167,11 @@ def on_task_event(crew, t: dict, col: str, summary: str | None) -> None:
         run["results"][i] = {"who": t.get("who") or "", "summary": (t.get("summary") or "")[:SUMMARY_MAX],
                              "branch": w["branch"] if w and w.get("branch") else "", "commit": t.get("commit") or ""}
         run["note"] = ""
-        if i + 1 < len(run["steps"]):
-            start_step(crew, run, i + 1)
+        g = group_of(run["steps"], i)
+        if waiting := [k for k in g if not run["results"][k]]:  # a parallel step is still going: the next group waits
+            run["note"] = "waiting for " + ", ".join(run["steps"][k]["agent"] for k in waiting)
+        elif g[-1] + 1 < len(run["steps"]):
+            start_group(crew, run, g[-1] + 1)
         else:
             run.update(status="done", ended=now())
             crew.event("workflow", f"⛓ {run['name']} finished: {run['title']}")

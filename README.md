@@ -37,7 +37,7 @@ Crew is pure standard-library Python (3.10 or newer) and installs as a `crew` co
 
 ```bash
 pipx install claude-crew                      # from PyPI, once published
-pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.4.0/claude_crew-0.4.0-py3-none-any.whl   # a release wheel
+pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.5.0/claude_crew-0.5.0-py3-none-any.whl   # a release wheel
 pipx install git+https://github.com/pranjal-joshi/claude-crew   # latest main
 ```
 
@@ -120,7 +120,7 @@ To keep a long wait cheap, the agent sets a **watch** (crew tool `watch`): one r
 | Incident | ops (diagnose) ✋ → builder ✋ → tester ⚡ → scribe (post-mortem) |
 | Request to ticket | ticketer (file it, share the link) ⚡ → planner |
 
-Edit workflows on a **canvas**, n8n-style: a **When** block (▶ Run by hand, or any trigger), one block per agent step, and an **Output** block. Drag blocks to reorder, drag an agent from the left onto the canvas (or press ＋ on a line) to add a step, and click ✋ / ⚡ on a line to switch its gate. Click a block to edit its instruction (`{input}`, `{prev_summary}`, `{prev_branch}` and more). Runs show live progress per step, and click through to each step's task.
+Edit workflows on a **canvas**, n8n-style: a **When** block (▶ Run by hand, or any trigger), one block per agent step, and an **Output** block. Drag blocks to reorder, drag an agent from the left onto the canvas (or press ＋ on a line) to add a step, and click ✋ / ⚡ on a line to switch its gate. Steps can also **run in parallel**: ＋ on a line offers *At the same time as …*, or set *When it starts: ∥ With step N* on a step. Parallel steps stack in one column, start together, and the next step waits until all of them are done, gets all their summaries and merges all their branches. For example, triage and telemetry together, then a planner. Click a block to edit its instruction (`{input}`, `{prev_summary}`, `{prev_branch}` and more). Runs show live progress per step, and click through to each step's task.
 
 The **Output** block decides what a finished run delivers:
 

@@ -4,13 +4,14 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .runs import find, start_run
+from .runs import find, groups, start_run
 
 
 # A step's gate: "approve" waits for you, "auto" goes on by itself, "until" keeps asking its agent to check again (every
 # `every` minutes, at most `checks` times) until it calls decide: for a PR to merge, a deployment to land, CI to finish.
 GATES = ("approve", "auto", "until")
 UNTIL_EVERY, UNTIL_CHECKS = 30, 96
+MAX_PAR = 6  # steps in one parallel group
 
 
 def clean(crew, p: dict, allow_missing_agents: bool = False) -> tuple[str | None, dict]:
@@ -25,6 +26,8 @@ def clean(crew, p: dict, allow_missing_agents: bool = False) -> tuple[str | None
             return f"step {k + 1}: pick an agent", {}
         gate = st.get("gate") if st.get("gate") in GATES else "approve"
         step = {"agent": agent, "title": str(st.get("title") or "").strip()[:200], "details": str(st.get("details") or "")[:3000], "gate": gate}
+        if k and st.get("par"):  # runs at the same time as the step before it
+            step["par"] = True
         if gate == "until":  # ask again every `every` minutes until the agent decides, at most `checks` times
             try:
                 step["every"] = min(1440, max(5, int(st.get("every") or UNTIL_EVERY)))
@@ -34,6 +37,8 @@ def clean(crew, p: dict, allow_missing_agents: bool = False) -> tuple[str | None
         steps.append(step)
     if not steps:
         return "add at least one step", {}
+    if any(len(g) > MAX_PAR for g in groups(steps)):
+        return f"at most {MAX_PAR} steps run at the same time", {}
     o = p.get("output") or {}
     kind = o.get("kind") if o.get("kind") in ("board", "report", "webhook", "workflow") else "board"
     out = {"kind": kind}
@@ -98,7 +103,7 @@ def export_file(crew, ids) -> dict:
         if out.get("kind") == "workflow":
             out["workflow"] = (find(crew, out.get("workflow")) or {}).get("name") or ""
         items.append({"name": w["name"], "description": w.get("description", ""), "off": bool(w.get("off")),
-                      "steps": [{k: st[k] for k in ("agent", "title", "details", "gate", "every", "checks") if k in st} for st in w["steps"]],
+                      "steps": [{k: st[k] for k in ("agent", "title", "details", "gate", "every", "checks", "par") if k in st} for st in w["steps"]],
                       "output": out})
     return {"ok": True, "file": {"crew": "workflows", "version": FILE_VERSION, "items": items}}
 
