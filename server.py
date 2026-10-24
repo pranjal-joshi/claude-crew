@@ -37,7 +37,7 @@ except ImportError:
     import workflows
     from triggers import azure
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the
@@ -87,6 +87,14 @@ def load_json_file(path: Path) -> dict:
 TRIGGER_KINDS = triggers.kinds()  # one module per kind in triggers/: see triggers/README.md
 PR_URL = re.compile(r"https://(?:github\.com/[\w.-]+/[\w.-]+/pull/\d+|dev\.azure\.com/[\w%.-]+/[\w%.-]+/_git/[\w%.-]+/pullrequest/\d+)")
 # "PR #123", "draft PR #123", "pull request #123": a PR named by number only, linked through the project's origin remote
+# pipeline runs a card is about (deploy agents show these instead of the PR): Azure Pipelines results and GitHub Actions
+# runs as links, or an Azure run id in a command (`az pipelines runs show --id 123`), linked through the ADO project
+PIPE_URL = re.compile(r"https://(?:dev\.azure\.com/[\w%.-]+/[\w%.-]+/_build/results\?buildId=\d+"
+                      r"|[\w-]+\.visualstudio\.com/[\w%.-]+/_build/results\?buildId=\d+|github\.com/[\w.-]+/[\w.-]+/actions/runs/\d+)")
+PIPE_ID = re.compile(r"\baz\s+pipelines\s+(?:runs\s+show|build\s+show)\b[^\n]*?--(?:id|run-id)\s+(\d+)")
+PIPE_SAID = re.compile(r"\b(?:[Bb]uild(?:\s+id)?|[Rr]un\s+id|buildId)[\s:=#]+(\d{4,9})(?![\d.])")
+PIPE_ORG = re.compile(r"--org(?:anization)?[ =](https://\S+)")
+PIPE_PROJ = re.compile(r"""--project[ =](?:'([^']+)'|"([^"]+)"|(\S+))""")
 PR_REF = re.compile(r"\b(?:PR|pull request)\s*#(\d{1,7})\b", re.I)
 # an Azure DevOps work item: "AB#123" or its link
 ADO_REF = re.compile(r"\bAB#\d{1,7}\b|/_workitems/edit/\d")
@@ -177,6 +185,7 @@ class Crew:
         self.version = 0
         self._pr_mine: dict[str, bool] = {}  # PR link -> yours (opened by your gh/az sign-in or from an agent's branch)
         self._pr_wait: dict[str, set[int]] = {}  # PR link -> tasks that mentioned it, while its owner is being read
+        self._pr_had: dict[str, set[int]] = {}  # PR link -> cards it was on before a restart, kept if its owner can't be read
         self.tasks: list[dict] = []
         self.feed: list[dict] = []
         self.next_id = 1
@@ -203,6 +212,8 @@ class Crew:
         self.next_run = 1
         self.alerts: list[dict] = []  # raised by agents (crew tool raise_alert) or by Crew; shown on the board until resolved
         self.next_alert = 1
+        self.facts: list[dict] = []  # crew memory: project facts agents save with `remember` and read at each task's start
+        self.facts_v = 1
         self.agents: dict[str, dict] = {}
         for spec in config["agents"]:
             self.agents[spec["name"]] = agents.record.new_agent(self, spec)
@@ -226,6 +237,8 @@ class Crew:
         saved["agents"] = self.config["agents"]
         saved["permission_mode"] = self.config["permission_mode"]
         saved["workflows"] = self.config.get("workflows", [])
+        if self.config.get("card_actions") or "card_actions" in saved:
+            saved["card_actions"] = self.config.get("card_actions", [])
         if self.config.get("boss"):
             saved["boss"] = self.config["boss"]
         for k in ("budget_task_usd", "budget_day_usd"):
@@ -262,6 +275,8 @@ class Crew:
         self.triggers = data.get("triggers", [])
         self.runs = data.get("runs", [])[-50:]
         self.alerts = data.get("alerts", [])[-200:]
+        self.facts = data.get("facts", [])[-workflows.memory.MAX_FACTS:]
+        self.facts_v = data.get("facts_v", 1)
         self.next_alert = data.get("next_alert", max([x["id"] for x in self.alerts], default=0) + 1)
         self.next_run = data.get("next_run", len(self.runs) + 1)
         self.next_trig = data.get("next_trig", len(self.triggers) + 1)
@@ -277,7 +292,10 @@ class Crew:
                 if owner.setdefault(sid, tk["id"]) != tk["id"]:
                     del ss[n]
         for tk in self.tasks:  # PR links in work that finished before Crew read them; earlier links are checked again
+            for u in tk.get("prs") or []:
+                self._pr_had.setdefault(u, set()).add(tk["id"])
             self._note_prs(tk, tk.get("details"), tk.get("summary"), " ".join(tk.pop("prs", None) or []))
+            self._note_pipes(tk, ((tk.get("wait") or {}).get("probe") or {}).get("cmd"))
         self.next_id = data.get("next_id", len(self.tasks) + 1)
         for t in self.tasks:  # nothing is running after a restart
             if (t.get("diff") or {}).get("pending"):
@@ -285,6 +303,7 @@ class Crew:
             if t["col"] == "doing":
                 t["col"] = t.pop("reviewing_from", None) or "backlog"  # an /address-review turn goes back where it was
                 t.pop("reviewing", None)
+                t.pop("acting", None)
             if t["col"] == "backlog" and t.get("who") and t["who"] not in self.agents:
                 t["who"] = t["pinned"] = None  # its agent left the roster; let the tags route it
         if b := data.get("boss"):
@@ -302,7 +321,7 @@ class Crew:
         data = {"project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
                 "mcp_allow": sorted(self.mcp_allow), "triggers": self._public_triggers(), "next_trig": self.next_trig,
                 "runs": self.runs[-50:], "next_run": self.next_run,
-                "alerts": self.alerts[-200:], "next_alert": self.next_alert,
+                "alerts": self.alerts[-200:], "next_alert": self.next_alert, "facts": self.facts, "facts_v": self.facts_v,
                 "day": self.day, "day_spend": round(self.day_spend, 6), "day_hit": self.day_hit,
                 "agents": {n: {"session": a["session"], **({"kept": a["kept"]} if "kept" in a else {}), "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
                            "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", []), "commands": a.get("commands", [])}
@@ -336,6 +355,8 @@ class Crew:
         severity = severity if severity in SEVERITIES else "warning"
         key = key or f"{agent or 'crew'}:{title.lower()}"
         al = next((x for x in self.alerts if x["key"] == key and x["status"] != "resolved"), None)
+        if not al and link and workflows.alert_watch.run_of(link):  # another agent saw the same failed run: one alert
+            al = next((x for x in self.alerts if x["status"] != "resolved" and x.get("link") == link), None)
         if al:  # the same problem again: one alert with a count, never a pile of copies
             al["count"] += 1
             al["last"] = now()
@@ -348,6 +369,8 @@ class Crew:
               "status": "open", "task": None}
         self.next_alert += 1
         self.alerts.append(al)
+        if link and (o := workflows.owners.owner(self, {workflows.owners.pr_key(link)})):  # news for the card that owns the PR
+            workflows.owners.attach(self, o, f"alert ({severity}): {title}", agent or "Crew")
         self.alerts = [x for x in self.alerts if x["status"] != "resolved"][-150:] + \
             [x for x in self.alerts if x["status"] == "resolved"][-50:]
         self.alerts.sort(key=lambda x: x["id"])
@@ -447,8 +470,8 @@ class Crew:
                     "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
                     "project_name": self.project.name, "app_version": __version__, "mcp_allow": sorted(self.mcp_allow),
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(), "ado_base": self._ado_base(),
-                    "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []),
-                    "runs": self.runs[-30:], "contexts": CONTEXTS, "alerts": self._public_alerts(),
+                    "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []), "card_actions": self.config.get("card_actions", []),
+                    "runs": self.runs[-30:], "contexts": CONTEXTS, "alerts": self._public_alerts(), "facts": self.facts,
                     "awake": getattr(self, "awake", False), "awake_mode": getattr(self, "awake_mode", ""), "demo": self.demo,
                     "scratch": self.project.parent.resolve() == WORK_ROOT.resolve()}
 
@@ -666,6 +689,7 @@ class Crew:
         column it was in when you pressed the button. Lock held."""
         if (rt := a.pop("addressing", None)) and (tk := self._task(rt)):
             tk.pop("reviewing", None)
+            tk.pop("acting", None)
             if (back := tk.pop("reviewing_from", None)) and tk["col"] == "doing":
                 tk["col"] = back
 
@@ -704,7 +728,22 @@ class Crew:
         dec = (task or {}).get("decision")
         if dec and dec["verdict"] == "continue" and self._step_gate(task) == "approve":
             dec = None  # a workflow step gated ✋ still waits for you: the decision shows on the review card
-        if task and dec:  # a gate (crew tool decide): no review; continue or stop here
+        if task and dec and dec["verdict"] == "blocked":  # ⟳ escape gate: parked for a person, the watch keeps going
+            tk = a["tokens"]
+            w = task.setdefault("wait", {"checks": 0})
+            w["blocked"] = {"reason": dec["reason"], "by": dec["by"], "t": now()}
+            for k in ("wake", "over"):
+                w.pop(k, None)
+            if pr := w.get("probe"):
+                pr.pop("seen", None)
+                w["next"] = now()
+            task.pop("decision")  # a later turn (woken, or sent back) decides afresh
+            task.update(tokens=tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0), col="review", finished=now(),
+                        summary=(d.get("result") or "").strip() or dec["reason"])
+            a.update(status="idle", task=None)  # parked can last days: the agent takes other work meanwhile
+            self.event("review", f"🚧 #{task['id']} blocked, over to you: {dec['reason']}", a["name"])
+            self._task_event(task, "review")
+        elif task and dec:  # a gate (crew tool decide): no review; continue or stop here
             tk = a["tokens"]
             task.update(tokens=tk["in"] + tk["cache"] + tk["out"] - task.get("tok0", 0), col="done", finished=now(),
                         summary=(d.get("result") or "").strip() or dec["reason"])
@@ -716,6 +755,7 @@ class Crew:
             w = task.setdefault("wait", {"checks": 0})
             w.update(checks=w.get("checks", 0) + 1, last=(d.get("result") or "").strip()[:2000], next=now() + step["every"] * 60)
             w.pop("wake", None)
+            w.pop("blocked", None)  # sent back from blocked: it is watching again
             if pr := w.get("probe"):  # a watch: Crew runs the command now for a baseline and wakes the agent only on change
                 pr.pop("seen", None)
                 w["next"] = now()
@@ -730,6 +770,7 @@ class Crew:
             task["summary"] = d.get("result", "")
             if self._until_step(task):
                 task.setdefault("wait", {})["over"] = True  # out of checks: a person looks at it
+                task["wait"].pop("blocked", None)
             task["col"] = "review"
             self._queue_diff(task)
             task["finished"] = now()
@@ -962,13 +1003,15 @@ class Crew:
         tk = a["tokens"]
         t.update(col="doing", who=a["name"], started=now(), tok0=tk["in"] + tk["cache"] + tk["out"] - t.get("tokens", 0))
         a.update(status="running", task=t["id"], since=now(), activity="starting…")
-        if (t.get("wait") or {}).get("checks") and (step := self._until_step(t)):
+        w = t.get("wait") or {}
+        if (w.get("checks") or str(w.get("wake") or "").startswith("fix")) and (step := self._until_step(t)):
             body = workflows.runs.recheck_body(t, step)
             t["wait"].pop("wake", None)
         else:
             body = f"Task #{t['id']}: {t['title']}"
             if t.get("details"):
                 body += "\n\n" + t["details"]
+        body += workflows.owners.block(t) + workflows.memory.block(self, t)
         body += self._ado_hint(t, body)
         self.log(a, "you", body)
         if not self._send(a, body):
@@ -1010,6 +1053,27 @@ class Crew:
                     self._bg(self._read_pr_owner, u)
         if mine:
             t["prs"] = list(dict.fromkeys([*(t.get("prs") or []), *mine]))[-5:]
+        self._note_pipes(t, *texts)
+
+    def _note_pipes(self, t: dict, *texts: str | None) -> None:
+        """Pipeline runs named in the card's text, newest last. Lock held."""
+        found = [m for x in texts if x for m in PIPE_URL.findall(x)]
+        if m := re.match(r"(https://\S+?/)_workitems/edit/$", self._ado_base()):  # "build 306403", "run id 306403"
+            found += [f"{m.group(1)}_build/results?buildId={n}" for x in texts if x for n in PIPE_SAID.findall(x)]
+        for x in texts:
+            for line in (x or "").splitlines():
+                if not (ids := PIPE_ID.findall(line)):
+                    continue
+                org, proj = PIPE_ORG.search(line), PIPE_PROJ.search(line)  # the command's own, else the ADO project's
+                if org and proj:
+                    base = f"{org.group(1).rstrip('/')}/{quote(proj.group(1) or proj.group(2) or proj.group(3))}/"
+                elif m := re.match(r"(https://\S+?/)_workitems/edit/$", self._ado_base()):
+                    base = m.group(1)
+                else:
+                    continue
+                found += [f"{base}_build/results?buildId={n}" for n in ids]
+        if found:
+            t["pipes"] = list(dict.fromkeys([*(t.get("pipes") or []), *(u.replace("&amp;", "&") for u in found)]))[-5:]
 
     @staticmethod
     def _bg(fn, *args) -> None:
@@ -1023,9 +1087,14 @@ class Crew:
         except Exception:  # can't tell now (no CLI, signed out, offline): left off the card, read again when next mentioned
             with self.lock:
                 self._pr_wait.pop(url, None)
+                had = self._pr_had.pop(url, set())
+                for tk in self.tasks:  # a link it had before the restart stays, so the PR trigger still knows it is Crew's
+                    if tk["id"] in had:
+                        tk["prs"] = list(dict.fromkeys([*(tk.get("prs") or []), url]))[-5:]
             return
         with self.lock:
             self._pr_mine[url] = yours
+            self._pr_had.pop(url, None)
             ids = self._pr_wait.pop(url, set())
             if yours:
                 for tk in self.tasks:
@@ -1082,14 +1151,27 @@ class Crew:
             moved = self._roll_day() | self._check_writers()
             if not self._day_blocked():  # a spent daily budget dispatches nothing until tomorrow or a higher budget
                 for a in self.agents.values():
-                    if a["status"] != "idle" or a.get("off") or self._git_busy(a["name"]):
+                    if a.get("off") or self._git_busy(a["name"]):
                         continue
+                    if a["status"] == "idle" and (h := a.pop("review_hold", None)) and not a.get("task")                             and (rt := self._task(h)) and rt["col"] == "review":
+                        a.update(status="review", task=h)  # its ⟳ check is done: back on the card waiting for you
+                        moved = True
+                    rt = self._task(a.get("task")) if a["status"] == "review" else None
+                    d = (rt or {}).get("diff") or {}
+                    watch_only = bool(rt and rt["col"] == "review" and "patch" in d and not d.get("pending") and not d["patch"].strip())
+                    if a["status"] != "idle" and not watch_only:
+                        continue  # a card in review with changes keeps its agent: nothing may touch that worktree
                     t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and not self._over_task(t) and
                               (t.get("wait") or {}).get("next", 0) <= now() and
                               (not (t.get("wait") or {}).get("probe") or (t.get("wait") or {}).get("wake")) and
+                              not (t.get("wait") or {}).get("fixing") and
+                              (not watch_only or t.get("who") == a["name"] and self._until_step(t)) and
                               (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"]))), None)
                     if t:
-                        self._begin(a, t)
+                        if watch_only:  # a review card with no changes doesn't stall the agent's ⟳ checks
+                            a.update(status="idle", task=None, review_hold=rt["id"])
+                        if not self._begin(a, t) and watch_only:
+                            a.update(status="review", task=a.pop("review_hold"))
                         moved = True
         if moved:
             self.touch()
@@ -1715,6 +1797,11 @@ class Crew:
                 return {"ok": True, "task": nt["id"]}
             elif action == "decide":  # an agent gates its own running task: continue or stop the work here
                 return workflows.runs.decide(self, p)
+            elif action == "remember":  # crew memory: an agent (or you) saves, replaces or forgets a project fact
+                res = workflows.memory.save(self, p, p.get("from") if via == "mcp" else "you")
+                if "error" not in res:
+                    self.touch()
+                return res
             elif action == "watch":  # a ⟳ step's agent sets the cheap command Crew polls instead of waking it
                 return workflows.probe.set_watch(self, p)
             elif action == "kill" and a:
@@ -1809,6 +1896,15 @@ class Crew:
             elif action == "trigger_run" and (tr := self._trigger(p.get("id"))):
                 self._fire(tr, {"payload": "(run by hand)", "output": "(run by hand)", "files": "(run by hand)", "exit": 0},
                            "run by you")
+            elif action == "card_button_save":  # buttons you (or the boss) add to board cards
+                return workflows.card_actions.save(self, p)
+            elif action == "card_button_delete":
+                return workflows.card_actions.delete(self, p)
+            elif action == "card_button_run" and t:  # UI only: press one on a card
+                res = workflows.card_actions.run(self, t, p)
+                if "error" not in res:
+                    self.touch()
+                return res
             elif action == "wf_save":
                 return workflows.definitions.save(self, p)
             elif action == "wf_toggle" and (w := self._workflow(p.get("id"))):
@@ -1822,6 +1918,16 @@ class Crew:
             elif action == "wf_run" and (w := self._workflow(p.get("id"))):
                 if res := workflows.definitions.run(self, p):
                     return res
+            elif action == "pipeline_fix":  # a waiting ⟳ step (deploy or PR) hands its failed pipeline to a fix run
+                if via == "mcp":
+                    src = self.agents.get(p.get("from") or "")
+                    t = self._task(src["task"]) if src and src.get("task") else (self._task(src.get("addressing")) if src else None)
+                    if not t:
+                        return {"error": "fix_pipeline works on the ⟳ step you are running now"}
+                reason = " ".join(str(p.get("reason") or "").split())[:500]
+                if via == "mcp" and not reason:
+                    return {"error": "say in `reason` what failed and why code must change"}
+                return workflows.fixes.start(self, t, reason, p.get("join") or None, by=p.get("from") or "you")
             elif action == "run_stop" and (run := self._run(p.get("id"))) and (p.get("cards") or run["status"] == "running"):
                 if run["status"] == "running":
                     workflows.runs.stop(self, run)
@@ -1986,7 +2092,7 @@ MCP_TOKEN = secrets.token_urlsafe(24)
 GIT_ACTIONS = ("approve", "unapprove", "merge", "open_pr", "diff")  # UI only; each runs git outside the lock (_git_action)
 UI_TASK_ACTIONS = {"merge_rebase": "_merge_rebase"}
 MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add",
-               "alert", "alert_resolve", "decide", "watch"}
+               "alert", "alert_resolve", "decide", "watch", "pipeline_fix", "remember", "card_button_save", "card_button_delete"}
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 MAX_BODY = 1_000_000
@@ -2353,6 +2459,10 @@ def main() -> None:
             try:
                 CREW.tick_triggers()
                 workflows.probe.tick(CREW)
+                if not CREW.demo:
+                    with CREW.lock:
+                        workflows.alert_watch.tick(CREW)
+                        workflows.merge_watch.tick(CREW)
                 CREW.dispatch()
                 busy = args.awake == "always" or CREW.busy()
                 if busy != awake.on:

@@ -151,7 +151,13 @@ def until_brief(step: dict) -> str:
             f"regex for the goal (e.g. MERGED) and `fail` as a regex for what you must act on (for a PR: {WATCH_FAIL}). "
             f"Pipes inside the quoted --jq filter are fine. Crew runs it "
             f"every {probe.WATCH_EVERY} minutes at no cost and wakes you, in this same session, when it matches done, or "
-            f"matches fail with a new failure: then fix that failure yourself. Without a watch Crew wakes you every "
+            f"matches fail with a new failure: then fix that failure yourself, or, when it fails on master too, call "
+            f"`fix_pipeline` (Crew wakes you once master is fixed; your watch can't see master). If the goal is stuck "
+            f"on something neither you nor a code fix can change (your run was cancelled or superseded and the later run "
+            f"fails for another change, a stage a person must run, access you lack), first follow the newest run that "
+            f"contains your commit (`git merge-base --is-ancestor <yours> <run commit>`); if that is stuck too, call "
+            f"`decide` with blocked and say what a person must do: the card goes to Review, no more checks, and your "
+            f"watch still continues the step if it reaches done. Without a watch Crew wakes you every "
             f"{step.get('every', 30)} minutes. Up to {step.get('checks', 96)} checks, then a person takes over.")
 
 
@@ -160,17 +166,30 @@ def recheck_body(t: dict, step: dict) -> str:
     w = t.get("wait") or {}
     last = " ".join((w.get("last") or "").split())[:400]
     pr = w.get("probe") or {}
-    seen = (f"Your watch `{pr['cmd']}` woke you ({w.get('wake')}). It now prints:\n{pr.get('out') or '(nothing)'}\n\n"
-            if pr and w.get("wake") else "")
+    from . import fixes
+    if fixed := fixes.recheck_note(w):  # the fix run it waited on ended: follow the run that carries the fix
+        seen = fixed
+    elif w.get("wake") == "news":
+        seen = "News about what this card owns woke you: it is at the end of this message.\n\n"
+    else:
+        seen = (f"Your watch `{pr['cmd']}` woke you ({w.get('wake')}). It now prints:\n{pr.get('out') or '(nothing)'}\n\n"
+                if pr and w.get("wake") else "")
     if pr and w.get("wake") in ("failed", "output changed"):
-        seen += ("If a CI check or pipeline failed: open its run (the link above, or `gh pr checks <number>` for the links), "
+        seen += ("If a pipeline run failed and you only watch it (a deploy step), don't fix it yourself: when a code change "
+                 "must fix it, call the crew tool `fix_pipeline` with the reason (it starts a fix run, or joins one already "
+                 "fixing the same failure); when it is flaky or infrastructure, say so and wait for the next run. "
+                 "If a CI check or pipeline failed: open its run (the link above, or `gh pr checks <number>` for the links), "
                  "find the cause in its log, fix it on this same branch and push, then re-run what failed if the push does "
-                 "not re-run it (`gh run rerun <id> --failed`, or queue the Azure pipeline again). If review asked for "
+                 "not re-run it (`gh run rerun <id> --failed`, or queue the Azure pipeline again). If the same check fails on master "
+                 "too (not this PR's doing), don't fix it here and don't just wait: call `fix_pipeline` with the reason, or "
+                 "`join` a running Pipeline fix run (see crew_status); you are woken when the fix merges. If review asked for "
                  "changes, make them. Then end your turn with a short status: your watch keeps running.\n\n")
     return (f"Task #{t['id']}: check again ({w.get('checks', 0) + 1} of {step.get('checks', 96)}): {t['title']}\n\n"
             + seen + (f"Last time you reported: {last}\n\n" if last else "")
             + "Look at the current state. Goal reached: call `decide` with continue and summarize. Can never be reached: "
-              f"`decide` stop. Still waiting: end with one or two lines of status; your watch stays set (call `watch` "
+              f"`decide` stop. Stuck on something outside your change that a person must sort out (your run cancelled or superseded "
+              "and the newest run carrying your commit is stuck too, a stage someone must run): `decide` blocked, saying what "
+              "they must do. Still waiting: end with one or two lines of status; your watch stays set (call `watch` "
               f"again to change it), or without one Crew asks again in {step.get('every', 30)} min.")
 
 
@@ -259,18 +278,25 @@ def output(crew, run: dict) -> None:
 def decide(crew, p: dict) -> dict | None:
     src = crew.agents.get(p.get("from") or "")
     verdict, reason = p.get("verdict"), " ".join(str(p.get("reason") or "").split())[:300]
-    if verdict not in ("continue", "stop"):
-        return {"error": "verdict: continue or stop"}
+    if verdict not in ("continue", "stop", "blocked"):
+        return {"error": "verdict: continue, stop or blocked"}
     if not reason:
         return {"error": "say why in `reason`"}
     tk = crew._task(src["task"]) if src and src.get("task") else None
     if not tk or tk["col"] != "doing":
         return {"error": "decide works on the task you are running now"}
+    if verdict == "blocked" and not crew._until_step(tk):
+        return {"error": "blocked is for a ⟳ (check until done) step: use stop, or end your turn for review"}
     tk["decision"] = {"verdict": verdict, "reason": reason, "by": src["name"], "t": now()}
     ref = tk.get("run") or {}
     run = find_run(crew, ref.get("id"))
     if verdict == "stop" and run and run["status"] == "running" and run["tasks"][ref["step"]] == tk["id"]:
         run.update(status="stopped", ended=now(), note=f"step {ref['step'] + 1}: {src['name']} stopped it: {reason}")
+    if verdict == "blocked":
+        crew.event("decide", f"🚧 {src['name']} parked #{tk['id']}: {reason}", src["name"])
+        crew.touch()
+        return {"ok": True, "note": "applies when your turn ends: finish with a short summary. Your watch keeps running "
+                                    "and wakes you if it reaches `done`; a person decides otherwise."}
     crew.event("decide", f"{'⏹' if verdict == 'stop' else '→'} {src['name']} {'stopped' if verdict == 'stop' else 'passed'} "
                          f"#{tk['id']}: {reason}", src["name"])
     crew.touch()

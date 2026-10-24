@@ -300,6 +300,18 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .tag.refactor,.tag.spike{background:var(--accent-soft);color:var(--accent-ink)}
 .card .cta{margin-top:9px;display:flex;gap:6px}.card .cta.prb{flex-wrap:wrap}a.btn{text-decoration:none}
 .card.review{border-color:color-mix(in srgb,var(--blue) 28%,transparent)}
+.card.ready{border-color:color-mix(in srgb,var(--green) 55%,transparent);box-shadow:0 0 0 3px var(--green-soft)}
+a.mergecta{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border-radius:8px;text-decoration:none;font-size:12.5px;font-weight:600;
+  color:var(--green);background:var(--green-soft);border:1px solid color-mix(in srgb,var(--green) 45%,transparent);transition:background .15s,border-color .15s}
+a.mergecta:hover{background:color-mix(in srgb,var(--green) 20%,transparent);border-color:var(--green)}
+a.mergecta .pd{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none;box-shadow:0 0 0 0 color-mix(in srgb,var(--green) 60%,transparent);animation:ping 1.8s ease-out infinite}
+a.mergecta .mt{display:flex;flex-direction:column;min-width:0;line-height:1.25;white-space:nowrap}
+a.mergecta .sub{font-weight:500;font-size:11px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+a.mergecta .go{margin-left:auto;font-size:13px;opacity:.8}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--green) 55%,transparent)}80%,100%{box-shadow:0 0 0 7px transparent}}
+@media (prefers-reduced-motion:reduce){a.mergecta .pd{animation:none}}
+.stat.readyb{cursor:pointer;font-family:inherit;text-decoration:none;color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,transparent);background:var(--green-soft)}
+.stat.readyb b{color:var(--green)}.stat.readyb:hover{border-color:var(--green)}
 .card.doing .bar{height:2px;margin:10px -11px -10px;border-radius:0 0 var(--r) var(--r);background:linear-gradient(90deg,transparent,var(--green),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:sh 1.6s linear infinite}
 .empty{color:var(--faint);font-size:12px;text-align:center;padding:22px 8px;border:1px dashed var(--line);border-radius:var(--r)}
 
@@ -945,6 +957,42 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .stat.blockedb{cursor:pointer;color:var(--amber);border-color:color-mix(in srgb,var(--amber) 40%,transparent);background:var(--amber-soft);font-family:inherit}
 .stat.blockedb b{color:var(--amber)}
 .stat.blockedb:hover{border-color:var(--amber)}
+.stat.memb{cursor:pointer;font-family:inherit}.stat.memb:hover{border-color:var(--violet)}
+.newsb{font-size:11px;color:var(--teal)}
+.modal.memm{width:min(640px,calc(100vw - 32px))}
+.cbform{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
+.cbform label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+.cbform .wide{grid-column:1/-1}
+.cbform .cols{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12.5px;color:var(--text)}
+.cbform .cols label{flex-direction:row;align-items:center;gap:5px;color:var(--text)}
+.cbform .fr{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
+#cbList{flex-shrink:0;max-height:none}
+@media (max-width:760px){.cbform{grid-template-columns:1fr}}
+.memcard .do{font:11.5px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.memm .mh .memh{display:flex;align-items:center;gap:8px}
+.memm .memn{font:500 11px var(--mono);color:var(--violet);background:color-mix(in srgb,var(--violet) 14%,transparent);border-radius:999px;padding:1px 8px}
+.memintro{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.memintro code{font:11.5px var(--mono);background:var(--code-bg);border-radius:4px;padding:0 4px}
+.memlist{display:flex;flex-direction:column;gap:8px;max-height:min(50vh,440px);overflow:auto;margin:0 -4px;padding:0 4px}
+.memcard{position:relative;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg2);transition:border-color .12s}
+.memcard:hover{border-color:var(--line2)}
+.memcard.editing{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+.memcard .k{display:inline-block;max-width:calc(100% - 64px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top;font:11px var(--mono);color:var(--violet);background:color-mix(in srgb,var(--violet) 12%,transparent);border-radius:6px;padding:1px 7px}
+.memcard .x{margin:6px 0 5px;font-size:13px;font-weight:400;line-height:1.5;color:var(--text);overflow-wrap:anywhere}
+.memcard .m{font-size:11px;color:var(--faint)}
+.memcard .acts{position:absolute;top:7px;right:7px;display:flex;gap:4px;opacity:0;transition:opacity .12s}
+.memcard:hover .acts,.memcard:focus-within .acts,.memcard.editing .acts{opacity:1}
+@media (hover:none){.memcard .acts{opacity:1}}
+.memcard .acts .iconbtn{width:24px;height:24px}
+.memcard .acts .iconbtn.danger:hover{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
+.memempty{display:flex;flex-direction:column;align-items:center;gap:4px;padding:22px 12px;border:1px dashed var(--line2);border-radius:10px;color:var(--faint);font-size:12.5px;text-align:center}
+.memempty b{font-size:20px;font-weight:400}
+.memform{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);margin:2px -16px 0;padding:12px 16px 2px}
+.memfh{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600}
+.memfh .faint{font:400 11px var(--mono)}.memfh .over{color:var(--red)}
+textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow:auto}
+.memfr{display:flex;gap:8px;align-items:center}.memfr .field{flex:1;min-width:0}
+@media (max-width:760px){.memfr{flex-wrap:wrap}.memfr .field{flex-basis:100%}}
 .blkc{white-space:nowrap;display:inline-flex;align-items:center;gap:4px;font:10.5px var(--mono);color:var(--amber);background:var(--amber-soft);border-radius:5px;padding:1px 6px}
 .costc{font:10.5px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .holdb.red{color:var(--red);background:var(--red-soft)}
@@ -952,6 +1000,7 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
 .blocked .bh{font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:6px}
 .den{padding:8px 0;border-top:1px solid color-mix(in srgb,var(--amber) 20%,transparent)}
 .bgchip{font:600 10.5px var(--sans);padding:1px 7px;border-radius:999px;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);cursor:pointer;white-space:nowrap}
+.fixchip{font:600 11px var(--sans);padding:3px 8px;border-radius:999px;border:1px solid color-mix(in srgb,var(--amber) 40%,transparent);background:var(--amber-soft);color:var(--amber);white-space:nowrap}
 .bgchip:hover{background:color-mix(in srgb,var(--accent) 22%,transparent)}
 .bgbox{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;max-height:320px;overflow:auto}
 .bgbox .bh{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:4px}
@@ -1187,6 +1236,49 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   </div>
 </div>
 
+<div class="scrim" id="cbModal">
+  <div class="modal memm" role="dialog" aria-labelledby="cbTitle">
+    <div class="mh"><span class="memh" id="cbTitle">Card buttons <span class="memn" id="cbN"></span></span><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
+    <div class="mb">
+      <p class="memintro">Your own one-click actions on task cards. A button asks the card's agent to do something in the card's session (a skill like <code>/rebase {pr}</code>, or an instruction), starts a workflow on the card, or hands the card to another agent. The boss can add them too: ask it in the chat.</p>
+      <div class="memlist" id="cbList"></div>
+      <div class="cbform" id="cbForm">
+        <div class="memfh wide"><span id="cbFormTitle">Add a button</span></div>
+        <label>Label<input class="field" id="cbLabel" maxlength="30" placeholder="e.g. Rebase on master" autocomplete="off"></label>
+        <label>Icon (optional)<input class="field" id="cbIcon" maxlength="4" placeholder="e.g. ⤴" autocomplete="off"></label>
+        <label>When pressed<select class="field" id="cbKind"><option value="agent">Ask the card's agent</option><option value="workflow">Start a workflow on the card</option><option value="handoff">Hand the card to an agent</option></select></label>
+        <label id="cbWfL">Workflow<select class="field" id="cbWf"></select></label>
+        <label id="cbToL">To<select class="field" id="cbTo"></select></label>
+        <label class="wide" id="cbTextL"><span id="cbTextLbl">What it should do</span><textarea class="field mono" id="cbText" rows="2" maxlength="2000" placeholder="/rebase {pr}"></textarea>
+          <span class="faint" style="font-size:11px">Placeholders: {id} {title} {pr} {pipeline} {branch} {agent} {summary}</span></label>
+        <div class="wide"><span style="font-size:12px;color:var(--muted)">Shows on cards in</span><div class="cols" id="cbCols"></div></div>
+        <label>Only when the card<select class="field" id="cbHas"><option value="">has anything</option><option value="pr">has a PR</option><option value="no_pr">has no PR</option><option value="pipeline">follows a pipeline run</option></select></label>
+        <label>Agent<select class="field" id="cbAgent"></select></label>
+        <label class="wide">Agent tags (optional, comma separated: the card's agent needs one)<input class="field" id="cbTags" placeholder="e.g. release, ci" autocomplete="off"></label>
+        <label class="wide">Tooltip (optional)<input class="field" id="cbHint" maxlength="200" autocomplete="off"></label>
+        <div class="fr"><button class="btn ghost sm" data-cb-cancel hidden>Cancel</button><button class="btn primary sm" data-cb-save>Save button</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="memModal">
+  <div class="modal memm" role="dialog" aria-labelledby="memTitle">
+    <div class="mh"><span class="memh" id="memTitle">🧠 Crew memory <span class="memn" id="memN"></span></span><button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
+    <div class="mb">
+      <p class="memintro">Facts about this project that every agent reads when it starts a task. Agents add them with the <code>remember</code> tool as they learn; saving the same key replaces a fact, so correct one instead of adding another.</p>
+      <input class="field" id="memQ" placeholder="Filter facts" autocomplete="off" hidden>
+      <div class="memlist" id="memList"></div>
+      <div class="memform">
+        <div class="memfh"><span id="memFormTitle">Add a fact</span><span class="faint" id="memCount">0 / 400</span></div>
+        <textarea class="field" id="memText" rows="2" maxlength="400" placeholder="The rule and why, e.g. Deploys are confirmed by the ImageUri stage; partiallySucceeded is normal"></textarea>
+        <div class="memfr"><input class="field mono" id="memKey" maxlength="40" placeholder="key · made from the text if empty" autocomplete="off">
+          <button class="btn ghost sm" data-mem-cancel hidden>Cancel</button><button class="btn primary sm" data-mem-save>Save fact</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="scrim" id="blockedModal">
   <div class="modal" role="dialog" aria-label="Blocked tool calls">
     <div class="mh">Blocked tool calls<button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
@@ -1301,9 +1393,20 @@ function render() {
   $('#stats').innerHTML = `<div class="stat" title="Agents running now${queued ? ', tasks waiting in the backlog' : ''} and tasks waiting for your review"><span class="dot" style="background:${running ? 'var(--green)' : toReview ? 'var(--blue)' : 'var(--faint)'}"></span><span>${sum}</span>${subsLive ? ` <span class="subtag live" title="subagents running inside agents">${SUBI}${subsLive}</span>` : ''}</div>` +
     (running || S.boss?.status === 'running' || (S.runs || []).some(r => r.status === 'running') ? `<button class="stat stopall" data-stop-all aria-label="Stop all" title="Stop every running agent and workflow run. Sessions are kept; tasks wait on hold.">■<span class="sl"> Stop all</span></button>` : '') +
     (S.agents.some(a => a.status === 'paused') ? `<button class="stat resumeall" data-resume-all aria-label="Resume all" title="Let paused agents pick up work again">▶<span class="sl"> Resume</span></button>` : '') +
+    (() => {
+      const ready = S.tasks.filter(mergeReady), urls = [...new Set(ready.map(t => t.gh.url))];
+      if (!urls.length) return '';
+      const tip = ready.map(t => `PR #${t.gh.number} · #${t.id} ${t.title}`).join('\n');
+      return urls.length === 1
+        ? `<a class="stat readyb" href="${esc(urls[0])}" target="_blank" rel="noopener" title="Ready to merge on GitHub:\n${esc(tip)}">✓<b>1</b><span class="sl"> ready to merge</span></a>`
+        : `<button class="stat readyb" data-ready-merge title="Ready to merge on GitHub:\n${esc(tip)}">✓<b>${urls.length}</b><span class="sl"> ready to merge</span></button>`;
+    })() +
+    `<button class="stat memb" data-memory title="Crew memory: project facts every agent reads at the start of a task">🧠<b>${(S.facts || []).length}</b><span class="sl"> memory</span></button>` +
     (blockedAll().length ? `<button class="stat blockedb" data-blocked title="Tool calls the permission mode refused: allow or dismiss them">⛔<b>${blockedAll().length}</b><span class="sl"> blocked</span></button>` : '') +
     `<div class="stat tokstat" title="Tokens this session (input + cache reads + output), all agents${showCost && S.budget ? ` · spent today ${money(S.budget.day_spent)}` : ''}"><span class="dot" style="background:var(--violet)"></span><b class="tok">${fmtTok(S.agents.reduce((s, a) => s + tokTotal(a), 0))}</b>tokens${showCost ? ` · <b>${money(spend)}</b>` : ''}<button class="eye" data-toggle-cost title="${showCost ? 'Hide' : 'Show'} price" aria-label="${showCost ? 'Hide' : 'Show'} price">${showCost ? '$' : '<s>$</s>'}</button><button class="eye" data-budgets title="Budgets: stop a task or the day at a spend limit" aria-label="Budgets">▾</button></div>`;
   if ($('#blockedModal').classList.contains('on')) drawBlocked();
+  if ($('#memModal').classList.contains('on') && !$('#memModal').contains(document.activeElement)) drawMemory();
+  if ($('#cbModal').classList.contains('on')) drawCardBtns();
 
   const authErr = S.agents.find(a => /authenticat|login|OAuth/i.test(a.error || ''));
   const b = $('#banner'), notes = [];
@@ -1426,7 +1529,7 @@ function renderAlerts() {
   const box = $('#alerts'), live = (S.alerts || []).filter(x => x.status !== 'resolved');
   if (!live.length) { box.hidden = true; alertSig = ''; return; }
   const sig = JSON.stringify([live, view.alertsMin, view.alertsAll, view.alertOpen]);
-  if (sig === alertSig || box.contains(document.activeElement) && document.activeElement.tagName !== 'BUTTON') return;
+  if (sig === alertSig || box.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
   alertSig = sig;
   live.sort((a, b) => (a.status === 'ack') - (b.status === 'ack') || SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.last - a.last);
   const open = live.filter(x => x.status === 'open'), worst = open[0]?.severity;
@@ -1462,6 +1565,7 @@ $('#alerts').addEventListener('click', async e => {
   else if (d.alResolve) act('alert_resolve', {id: +d.alResolve});
   else if (d.alCard) { e.preventDefault(); const t = task(+d.alCard); if (t?.who) { view.drawer = {agent: t.who}; } else toast(`#${d.alCard} is in ${t ? t.col : 'no column'}`, 'var(--faint)'); }
   alertSig = ''; renderAlerts(); render();
+  if ('alMin' in d) $('#alerts [data-al-min]')?.focus();  // the header was redrawn: keep keyboard focus on it
 });
 $('#alerts').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-al-min]')) e.target.click(); });
 
@@ -1652,12 +1756,78 @@ const FWD = '<svg class="fwd" width="12" height="12" viewBox="0 0 24 24" fill="c
 const prOf = t => t.pr || t.prs?.at(-1) || '';
 const prLink = (t, sz = '') => { const u = prOf(t), n = (/\/pull(?:request)?\/(\d+)/i.exec(u) || [])[1];
   return `<a class="btn ${sz}" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">Open PR${n ? ' #' + n : ''} ↗</a>`; };
+// deploy agents (tagged deploy or cd) follow a pipeline run: their cards link the run instead of the PR
+const isDeploy = t => (agent(t.who)?.tags || []).some(x => x === 'deploy' || x === 'cd');
+const pipeOf = t => t.pipes?.at(-1) || '';
+const pipeLink = (t, sz = '') => { const u = pipeOf(t), n = (/(?:buildId=|\/runs\/)(\d+)/i.exec(u) || [])[1];
+  return `<a class="btn ${sz}" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(u)}">Open pipeline${n ? ' #' + n : ''} ↗</a>`; };
+// the card's link buttons: a deploy card's pipeline run (its PR only until a run is known), otherwise the PR and Address review
+const linkBtns = (t, sz = '') => isDeploy(t) ? (pipeOf(t) ? pipeLink(t, sz) : prOf(t) ? prLink(t, sz) : '') : prOf(t) ? prLink(t, sz) + addrevBtn(t, sz) : '';
+// a deploy watch whose pipeline failed hands the failure to a Pipeline fix run, then follows the run that carries the fix
+const fixRuns = () => (S.runs || []).filter(r => r.status === 'running' && r.source?.kind === 'pipeline_fix');
+function fixCta(t) {
+  const w = t.wait;
+  if (!t.run || !w || !['backlog', 'doing'].includes(t.col) || !(isDeploy(t) || prOf(t))) return '';
+  if (w.fixing) {
+    const r = (S.runs || []).find(x => x.id === w.fixing);
+    return `<span class="fixchip" title="Waiting for ⛓ ${esc(r?.name || 'Pipeline fix')} ${esc(w.fixing)}${r ? ': ' + esc(r.title) : ''}. No checks meanwhile; ${esc(t.who || 'its agent')} is woken when the fix merges or the run ends.">🛠 fixing · ${esc(w.fixing)}${r ? ` · step ${r.step + 1}/${r.steps.length}` : ''}</span>`;
+  }
+  const failed = w.wake === 'failed' || w.probe?.failed || (w.fix && w.fix.status !== 'done');
+  if (!failed) return '';
+  return `<button class="btn sm" data-pipefix="${t.id}" title="Hand the failed pipeline to the Pipeline fix workflow: find the cause, check nobody else fixed it, ship a PR, keep it green until it merges. This step waits, then follows the run that carries the fix.">🛠 Fix pipeline</button>`;
+}
+function openPipeFix(id) {
+  const t = task(id); if (!t) return;
+  const live = fixRuns();
+  askConfirm('Fix the pipeline?',
+    `<span style="display:block;margin-bottom:8px">${esc(t.who || 'The deploy agent')} stops checking #${t.id} while a fix run finds the cause, checks that nobody else has fixed it already, ships a PR and keeps it green until it merges. Then it follows the first pipeline run that carries the fix.</span>
+     ${live.length ? `<label style="display:block;margin-bottom:8px;font-size:12px">Fix run<select class="field" id="pfJoin" style="margin-top:4px"><option value="">Start a new fix run</option>${live.map(r => `<option value="${esc(r.id)}">Join ${esc(r.id)}: ${esc(r.title)} (step ${r.step + 1}/${r.steps.length})</option>`).join('')}</select></label>
+       <span class="faint" style="display:block;margin-bottom:8px;font-size:12px">Join when the same failure (a red master, say) is already being fixed, so it is fixed once.</span>` : ''}
+     <label style="display:block;font-size:12px">What failed (optional, the agent's report goes along)<textarea class="field" id="pfWhy" rows="2" style="margin-top:4px" placeholder="e.g. Ruff lint ISC004 in adapter.py blocks the deploy stage"></textarea></label>`,
+    'Fix pipeline', async () => {
+      const join = $('#pfJoin')?.value || '', reason = ($('#pfWhy')?.value || '').trim();
+      const r = await act('pipeline_fix', {task: id, reason, ...(join ? {join} : {})});
+      if (r.ok) toast(r.joined ? `#${id} waits for ${r.run}` : `Started ${r.run} to fix #${id}'s pipeline`, 'var(--accent)');
+    });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-pipefix]');
+  if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  openPipeFix(+b.dataset.pipefix);
+});
 const addrevOk = t => { const a = agent(t.who); return a && (!a.skill_names?.length || a.skill_names.includes('address-review')); };
 function addrevBtn(t, sz = '') {
-  if (!addrevOk(t) || (t.col === 'doing' && !t.reviewing)) return '';  // In progress only while it addresses the review
-  const a = agent(t.who), busy = t.reviewing && a.status === 'running';
+  if (!addrevOk(t) || (t.col === 'doing' && (!t.reviewing || t.acting))) return '';  // In progress only while it addresses the review
+  const a = agent(t.who), busy = t.reviewing && !t.acting && a.status === 'running';
   return `<button class="btn ${sz}" data-addrev="${t.id}" ${a.status === 'running' ? 'disabled' : ''} title="${busy ? `${esc(a.name)} is addressing the review` : a.status === 'running' ? `${esc(a.name)} is busy; try when it's done` : `Ask ${esc(a.name)} to run /address-review on ${esc(prOf(t))}: fetch the comments, fix, reply and resolve`}">${busy ? '<span class="spinner sm" aria-hidden="true"></span> Addressing review…' : '↻ Address review'}</button>`;
 }
+// card buttons you (or the boss) defined: crew.json "card_actions"; the server checks the same rule (card_actions.matches)
+const cardBtnOk = (b, t) => { const w = b.when, a = agent(t.who), pr = !!prOf(t);
+  return w.cols.includes(t.col) && !t.reviewing && (!w.agent || t.who === w.agent) && (!w.tags.length || (a?.tags || []).some(x => w.tags.includes(x)))
+    && ({'': true, pr, no_pr: !pr, pipeline: !!t.pipes?.length})[w.has]; };
+function cardBtns(t, sz = '') {
+  const a = agent(t.who), bs = S.card_actions || [];
+  if (t.acting) {  // one is running: show it busy while its turn lasts
+    const b = bs.find(x => x.id === t.acting);
+    return b ? `<button class="btn ${sz}" disabled title="${esc(t.who)} is on it"><span class="spinner sm" aria-hidden="true"></span> ${esc(b.label)}…</button>` : '';
+  }
+  return bs.filter(b => cardBtnOk(b, t)).map(b => {
+    const busy = b.do.kind === 'agent' && a?.status === 'running';
+    const what = b.do.kind === 'agent' ? `Ask ${t.who}: ${b.do.text}` : b.do.kind === 'workflow' ? `Start ⛓ ${(S.workflows || []).find(w => w.id === b.do.workflow)?.name || b.do.workflow} on this card` : `Hand this card to ${b.do.to}`;
+    return `<button class="btn ${sz}" data-cardbtn="${t.id}:${esc(b.id)}" ${busy ? 'disabled' : ''} title="${esc(busy ? `${t.who} is busy; try when it's done` : b.hint || what)}">${b.icon ? esc(b.icon) + ' ' : ''}${esc(b.label)}</button>`;
+  }).join('');
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-cardbtn]');
+  if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  const [tid, id] = b.dataset.cardbtn.split(':'), cb = (S.card_actions || []).find(x => x.id === id);
+  b.disabled = true;
+  const r = await act('card_button_run', {task: +tid, id});
+  if (r.ok) toast(r.agent ? `${cb?.label}: ${r.agent} is on #${tid}` : r.run ? `${cb?.label}: started ${r.run}` : `${cb?.label}: #${tid} handed on as #${r.task}`, 'var(--accent)');
+  else b.disabled = false;
+});
 async function addressReview(id) {
   const r = await act('address_review', {task: id});
   if (r.ok) { toast(`${task(id)?.who} is addressing the review on #${id}`, 'var(--accent)'); if (view.drawer?.review === id) view.drawer = {agent: task(id)?.who}; render(); }
@@ -1668,6 +1838,13 @@ function cardCost(t) {
     + (t.budget_hit ? '<span class="holdb red" title="This task reached its budget. Raise the budget to send it back or run it again.">budget reached</span>' : '')
     + (nb ? `<span class="blkc" title="${nb} tool call${nb > 1 ? 's were' : ' was'} refused: open the agent to allow ${nb > 1 ? 'them' : 'it'}">⛔ ${nb}</span>` : '')
     + (t.busy ? `<span class="holdb" title="Working in git">${esc(t.busy)}…</span>` : '');
+}
+// a PR GitHub says can be merged now (Crew checks every 2 minutes, read-only): merge it there, the card then moves on
+const mergeReady = t => !!(t.gh?.ready && ['backlog', 'doing', 'review'].includes(t.col));
+function mergeCta(t) {
+  const g = t.gh, why = g.review === 'APPROVED' ? 'approved, checks passing, no conflicts' : 'checks passing, no conflicts, no review required';
+  return `<a class="mergecta" href="${esc(g.url)}" target="_blank" rel="noopener" title="GitHub: PR #${g.number} is ${why}. Merge it on GitHub; this card follows the merge on its own.">
+    <span class="pd" aria-hidden="true"></span><span class="mt">Ready to merge<span class="sub">PR #${g.number} on GitHub</span></span><span class="go" aria-hidden="true">↗</span></a>`;
 }
 function card(t) {
   const who = t.who ? `<span class="who" title="${esc(t.who)}"><span class="mini" ${avPaint(t.who)}>${avFace(t.who, 11)}</span><span class="et">${esc(t.who)}</span></span>` : `<span class="who faint">anyone</span>`;
@@ -1682,7 +1859,10 @@ function card(t) {
     const stop = `<button class="btn sm danger" data-run-stop-card="${esc(runOf.id)}" title="End ⛓ ${esc(runOf.name)}: no more steps, and this step's agent stops working and checking">⏹ Stop workflow</button>`;
     cta = t.col === 'review' && cta ? cta.replace(/<\/div>$/, stop + '</div>') : cta + `<div class="cta">${stop}</div>`;
   }
-  if (prOf(t)) cta += `<div class="cta prb">${prLink(t, 'sm')}${addrevBtn(t, 'sm')}</div>`;
+  if (linkBtns(t, 'sm')) cta += `<div class="cta prb">${linkBtns(t, 'sm')}</div>`;
+  if (fixCta(t)) cta += `<div class="cta prb">${fixCta(t)}</div>`;
+  if (cardBtns(t, 'sm')) cta += `<div class="cta prb">${cardBtns(t, 'sm')}</div>`;
+  if (mergeReady(t)) cta = `<div class="cta">${mergeCta(t)}</div>` + cta;
   const owner = t.col === 'doing' && t.who ? S.agents.find(a => a.name === t.who) : null;
   const liveSubs = owner ? Object.keys(owner.subs || {}).length : 0;
   const subs = liveSubs ? `<span class="subtag live" title="${liveSubs} subagent${liveSubs > 1 ? 's' : ''} running">${SUBI}${liveSubs}</span>`
@@ -1690,13 +1870,13 @@ function card(t) {
   const hand = t.history?.length ? `<span class="handoff" title="Handed off ${t.history.length}x. Last hand-off went to ${esc(t.history[t.history.length - 1].who || 'another agent')}">${FWD}<span class="et">${esc(t.history[t.history.length - 1].who || '')}</span></span>` : '';
   const sending = view.sending?.[t.id];
   if (sending) cta = `<div class="sendl" role="status"><span class="spinner sm" aria-hidden="true"></span>${esc(sending)}</div>`;
-  return `<div class="card ${t.col}${sending ? ' sending' : ''}" draggable="true" tabindex="0" data-card="${t.id}" aria-label="#${t.id} ${esc(t.title)}, ${t.col}">
+  return `<div class="card ${t.col}${sending ? ' sending' : ''}${mergeReady(t) ? ' ready' : ''}" draggable="true" tabindex="0" data-card="${t.id}" aria-label="#${t.id} ${esc(t.title)}, ${t.col}">
     ${t.source ? `<div class="srcl" title="Created by trigger: ${esc(t.source.name)}">${BOLT}${esc(t.source.name)}</div>` : ''}
     ${t.run ? `<div class="srcl wfl" title="Workflow step">⛓ ${esc(t.run.name)} · step ${t.run.step + 1}/${t.run.n}</div>` : ''}
     <div class="th"><div class="t">${esc(t.title)}</div><span class="cbtns"><button class="kebab fwdb" data-fwd="${t.id}" title="Hand off: forward this task to another agent as a to-do, with this task's summary as context" aria-label="Hand off task #${t.id} to another agent" aria-haspopup="menu">${FWD}</button><button class="kebab" data-menu="${t.id}" title="Move, mark done or delete" aria-label="More actions for task #${t.id}" aria-haspopup="menu">⋮</button></span></div>
     ${t.details ? `<div class="d">${esc(t.details)}</div>` : ''}
     <div class="f"><span class="tag ${t.tag}">${t.tag}</span><span>#${t.id}</span>${adoChip(t.ado || t.source?.ado || adoRef(t))}${hand}${subs}${owner ? bgChip(owner, t.id) : ''}${cardCost(t)}${t.hold ? '<span class="holdb" title="Stopped. It waits here until you resume it or hand it to someone.">⏸ on hold</span>' : ''}${t.wait?.probe && t.col === 'backlog' ? `<span class="waitb" title="Watching: ${esc(t.wait.probe.cmd)}${t.wait.probe.done ? ' · done when it matches ' + esc(t.wait.probe.done) : ''}${t.wait.probe.fail ? ' · fix when it matches ' + esc(t.wait.probe.fail) : ''}&#10;Runs every 2 min. Its agent wakes ${t.wait.probe.fail ? 'on the goal or a new failure' : 'only when the output changes'}.&#10;Last output: ${esc((t.wait.probe.out || '').slice(0, 300))}">👁 ${t.wait.checks}${t.wait.wake ? ' · ' + esc(t.wait.wake) : t.wait.next ? ` · next <span data-until="${t.wait.next}">${untilTxt(t.wait.next)}</span>` : ''}</span>`
-  : t.wait?.next && t.col === 'backlog' ? `<span class="waitb" title="Waiting for its goal. Last check: ${esc((t.wait.last || '').slice(0, 300))}">⟳ ${t.wait.checks} · next <span data-until="${t.wait.next}">${untilTxt(t.wait.next)}</span></span>` : ''}${t.wait?.over && t.col === 'review' ? '<span class="waitb" title="Checked as many times as the step allows without reaching its goal: over to you">⟳ out of checks</span>' : ''}${t.decision ? `<span class="holdb${t.decision.verdict === 'stop' ? ' red' : ''}" title="${esc(t.decision.by)}: ${esc(t.decision.reason)}">${t.decision.verdict === 'stop' ? '⏹ stopped' : '→ passed'}</span>` : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
+  : t.wait?.next && t.col === 'backlog' ? `<span class="waitb" title="Waiting for its goal. Last check: ${esc((t.wait.last || '').slice(0, 300))}">⟳ ${t.wait.checks} · next <span data-until="${t.wait.next}">${untilTxt(t.wait.next)}</span></span>` : ''}${t.wait?.over && t.col === 'review' ? '<span class="waitb" title="Checked as many times as the step allows without reaching its goal: over to you">⟳ out of checks</span>' : ''}${t.news?.length ? `<span class="newsb" title="${esc(t.news.map(n => `${n.by}: ${n.text}`).join('\n'))}">📎 ${t.news.length} news</span>` : ''}${t.wait?.blocked && t.col === 'review' ? `<span class="holdb red" title="${esc(t.wait.blocked.by)}: ${esc(t.wait.blocked.reason)}. Approve to pass the step anyway, send back to retry, or stop the run. The watch keeps running and continues the step if it reaches its goal.">🚧 blocked</span>` : ''}${t.decision ? `<span class="holdb${t.decision.verdict === 'stop' ? ' red' : ''}" title="${esc(t.decision.by)}: ${esc(t.decision.reason)}">${t.decision.verdict === 'stop' ? '⏹ stopped' : '→ passed'}</span>` : ''}${t.handoff ? `<span class="hofrom" title="Handed off by ${esc(t.handoff.from)}${t.handoff.task ? ' from #' + t.handoff.task : ''}">${FWD}<span class="et">from ${esc(t.handoff.from)}</span></span>` : ''}${t.col === 'doing' && t.started ? `<span data-since="${t.started}">${ago(t.started)}</span>` : ''}${who}</div>
     ${cta}${t.col === 'doing' ? '<div class="bar"></div>' : ''}
   </div>`;
 }
@@ -1766,6 +1946,122 @@ function blockedBox(a) {
   const ds = a.denials || [];
   return ds.length ? `<div class="blocked"><div class="bh">Blocked · ${ds.length}</div>${ds.map(d => denialRow(a, d, false)).join('')}</div>` : '';
 }
+let memEditing = null;
+function drawMemory() {
+  const fs = S.facts || [], q = $('#memQ').value.trim().toLowerCase();
+  $('#memN').textContent = fs.length ? `${fs.length} / 50` : '';
+  $('#memQ').hidden = fs.length < 6;
+  const shown = q ? fs.filter(f => `${f.key} ${f.text} ${f.by}`.toLowerCase().includes(q)) : fs;
+  $('#memList').innerHTML = !fs.length
+    ? '<div class="memempty"><b>🧠</b>Nothing remembered yet.<span>Agents save facts here as they work things out, or add one below.</span></div>'
+    : !shown.length ? '<div class="memempty">No fact matches that filter.</div>'
+    : [...shown].reverse().map(f => `<div class="memcard${memEditing === f.key ? ' editing' : ''}">
+      <span class="k" title="${esc(f.key)}">${esc(f.key)}</span>
+      <div class="x">${esc(f.text)}</div>
+      <div class="m">${f.by === 'you' ? 'You' : esc(f.by)} · ${agoText(f.t)}${f.task ? ` · while on #${f.task}` : ''}</div>
+      <div class="acts"><button class="iconbtn" data-mem-edit="${esc(f.key)}" aria-label="Edit ${esc(f.key)}" title="Edit">✎</button><button class="iconbtn danger" data-mem-forget="${esc(f.key)}" aria-label="Forget ${esc(f.key)}" title="Forget">✕</button></div></div>`).join('');
+}
+function memForm(f) {
+  memEditing = f?.key || null;
+  $('#memText').value = f?.text || ''; $('#memKey').value = f?.key || ''; $('#memKey').readOnly = !!f;
+  $('#memFormTitle').textContent = f ? `Edit ${f.key}` : 'Add a fact';
+  $('[data-mem-save]').textContent = f ? 'Save changes' : 'Save fact';
+  $('[data-mem-cancel]').hidden = !f;
+  memCount(); drawMemory();
+  if (f) $('#memText').focus();
+}
+function memCount() {
+  const n = $('#memText').value.length;
+  $('#memCount').textContent = `${n} / 400`; $('#memCount').classList.toggle('over', n > 380);
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-ready-merge]')) return;
+  gotoTab('board');
+  const el = document.querySelector('.card.ready');
+  if (el) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.focus({preventScroll: true}); }
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-memory],[data-mem-save],[data-mem-edit],[data-mem-forget],[data-mem-cancel]');
+  if (!b) return;
+  const d = b.dataset;
+  if ('memory' in d) { $('#memQ').value = ''; memForm(null); $('#memModal').classList.add('on'); return setTimeout(() => $('#memText').focus(), 0); }
+  if ('memCancel' in d) return memForm(null);
+  if (d.memEdit) return memForm((S.facts || []).find(x => x.key === d.memEdit));
+  if (d.memForget) {
+    const r = await act('remember', {key: d.memForget, text: ''});
+    if (r.ok) { toast(`Forgot ${d.memForget}`, 'var(--faint)'); if (memEditing === d.memForget) memForm(null); }
+    return drawMemory();
+  }
+  const text = $('#memText').value.trim();
+  if (!text) return $('#memText').focus();
+  const r = await act('remember', {key: $('#memKey').value.trim(), text});
+  if (r.ok) { toast(`${r.replaced ? 'Updated' : 'Saved'} ${r.key}`, 'var(--accent)'); memForm(null); }
+});
+$('#memText').addEventListener('input', memCount);
+$('#memQ').addEventListener('input', drawMemory);
+$('#memText').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('[data-mem-save]').click(); } });
+$('#memKey').addEventListener('keydown', e => { if (e.key === 'Enter') $('[data-mem-save]').click(); });
+// ---- card buttons editor ---------------------------------------------------------------
+let cbEditing = null;
+const CB_COLS = [['backlog', 'To do'], ['doing', 'In progress'], ['review', 'Review'], ['done', 'Done']];
+const cbDoText = b => b.do.kind === 'agent' ? `asks the card's agent: ${b.do.text}` : b.do.kind === 'workflow' ? `starts ⛓ ${(S.workflows || []).find(w => w.id === b.do.workflow)?.name || b.do.workflow + ' (deleted)'}`
+  : `hands the card to ${b.do.to}${b.do.tag ? ' (' + b.do.tag + ')' : ''}${b.do.text ? ': ' + b.do.text : ''}`;
+const cbWhenText = b => { const w = b.when; return `on ${w.cols.map(c => CB_COLS.find(x => x[0] === c)?.[1] || c).join(', ')} cards` + (w.agent ? ` of ${w.agent}` : '') + (w.tags.length ? ` (tags ${w.tags.join(', ')})` : '')
+  + ({'': '', pr: ' with a PR', no_pr: ' without a PR', pipeline: ' following a pipeline'})[w.has]; };
+function drawCardBtns() {
+  const bs = S.card_actions || [];
+  $('#cbN').textContent = bs.length ? `${bs.length}` : '';
+  $('#cbList').innerHTML = !bs.length ? '<div class="memempty"><b>⊕</b>No card buttons yet.<span>Add one below, or ask the boss: "add a Rebase button on cards with a PR".</span></div>'
+    : bs.map(b => `<div class="memcard${cbEditing === b.id ? ' editing' : ''}">
+      <span class="k">${b.icon ? esc(b.icon) + ' ' : ''}${esc(b.label)}</span>
+      <div class="x do">${esc(cbDoText(b))}</div>
+      <div class="m">${esc(cbWhenText(b))}</div>
+      <div class="acts"><button class="iconbtn" data-cb-edit="${esc(b.id)}" aria-label="Edit ${esc(b.label)}" title="Edit">✎</button><button class="iconbtn danger" data-cb-del="${esc(b.id)}" aria-label="Delete ${esc(b.label)}" title="Delete">✕</button></div></div>`).join('');
+}
+function cbKind() {
+  const k = $('#cbKind').value;
+  $('#cbWfL').hidden = k !== 'workflow'; $('#cbToL').hidden = k !== 'handoff'; $('#cbTextL').hidden = k === 'workflow';
+  $('#cbTextLbl').textContent = k === 'agent' ? 'What the agent should do (a /skill or an instruction)' : 'Note for the new task (optional)';
+  $('#cbText').placeholder = k === 'agent' ? '/rebase {pr}' : 'e.g. Check {pr} for security issues';
+}
+function cbForm(b) {
+  cbEditing = b?.id || null;
+  const opt = (v, l, cur) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`;
+  $('#cbLabel').value = b?.label || ''; $('#cbIcon').value = b?.icon || ''; $('#cbHint').value = b?.hint || '';
+  $('#cbKind').value = b?.do.kind || 'agent'; $('#cbText').value = b?.do.text || '';
+  $('#cbWf').innerHTML = (S.workflows || []).map(w => opt(w.id, w.name, b?.do.workflow)).join('') || '<option value="">No workflows yet</option>';
+  $('#cbTo').innerHTML = opt('auto', 'Auto: by tag', b?.do.to) + S.agents.map(a => opt(a.name, a.name, b?.do.to)).join('');
+  $('#cbAgent').innerHTML = opt('', 'Any agent', b?.when.agent || '') + S.agents.map(a => opt(a.name, a.name, b?.when.agent)).join('');
+  $('#cbHas').value = b?.when.has || '';
+  $('#cbTags').value = (b?.when.tags || []).join(', ');
+  const cols = b?.when.cols || ['review', 'done'];
+  $('#cbCols').innerHTML = CB_COLS.map(([v, l]) => `<label><input type="checkbox" value="${v}" ${cols.includes(v) ? 'checked' : ''}>${l}</label>`).join('');
+  $('#cbFormTitle').textContent = b ? `Edit ${b.label}` : 'Add a button';
+  $('[data-cb-save]').textContent = b ? 'Save changes' : 'Save button';
+  $('[data-cb-cancel]').hidden = !b;
+  cbKind(); drawCardBtns();
+  if (b) $('#cbLabel').focus();
+}
+function openCardBtns() { cbForm(null); $('#cbModal').classList.add('on'); setTimeout(() => $('#cbLabel').focus(), 0); }
+$('#cbKind').addEventListener('change', cbKind);
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-cb-save],[data-cb-edit],[data-cb-del],[data-cb-cancel]');
+  if (!b) return;
+  const d = b.dataset;
+  if ('cbCancel' in d) return cbForm(null);
+  if (d.cbEdit) return cbForm((S.card_actions || []).find(x => x.id === d.cbEdit));
+  if (d.cbDel) {
+    const r = await act('card_button_delete', {id: d.cbDel});
+    if (r.ok && cbEditing === d.cbDel) cbForm(null);  // the feed's event says it was deleted
+    return;
+  }
+  const kind = $('#cbKind').value;
+  const r = await act('card_button_save', {id: cbEditing || '', label: $('#cbLabel').value, icon: $('#cbIcon').value, hint: $('#cbHint').value,
+    when: {cols: [...$('#cbCols').querySelectorAll('input:checked')].map(x => x.value), has: $('#cbHas').value, agent: $('#cbAgent').value,
+           tags: $('#cbTags').value.split(',').map(x => x.trim()).filter(Boolean)},
+    do: {kind, text: $('#cbText').value, workflow: $('#cbWf').value, to: $('#cbTo').value}});
+  if (r.ok) cbForm(null);  // the feed's event says it was saved
+});
 function drawBlocked() {
   const rows = S.agents.filter(a => (a.denials || []).length).map(a => a.denials.map(d => denialRow(a, d, true)).join('')).join('');
   $('#blockedList').innerHTML = rows || '<div class="empty">Nothing is blocked.</div>';
@@ -2125,7 +2421,7 @@ async function openPr(id) {
 function reviewBarHtml(t) {
   const w = t.who, a = agent(w);
   if (t.col === 'review') return `${t.decision?.verdict === 'continue' ? `<div class="rstate"><span>→ ${esc(t.decision.by)} says <b>go on</b>: ${esc(t.decision.reason)}. Approve to start the next step.</span></div>` : ''}<div class="inputwrap"><textarea id="fb" rows="1" placeholder="Feedback for ${esc(w)} if you send it back…"></textarea></div>
-      <div class="acts"><button class="btn green" data-approve="${t.id}" ${t.busy ? 'disabled' : ''}>✓ Approve &amp; commit <kbd>A</kbd></button><button class="btn" data-reject="${t.id}" ${t.busy ? 'disabled' : ''}>↺ Send back</button>${prOf(t) ? prLink(t) + addrevBtn(t) : ''}<button class="btn ghost" data-fwd="${t.id}" title="Hand off to another agent" aria-label="Hand off to another agent">⋮</button></div>`;
+      <div class="acts"><button class="btn green" data-approve="${t.id}" ${t.busy ? 'disabled' : ''}>✓ Approve &amp; commit <kbd>A</kbd></button><button class="btn" data-reject="${t.id}" ${t.busy ? 'disabled' : ''}>↺ Send back</button>${linkBtns(t)}${cardBtns(t)}<button class="btn ghost" data-fwd="${t.id}" title="Hand off to another agent" aria-label="Hand off to another agent">⋮</button></div>`;
   const me = t.merge_error, st = t.merged ? `<span>✓ <b>Merged</b> into ${esc(t.merged.into || 'the base branch')} · ${esc(t.merged.commit)}</span>`
     : prOf(t) ? `<span>PR open: <a href="${esc(prOf(t))}" target="_blank" rel="noopener">${esc(prOf(t))}</a></span>` : t.commit ? '<span><b>Not merged</b> yet</span>' : '<span>Nothing to commit: no file changes</span>';
   const conflict = me?.files?.length ? `<div class="cflict">Merging into <b>${esc(me.base)}</b> hit conflicts, so nothing was changed. Conflicting files:<br>${me.files.map(f => `<code>${esc(f)}</code>`).join(' ')}
@@ -2133,11 +2429,11 @@ function reviewBarHtml(t) {
   if (t.decision) { const dc = t.decision; return `<div class="rstate"><span>${dc.verdict === 'stop' ? '⏹ <b>Stopped</b>' : '→ <b>Passed on</b>'} by ${esc(dc.by)}: ${esc(dc.reason)}</span></div>`; }
   const can = t.commit && !t.merged;
   return `<div class="rstate"><span>✓ <b>Approved</b>${t.commit ? ` · commit ${esc(t.commit)}${a?.branch ? ' on ' + esc(a.branch) : ''}` : ''}</span>${st}</div>${conflict}
-      <div class="acts">${can ? `<button class="btn green" data-merge="${t.id}" ${t.busy ? 'disabled' : ''}>${t.busy === 'merge' ? 'Merging…' : 'Merge into current branch'}</button>${prOf(t) ? '' : `<button class="btn" data-openpr="${t.id}" ${t.busy ? 'disabled' : ''} title="Push the branch and open a pull request">${t.busy === 'open_pr' ? 'Opening…' : 'Create PR'}</button>`}` : ''}${prOf(t) ? prLink(t) + addrevBtn(t) : ''}${t.commit_full && !t.merged && !prOf(t) ? `<button class="btn ghost" data-undo="${t.id}" style="margin-left:auto">↶ Undo approval</button>` : ''}</div>`;
+      <div class="acts">${can ? `<button class="btn green" data-merge="${t.id}" ${t.busy ? 'disabled' : ''}>${t.busy === 'merge' ? 'Merging…' : 'Merge into current branch'}</button>${prOf(t) ? '' : `<button class="btn" data-openpr="${t.id}" ${t.busy ? 'disabled' : ''} title="Push the branch and open a pull request">${t.busy === 'open_pr' ? 'Opening…' : 'Create PR'}</button>`}` : ''}${linkBtns(t)}${cardBtns(t)}${t.commit_full && !t.merged && !prOf(t) ? `<button class="btn ghost" data-undo="${t.id}" style="margin-left:auto">↶ Undo approval</button>` : ''}</div>`;
 }
 function renderReviewDrawer(d, t) {
   if (!t || (t.col !== 'review' && t.col !== 'done')) { view.drawer = null; return renderDrawer(); }
-  const key = [t.id, t.col, t.commit, t.merged?.commit, t.pr, t.merge_error?.at, t.merge_error?.sent, t.busy, t.diff?.pending, t.reviewing, agent(t.who)?.status].join(':');
+  const key = [t.id, t.col, t.commit, t.merged?.commit, t.pr, t.merge_error?.at, t.merge_error?.sent, t.busy, t.diff?.pending, t.reviewing, t.acting, JSON.stringify(S.card_actions || []), agent(t.who)?.status].join(':');
   if (d.querySelector('[data-shell="review"]')?.dataset.key === key) return; // keep typed feedback
   const diff = t.diff || {}, files = diffFiles(diff.patch);
   const add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0), tn = testsNote(t);
@@ -2156,7 +2452,7 @@ function renderReviewDrawer(d, t) {
   $('#fb')?.addEventListener('input', autosize);
 }
 
-const FEED_COLOR = {decide:'var(--accent)',alert:'var(--red)',handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)',blocked:'var(--amber)',budget:'var(--red)'};
+const FEED_COLOR = {memory:'var(--violet)',decide:'var(--accent)',alert:'var(--red)',handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)',blocked:'var(--amber)',budget:'var(--red)'};
 function renderFeed() {
   const f = S.feed;
   const last = f.length ? f[f.length - 1].t : 0;
@@ -3618,6 +3914,7 @@ $('#hMenu').onclick = e => {
   let h = '';
   if (['localhost', '127.0.0.1'].includes(location.hostname)) h += item('Open on phone…', openLan, {sub: 'Scan a code from a phone on the same Wi-Fi'}) + '<div class="sep"></div>';
   if (matchMedia('(max-width:760px)').matches && (view.tab || 'board') === 'board') h += item('Clear board…', () => setTimeout(() => clearMenu($('#hMenu'))), {sub: 'Remove finished or all tasks'}) + '<div class="sep"></div>';
+  h += item('Card buttons…', openCardBtns, {sub: 'Your own one-click actions on task cards'}) + '<div class="sep"></div>';
   h += '<div class="mh">Agents</div>' + item('Export agents…', () => openIO('export'), {sub: 'Save all or some agents as a JSON file'}) +
     item('Import agents…', () => openIO('import'), {sub: 'Add agents from an exported file'}) + '<div class="sep"></div>';
   h += '<div class="mh">Workflows</div>' + item('Export workflows…', () => openIO('export', 'workflows'), {sub: 'Steps, gates and output as a JSON file'}) +

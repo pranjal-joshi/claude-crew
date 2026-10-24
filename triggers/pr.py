@@ -158,8 +158,15 @@ def crew_prs(crew) -> tuple[set[str], set[str]]:
     """(PR links Crew knows, agent branches). Lock held."""
     links = {norm(u) for t in crew.tasks for u in [t.get("pr"), *(t.get("prs") or [])] if u}
     links |= {norm((r.get("source") or {}).get("pr") or "") for r in crew.runs if r["status"] == "running"} - {""}
+    links |= {norm(u) for u in [*crew._pr_wait, *crew._pr_had]}  # cards' links still being checked (after a restart)
     branches = {a["branch"] for a in crew.agents.values() if a.get("branch")}
     return links, branches
+
+
+def owned_by(crew, pr: dict) -> dict | None:
+    """The open card that already owns this PR, if any. Lock held."""
+    from workflows import owners
+    return owners.owner(crew, {owners.pr_key(pr["url"])})
 
 
 def is_crews(pr: dict, links: set[str], branches: set[str]) -> bool:
@@ -205,9 +212,10 @@ class Pr(Trigger):
             return {"error": str(e)}
         with crew.lock:
             links, branches = crew_prs(crew)
-        since = now()  # a trigger made now starts nothing that already happened
-        items = [{"number": x["number"], "title": x["title"], "url": x["url"], "draft": x["draft"],
-                  "why": why_not(x, sp, links, branches, since) or "would start"} for x in prs]
+            since = now()  # a trigger made now starts nothing that already happened
+            items = [{"number": x["number"], "title": x["title"], "url": x["url"], "draft": x["draft"],
+                      "why": why_not(x, sp, links, branches, since) or (f"news for #{o['id']}" if (o := owned_by(crew, x)) else "would start")}
+                     for x in prs]
         return {"ok": True, "total": len(items), "items": items[:25]}
 
     @staticmethod
@@ -220,6 +228,10 @@ class Pr(Trigger):
                    + (f" · {pr['repo']}" if pr.get("repo") else "") + (f"\nMerged into {pr['base']}." if done else "\nOpened outside Crew.")
                    + (f"\n\n{pr['body']}" if pr["body"].strip() else ""))
         source = {"trigger": tr["id"], "name": tr["name"], "pr": pr["url"]} | ({"merged": True} if done else {})
+        from workflows import owners
+        if o := owned_by(crew, pr):  # an open card already owns this PR: it gets the news, nothing new starts
+            owners.attach(crew, o, f"PR #{pr['number']} {'merged into ' + pr['base'] if done else 'was raised'} ({pr['url']})", tr["name"])
+            return f"news for #{o['id']}"
         if (w := crew._workflow(sp.get("workflow"))) is not None:
             run = crew._start_run(w, title, details, source=source)
             crew.event("trigger", f"⚡ {tr['name']} → ⛓ {w['name']}: {title}")

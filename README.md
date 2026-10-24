@@ -74,7 +74,7 @@ Crew gives that queue a home:
 
 ## The boss
 
-A chat bar at the bottom (<kbd>/</kbd>) talks to the **boss**: a Claude session that runs the crew instead of writing code. Ask it to "plan and build CSV export, then have it tested and reviewed" and it creates tasks, assigns agents, starts workflows, messages or stops agents, and adds triggers, through a small set of crew tools (`crew_mcp.py`). Switch the chat to any agent to talk to it directly.
+A chat bar at the bottom (<kbd>/</kbd>) talks to the **boss**: a Claude session that runs the crew instead of writing code. Ask it to "plan and build CSV export, then have it tested and reviewed" and it creates tasks, assigns agents, starts workflows, messages or stops agents, adds triggers and card buttons, through a small set of crew tools (`crew_mcp.py`). Switch the chat to any agent to talk to it directly.
 
 Type <kbd>/</kbd> in the chat bar (or in an agent's message box) for a picker of commands and skills: Crew's own `/clear` `/compact` `/stop`, plus that agent's Claude Code slash commands and skills with their descriptions. <kbd>↑</kbd><kbd>↓</kbd> to move, <kbd>Tab</kbd> or <kbd>Enter</kbd> to pick, <kbd>Esc</kbd> to close.
 
@@ -104,6 +104,8 @@ Nine agents, one per stage of the delivery loop. Each owns a few tags, so an una
 ## Workflows
 
 The **Workflows** tab (<kbd>W</kbd>) chains agents in a fixed order. Run one with a goal, and step 1's task is created. When a step is done, the next step's task is created with the earlier steps' summaries and an instruction to merge the previous agent's branch, so each agent builds on real work.
+
+**Fix a broken pipeline.** When a deploy watch (a ⟳ step whose agent is tagged `deploy` or `cd`) sees its pipeline run fail, its card shows **🛠 Fix pipeline**, and the agent can ask for the same with the crew tool `fix_pipeline`. That starts the *Pipeline fix* workflow, made from your crew's tags the first time (a fixer tagged `bug`, a shipper tagged `release` or `chore`, a CI agent tagged `ci` or `review`; edit it in Workflows like any other): the fixer finds the cause in the run's log, the shipper opens a PR linked to the same work item, and the CI agent keeps it green until it merges. Each step first looks for a fix someone else already shipped (open and merged PRs, branches, master) and reuses it or stops. The deploy watch waits meanwhile without checking, then wakes to follow the first run that carries the fix. A second watch blocked by the same failure can join the running fix instead of starting another. A PR's CI watch does the same when its check fails on master too (not the PR's doing): it calls `fix_pipeline` instead of waiting on a master its watch can't see, and once the fix merges it brings master into its branch and carries on.
 
 **Restart a run.** ↻ on a workflow's frame on the board restarts the whole run (with the workflow's steps as they are now) or restarts from any step whose earlier steps finished; those keep their results and the restarted step reads them. The open step stops, and every restarted step is a new task, so each agent starts on a fresh session. Earlier cards stay in Done. It works on running, stopped and finished runs.
 
@@ -137,6 +139,16 @@ The **Output** block decides what a finished run delivers:
 
 A finished task lands in **Review** as a decision sheet: a verdict line, **Approve & commit** pinned at the bottom, the diff collapsed per file, and **Send back** beside it. Press <kbd>A</kbd> to approve; an undo toast lets you take it back. Once approved, **Merge into current branch** merges it in one click, or **Open PR** uses `gh` when the repo has a remote. On a conflict Crew lists the files and offers to send the task back to the agent. Done cards show merged or not merged.
 
+**Card buttons.** Add your own one-click actions to task cards from the header **⋮** menu, **Card buttons…**, or ask the boss ("add a *Rebase* button on cards with a PR that runs /rebase in that agent"). A button shows on the cards that match it (columns, the agent or its tags, has a PR, no PR, or follows a pipeline run) and, pressed, does one of three things:
+
+| Kind | What it does |
+| --- | --- |
+| Ask the card's agent | Sends a skill or an instruction to the card's agent, in the card's own session, e.g. `/rebase {pr}`. The card is In progress until the turn ends, then goes back. |
+| Start a workflow | Runs a workflow with the card's title as its goal and its PR, pipeline run and summary in the brief. |
+| Hand off | Gives the card to another agent (or `auto` by tag) as a new task, with a note, the PR and the summary. |
+
+Text can use `{id}`, `{title}`, `{pr}`, `{pipeline}`, `{branch}`, `{agent}` and `{summary}`. Buttons run no shell commands themselves, which is why the boss may create them (crew tools `set_card_button` and `delete_card_button`); only you press them. They are saved in `crew.json` under `card_actions`.
+
 Every card shows its cost. Set a **per-task** and a **per-day** budget (click the tokens/$ stat). A task that hits its budget is flagged and can't be sent back; a spent day budget stops running agents until the next local day or a higher budget.
 
 ## Stop, kill, clear
@@ -147,6 +159,10 @@ Every card shows its cost. Set a **per-task** and a **per-day** budget (click th
 - **Clear chat** (red button, top right of an open boss or agent chat) wipes that conversation and empties its context: the next message starts a fresh session.
 
 Give each agent an icon (two dozen dev line icons) and a colour in its settings; the glyph switches between black and white to stay readable. Every agent and every card has a **⋮** menu at its top right: rename, settings, stop, kill or delete an agent; move, mark done or delete a card. The forward button next to a card's ⋮ hands it to an agent (or lets the boss pick), and hand-offs show the same arrow with who it went to. Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
+
+**Crew memory.** Agents save what they work out about your project with the crew tool `remember`: how a deploy is confirmed, which pipeline steps are non-blocking, who owns what. Every agent reads these facts when it starts a task. A fact has a key, so saving the same key corrects it instead of adding another. The 🧠 chip in the header lists them, and you can add, edit or forget them there.
+
+**One card per PR or work item.** When an open card is already about a PR or a work item, news about it (the PR merged, a pipeline run carrying it finished, an alert about it) goes to that card, 📎, instead of starting new work. A waiting ⟳ card wakes up to read it.
 
 **Alerts.** Any agent can raise an alert with the `raise_alert` crew tool when it finds something failing that you must see now: a failed deployment, a red pipeline on the main branch, an outage, expired access. Open alerts show in a strip above the board, worst first; turn one into an incident task, acknowledge it, or resolve it. Raising the same alert again bumps its count instead of adding a copy, and the agent resolves it when things recover. Crew raises its own when a trigger's check fails or the daily budget is reached.
 
@@ -220,6 +236,7 @@ At most 10 items start per check, and closed, done and removed items are skipped
 | 🪢 **Subagents, visible** | When an agent fans out to subagents, you see each one live on the agent card, a count on the task, and a labelled thread in the transcript. |
 | 🌳 **Worktree isolation** | One worktree and branch per agent, kept even if the worktree folder goes missing. |
 | 🔍 **Review gate** | A decision sheet: summary, verdict line and per-file diff. Approve and commit (<kbd>A</kbd>, with undo), send back, or hand off. |
+| 🔘 **Card buttons** | Your own one-click actions on task cards: run a skill in the card's agent, start a workflow, or hand off. Add them in the UI or ask the boss. |
 | 🔀 **Merge or PR** | One click merges an approved branch, or opens a PR with `gh`. Conflicts are listed and can go back to the agent. |
 | 🚫 **Blocked inbox** | Tool calls the permission mode refused are listed: Allow & retry, Allow once, or Dismiss. |
 | 💲 **Budgets** | Cost on every card, plus a per-task and a per-day budget that stops runs. |

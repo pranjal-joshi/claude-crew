@@ -195,6 +195,11 @@ class Pipeline(Trigger):
                       + (" …" if len(items) > 60 else "")]
         details = "\n".join(lines)
         source = {"trigger": tr["id"], "name": tr["name"], "kind": "pipeline", "run": run["id"], "url": run["url"]} | ({"ado": ado} if ado else {})
+        from workflows import owners
+        for x in mine:  # cards that own your work items in this run hear about it, whatever starts below
+            if o := owners.owner(crew, {f"ab:{x['id']}"}):
+                owners.attach(crew, o, f"{run['pipeline']} run {run.get('number') or run['id']} {said} on {run['branch'] or '?'}, "
+                                       f"carrying AB#{x['id']}: {run['url']}", tr["name"])
         if (w := crew._workflow(sp.get("workflow"))) is not None:
             r = crew._start_run(w, title, details, source=source)
             crew.event("trigger", f"⚡ {tr['name']} → ⛓ {w['name']}: {title}")

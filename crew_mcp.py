@@ -38,7 +38,8 @@ TOOLS = [
          "deployment or rollout, a red pipeline on the main branch, an outage or error spike, a security problem, a blocked "
          "dependency or expired access. severity: critical (users affected or prod down), warning (needs attention soon) or "
          "info. Put the evidence in `details` (what failed, where, since when, the query or log line) and a URL in `link` if "
-         "there is one. Raising the same title again updates the open alert (count, details) instead of adding a copy. "
+         "there is one; for a red pipeline, the failed run's link: Crew then resolves the alert itself once a later run of "
+         "that pipeline on the same branch succeeds. Raising the same title again updates the open alert (count, details) instead of adding a copy. "
          "Not for your own task's normal progress or test failures you are fixing.",
          {"title": S, "severity": {"type": "string", "enum": ["critical", "warning", "info"]}, "details": S, "link": S},
          ["title", "severity"]),
@@ -51,11 +52,30 @@ TOOLS = [
          "regex with a new failure (e.g. FAILED|CHANGES_REQUESTED: print each failed check's link so you can fix it); with "
          "no `fail`, any change wakes you. Print only what matters (no timestamps). Empty command removes the watch.",
          {"command": S, "done": S, "fail": S}, ["command"]),
+    tool("fix_pipeline", "On a ⟳ step blocked by a pipeline failure only a code change fixes (lint, a build or test error): "
+         "a deploy step whose run failed, or a PR step whose check fails on master too (not this PR's doing). Hands it to "
+         "Crew's Pipeline fix workflow, which finds the cause, checks that nobody else has fixed it already, ships a PR and "
+         "keeps it green until it merges. Your step waits meanwhile (no checks) and you are woken when the fix run ends: a "
+         "deploy step follows the first run that carries the fix, a PR step brings master into its branch. Not for flaky "
+         "or infrastructure failures. `reason`: what failed, where, and why code must change. `join`: the id of a running "
+         "Pipeline fix run (see crew_status) already fixing the same failure, instead of starting another.",
+         {"reason": S, "join": S}, ["reason"]),
     tool("decide", "Gate the task you are running: should this work go ahead? verdict 'continue': your task closes "
          "without review and, in a workflow, the next step starts with your summary (outside a workflow, hand the work on "
          "with the handoff tool first). verdict 'stop': your task closes marked stopped and the workflow run ends here; "
-         "nothing else starts. `reason` is one line shown on the card. Call it once, last, then end with your summary.",
-         {"verdict": {"type": "string", "enum": ["continue", "stop"]}, "reason": S}, ["verdict", "reason"]),
+         "nothing else starts. verdict 'blocked' (⟳ steps only): the goal is stuck on something outside your change "
+         "that you can't fix (a cancelled or superseded run, another change's failure, a stage a person must run): the "
+         "card goes to Review for a person, with no more checks, and your watch still continues the step if it reaches "
+         "done. `reason` is one line shown on the card: for blocked, what a person must do. Call it once, last, then end "
+         "with your summary.",
+         {"verdict": {"type": "string", "enum": ["continue", "stop", "blocked"]}, "reason": S}, ["verdict", "reason"]),
+    tool("remember", "Save a fact about this project that teammates need in later tasks, in Crew's shared memory: every "
+         "agent reads it when it starts a task. For durable truths you had to work out: how a deploy is confirmed, which "
+         "pipeline steps are non-blocking or skipped by design, where config lives, who owns what, a recurring gotcha. "
+         "Not task progress or anything one task needs. `text`: one fact, the rule and why, under 400 characters. `key`: "
+         "a short slug (e.g. deploy-confirmed-by); saving the same key replaces that fact, so correct an outdated one "
+         "instead of adding another. Empty `text` with a `key` forgets it.",
+         {"text": S, "key": S}, []),
     tool("create_task", "Add a task to the board. Leave `agent` empty to let tags route it. `title` is what people read on the card: about 6 plain words saying what to do (\"Fix login timeout on upload\"), no links or long IDs (AB#123 is fine); put everything else in `details`.",
          {"title": S, "details": S, "tag": S, "agent": S}, ["title"], boss=True),
     tool("assign_task", "Give an existing task (any column) to an agent as a to-do.", {"task": I, "agent": S}, ["task", "agent"], boss=True),
@@ -75,6 +95,21 @@ TOOLS = [
          "{kind: webhook, url}, or {kind: workflow, workflow: id} (start another workflow with the same goal).",
          {"id": S, "name": S, "description": S, "steps": {"type": "array", "items": STEP}, "output": {"type": "object"}},
          ["name", "steps"], boss=True),
+    tool("set_card_button", "Add a button to the board's task cards, or replace one with the same `label` (or `id`). It shows on "
+         "cards that match `when` and, pressed by the user, does `do`. when: {tags: [agent tags; the card's agent must have one], "
+         "cols: [backlog|doing|review|done, default review and done], has: ''|pr|no_pr|pipeline, agent: one agent's name}. "
+         "do: {kind: agent, text} asks the card's own agent, in the card's session, e.g. '/rebase {pr}' to run a skill it has "
+         "or a plain instruction; {kind: workflow, workflow: id or name} starts that workflow on the card; {kind: handoff, "
+         "to: agent name or auto, tag, text} gives the card to another agent as a new task. `text` may use {id}, {title}, "
+         "{pr}, {pipeline}, {branch}, {agent} and {summary}. `icon`: one emoji; `hint`: the tooltip. Buttons run no shell "
+         "commands themselves. Prefer an existing skill or workflow over a long instruction.",
+         {"id": S, "label": S, "icon": S, "hint": S,
+          "when": {"type": "object", "properties": {"tags": {"type": "array", "items": S}, "cols": {"type": "array", "items": S},
+                                                    "has": S, "agent": S}},
+          "do": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["agent", "workflow", "handoff"]},
+                                                  "text": S, "workflow": S, "to": S, "tag": S}, "required": ["kind"]}},
+         ["label", "do"], boss=True),
+    tool("delete_card_button", "Remove a card button by its id or label.", {"id": S}, ["id"], boss=True),
     tool("add_trigger", "Create a trigger. kind: schedule (spec.cron, 5-field local time), event (spec.on: review|done|error, "
          "optional spec.tag/spec.agent), watch (spec.glob, spec.every seconds) or webhook. kind poll (runs a shell command) and kind ado (writes to Azure DevOps) "
          "are UI-only: you cannot create them, so ask the user to add it in Crew's Triggers panel. It creates `task` (title, details, tag, agent) or, with task.workflow "
@@ -111,6 +146,13 @@ def status() -> str:
         lines.append(f"- {w['id']} {w['name']}{' [OFF, cannot run]' if w.get('off') else ''}: " + " -> ".join(f"{s['agent']}({s['gate']})" for s in w["steps"]))
     for r in d.get("runs", [])[-10:]:
         lines.append(f"- run {r['id']} {r['name']} [{r['status']}] step {r['step'] + 1}/{len(r['steps'])}: {r['title']}")
+    if d.get("card_actions"):
+        lines.append("Card buttons:")
+        for b in d["card_actions"]:
+            w, do = b["when"], b["do"]
+            lines.append(f"- {b['id']} {b['icon']} {b['label']}: on {'/'.join(w['cols'])} cards" + (f" of tags {','.join(w['tags'])}" if w['tags'] else "")
+                         + (f" of {w['agent']}" if w['agent'] else "") + (f" with {w['has']}" if w['has'] else "") + f" -> {do['kind']} "
+                         + (do.get("text") or do.get("workflow") or "")[:80] + (f" to {do['to']}" if do.get("to") else ""))
     lines.append("Triggers:")
     for tr in d.get("triggers", []):
         lines.append(f"- {tr['id']} {tr['name']} ({tr['kind']}, {'on' if tr['enabled'] else 'off'})")
@@ -128,8 +170,12 @@ def run_tool(name, a):
         r = call("/api/act/handoff", {"from": ME, "to": a.get("to"), "title": a.get("title"), "details": a.get("details", ""), "tag": a.get("tag", "")})
     elif name == "watch":
         r = call("/api/act/watch", {"from": ME, "command": a.get("command"), "done": a.get("done"), "fail": a.get("fail")})
+    elif name == "remember":
+        r = call("/api/act/remember", {"from": ME, "text": a.get("text") or "", "key": a.get("key") or ""})
     elif name == "decide":
         r = call("/api/act/decide", {"from": ME, "verdict": a.get("verdict"), "reason": a.get("reason")})
+    elif name == "fix_pipeline":
+        r = call("/api/act/pipeline_fix", {"from": ME, "reason": a.get("reason"), "join": a.get("join") or ""})
     elif name == "raise_alert":
         r = call("/api/act/alert", {"from": ME, **{k: a.get(k) for k in ("title", "severity", "details", "link")}})
     elif name == "resolve_alert":
@@ -155,6 +201,10 @@ def run_tool(name, a):
         r = call("/api/act/configure", {"agent": a.get("name"), **{k: a[k] for k in ("role", "tags", "model", "effort") if k in a}})
     elif name == "save_workflow":
         r = call("/api/act/wf_save", a)
+    elif name == "set_card_button":
+        r = call("/api/act/card_button_save", a)
+    elif name == "delete_card_button":
+        r = call("/api/act/card_button_delete", {"id": a.get("id")})
     elif name == "add_trigger":
         r = call("/api/act/trigger_add", a)
     else:

@@ -100,6 +100,7 @@ def set_watch(crew, p: dict) -> dict:
     w["probe"] = {"cmd": shlex.join(argv), "done": done, "fail": fail, "since": old.get("since") or time.time()}
     if old.get("failed"):
         w["probe"]["failed"] = old["failed"]  # the failure the agent already saw does not wake it again
+    crew._note_pipes(t, w["probe"]["cmd"])
     crew.event("wait", f"👁 {src['name']} watches #{t['id']}: {w['probe']['cmd'][:120]}", src["name"])
     crew.touch()
     wakes = [x for x in ("matches done" if done else "", "matches fail with a new failure" if fail else "",
@@ -111,8 +112,11 @@ def set_watch(crew, p: dict) -> dict:
 def tick(crew) -> None:
     """Start due watches (dispatcher thread, every second). Each runs in its own thread, outside the lock."""
     with crew.lock:
-        due = [t for t in crew.tasks if t["col"] == "backlog" and (w := t.get("wait") or {}).get("probe")
-               and not w.get("wake") and time.time() - w.get("probing", 0) > TIMEOUT * 2
+        from . import fixes
+        fixes.tick(crew)
+        due = [t for t in crew.tasks if (t["col"] == "backlog" or t["col"] == "review" and (t.get("wait") or {}).get("blocked"))
+               and (w := t.get("wait") or {}).get("probe")
+               and not w.get("wake") and not w.get("fixing") and time.time() - w.get("probing", 0) > TIMEOUT * 2
                and w.get("next", 0) <= time.time() and not t.get("hold")]
         for t in due:
             t["wait"]["probing"] = time.time()  # a stamp, so a restart mid-run cannot leave it stuck
@@ -126,13 +130,25 @@ def _probe(crew, t: dict) -> None:
     with crew.lock:
         w = t.get("wait") or {}
         w.pop("probing", None)
-        if w.get("probe") is not pr or t["col"] != "backlog":
-            return  # replaced or moved while it ran
+        parked = t["col"] == "review" and w.get("blocked")
+        if w.get("probe") is not pr or t["col"] != "backlog" and not parked or w.get("fixing"):
+            return  # replaced or moved while it ran, or handed to a pipeline fix meanwhile
         step = crew._until_step(t)
         if not step:
             return
         h, first = digest(out), "seen" not in pr
         hit = bool(pr["done"] and re.search(pr["done"], out))
+        if parked:  # blocked, over to a person: only reaching the goal wakes the agent again
+            pr.update(seen=h, ran=time.time(), out=out[:OUT_MAX])
+            if hit:
+                w.pop("blocked")
+                w.update(wake="done matched", next=0)
+                t["col"] = "backlog"
+                crew.event("wait", f"👁 #{t['id']}: done matched while blocked · waking {t.get('who') or 'its agent'}", t.get("who"))
+            else:
+                w["next"] = time.time() + WATCH_EVERY * 60
+            crew.touch()
+            return
         failed = bool(pr.get("fail") and re.search(pr["fail"], out)) and h != pr.get("failed")
         if failed and first and "failed" not in pr:  # set at the end of the agent's turn: what fails now, it just saw
             pr["failed"], failed = h, False

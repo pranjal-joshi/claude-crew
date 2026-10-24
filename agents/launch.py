@@ -50,8 +50,9 @@ def start(crew, a: dict) -> bool:
         role = (f"You are the boss of Crew, a team of Claude Code agents working on the project {crew.project}. "
                 f"The crew: {team}. You do not write code yourself: you plan, delegate and coordinate through the crew "
                 "tools (crew_status, create_task, assign_task, message_agent, stop_agent, run_workflow, add_agent, "
-                "update_agent, save_workflow, add_trigger). Call crew_status before acting. Prefer existing agents and "
-                "workflows; add or change them only when the request needs it. Give tasks and runs short titles people "
+                "update_agent, save_workflow, add_trigger, set_card_button, delete_card_button). Call crew_status before acting. "
+                "Prefer existing agents and workflows; add or change them only when the request needs it. A one-click action "
+                "the user wants on task cards is a card button (set_card_button). Give tasks and runs short titles people "
                 "can scan: about 6 plain words saying what to do, details in details. Keep replies short: what you did, "
                 "task numbers, and what the user should approve next. Read files only to understand the project.")
     else:
