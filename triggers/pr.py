@@ -125,25 +125,31 @@ def gh_me(cwd) -> str:
     return _gh_me
 
 
-def owned(url: str, branches: set[str], cwd) -> bool:
+ADO_STATES = {"active": "OPEN", "completed": "MERGED", "abandoned": "CLOSED"}
+
+
+def owned(url: str, branches: set[str], cwd) -> str | bool:
     """Whether a PR link an agent mentioned is yours to work on: opened by your gh or az sign-in, or from an agent's
-    branch. Read-only. Raises PrError or AzError when it can't tell (no CLI, no sign-in, no network)."""
+    branch. Yours: its state, OPEN, MERGED or CLOSED (truthy); not yours: False. Read-only. Raises PrError or AzError
+    when it can't tell (no CLI, no sign-in, no network)."""
     if m := ADO_PR.match(url):
         x = azure.az("repos", "pr", "show", "--id", m.group(2), "--organization", m.group(1), "--output", "json") or {}
         who = str((x.get("createdBy") or {}).get("uniqueName") or "").lower()
-        return bool(who) and who == azure.az_me() or str(x.get("sourceRefName") or "").removeprefix("refs/heads/") in branches
+        mine = bool(who) and who == azure.az_me() or str(x.get("sourceRefName") or "").removeprefix("refs/heads/") in branches
+        return mine and ADO_STATES.get(str(x.get("status") or "").lower(), "OPEN")
     exe = shutil.which("gh")
     if not exe:
         raise PrError("gh not found")
     try:
-        r = subprocess.run([exe, "pr", "view", url, "--json", "author,headRefName"], cwd=cwd, capture_output=True, text=True,
+        r = subprocess.run([exe, "pr", "view", url, "--json", "author,headRefName,state"], cwd=cwd, capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=60, stdin=subprocess.DEVNULL)
     except (subprocess.TimeoutExpired, OSError) as e:
         raise PrError(str(e)) from None
     if r.returncode:
         raise PrError((r.stderr or "gh failed").strip()[:200])
     x = json.loads(r.stdout or "{}")
-    return str((x.get("author") or {}).get("login") or "").lower() == gh_me(cwd) or x.get("headRefName") in branches
+    mine = str((x.get("author") or {}).get("login") or "").lower() == gh_me(cwd) or x.get("headRefName") in branches
+    return mine and str(x.get("state") or "OPEN").upper()
 
 
 def list_prs(crew, sp: dict) -> list[dict]:

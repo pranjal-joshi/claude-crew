@@ -37,7 +37,7 @@ except ImportError:
     import workflows
     from triggers import azure
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the
@@ -186,6 +186,8 @@ class Crew:
         self._pr_mine: dict[str, bool] = {}  # PR link -> yours (opened by your gh/az sign-in or from an agent's branch)
         self._pr_wait: dict[str, set[int]] = {}  # PR link -> tasks that mentioned it, while its owner is being read
         self._pr_had: dict[str, set[int]] = {}  # PR link -> cards it was on before a restart, kept if its owner can't be read
+        self._pr_closed: set[str] = set()  # your PR links that are merged or closed
+        self._pr_cited: set[tuple[str, int]] = set()  # (link, task) seen only in the task's brief, while its owner is read
         self.tasks: list[dict] = []
         self.feed: list[dict] = []
         self.next_id = 1
@@ -292,9 +294,12 @@ class Crew:
                 if owner.setdefault(sid, tk["id"]) != tk["id"]:
                     del ss[n]
         for tk in self.tasks:  # PR links in work that finished before Crew read them; earlier links are checked again
-            for u in tk.get("prs") or []:
+            old = tk.pop("prs", None) or []
+            for u in old:
                 self._pr_had.setdefault(u, set()).add(tk["id"])
-            self._note_prs(tk, tk.get("details"), tk.get("summary"), " ".join(tk.pop("prs", None) or []))
+            cited = set(self._pr_links(tk.get("details"))) - set(self._pr_links(tk.get("summary")))  # the brief's, not the agent's
+            self._note_prs(tk, tk.get("summary"), " ".join(u for u in old if u not in cited),
+                           brief=(tk.get("details"), " ".join(u for u in old if u in cited)))
             self._note_pipes(tk, ((tk.get("wait") or {}).get("probe") or {}).get("cmd"))
         self.next_id = data.get("next_id", len(self.tasks) + 1)
         for t in self.tasks:  # nothing is running after a restart
@@ -995,7 +1000,7 @@ class Crew:
         if self._git_busy(a["name"]):
             return False
         self._task_session(a, t)
-        self._note_prs(t, t.get("details"))
+        self._note_prs(t, brief=(t.get("details"),))
         if not self._start(a):
             return False
         a["last_task"] = t["id"]
@@ -1035,25 +1040,38 @@ class Crew:
             self._prb = pr_base(out or "")
         return self._prb
 
-    def _note_prs(self, t: dict, *texts: str | None) -> None:
-        """PRs an agent opened or works on (it runs gh itself), picked out of its task text and summary: full links, or
-        "PR #123" linked through the project's origin remote. Agents also cite other people's PRs (related work, an
-        earlier change), so a link joins the card only once it is known to be yours: Address review and the PR trigger
-        act on it. Owners are read in the background, once per link. Lock held."""
+    def _pr_links(self, *texts: str | None) -> list[str]:
+        """PR links in texts: full links, or "PR #123" linked through the project's origin remote. Lock held."""
         base = self._pr_base() if any(x and PR_REF.search(x) for x in texts) else ""
-        found = [m for x in texts if x for m in [*PR_URL.findall(x), *(base + n for n in PR_REF.findall(x) if base)]]
+        return list(dict.fromkeys(m for x in texts if x for m in [*PR_URL.findall(x), *(base + n for n in PR_REF.findall(x) if base)]))
+
+    def _note_prs(self, t: dict, *texts: str | None, brief: tuple = ()) -> None:
+        """PRs an agent opened or works on (it runs gh itself), picked out of its output (texts) and its task's brief.
+        Agents also cite other people's PRs (related work, an earlier change), so a link joins the card only once it is
+        known to be yours: Address review and the PR trigger act on it. A brief also cites your own earlier PRs as
+        background, so a link only the brief names joins only while that PR is open, and a merged or closed one
+        leaves the card. Owners are read in the background, once per link. Lock held."""
+        own = self._pr_links(*texts)
+        cited = [u for u in self._pr_links(*brief) if u not in own]
         mine = []
-        for u in dict.fromkeys(found):
-            if u == t.get("pr") or self._pr_mine.get(u):
+        for u in [*own, *cited]:
+            stale = u in cited and u in self._pr_closed and u != t.get("pr")
+            if u == t.get("pr") or (self._pr_mine.get(u) and not stale):
                 mine.append(u)
             elif u not in self._pr_mine:
                 new = u not in self._pr_wait
                 self._pr_wait.setdefault(u, set()).add(t["id"])
+                if u in cited:
+                    self._pr_cited.add((u, t["id"]))
                 if new:
                     self._bg(self._read_pr_owner, u)
+        if gone := {u for u in cited if u in self._pr_closed and u != t.get("pr")} & set(t.get("prs") or []):
+            t["prs"] = [u for u in t["prs"] if u not in gone]
+            if not t["prs"]:
+                t.pop("prs")
         if mine:
             t["prs"] = list(dict.fromkeys([*(t.get("prs") or []), *mine]))[-5:]
-        self._note_pipes(t, *texts)
+        self._note_pipes(t, *texts, *brief)
 
     def _note_pipes(self, t: dict, *texts: str | None) -> None:
         """Pipeline runs named in the card's text, newest last. Lock held."""
@@ -1093,12 +1111,16 @@ class Crew:
                         tk["prs"] = list(dict.fromkeys([*(tk.get("prs") or []), url]))[-5:]
             return
         with self.lock:
-            self._pr_mine[url] = yours
+            self._pr_mine[url] = bool(yours)
+            if yours in ("MERGED", "CLOSED"):
+                self._pr_closed.add(url)
             self._pr_had.pop(url, None)
             ids = self._pr_wait.pop(url, set())
+            cited = {i for u, i in self._pr_cited if u == url}
+            self._pr_cited -= {(url, i) for i in cited}
             if yours:
-                for tk in self.tasks:
-                    if tk["id"] in ids:
+                for tk in self.tasks:  # a link only the brief named joins while its PR is open
+                    if tk["id"] in ids and not (tk["id"] in cited and url in self._pr_closed and url != tk.get("pr")):
                         tk["prs"] = list(dict.fromkeys([*(tk.get("prs") or []), url]))[-5:]
         if yours and ids:
             self.touch()

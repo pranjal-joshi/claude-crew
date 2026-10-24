@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-24
+
+### Fixed
+- **Open PR pointed at an old, merged PR.** A task's brief often cites your own earlier PRs as background ("follow-up flagged in the review of PR #2"), and every PR of yours it named joined the card, so Open PR, Address review and Ready to merge could act on a PR the task never touched. A PR that only the brief names now joins the card only while it is open; PRs the agent names in its own output count as before. Links like that already on a card leave it when Crew restarts.
+
 ## [0.7.0] - 2026-10-24
 
 ### Added
@@ -211,4 +216,5 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 [0.5.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.4.0...v0.5.0
 [0.6.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.5.0...v0.6.0
 [0.7.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.6.0...v0.7.0
-[Unreleased]: https://github.com/pranjal-joshi/claude-crew/compare/v0.7.0...HEAD
+[0.7.1]: https://github.com/pranjal-joshi/claude-crew/compare/v0.7.0...v0.7.1
+[Unreleased]: https://github.com/pranjal-joshi/claude-crew/compare/v0.7.1...HEAD
