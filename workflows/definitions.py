@@ -54,7 +54,8 @@ def clean(crew, p: dict, allow_missing_agents: bool = False) -> tuple[str | None
         out["workflow"] = str(o.get("workflow") or "")
         if not find(crew, out["workflow"]) or out["workflow"] == p.get("id"):
             return "pick another workflow to start", {}
-    return None, {"name": name, "description": str(p.get("description") or "").strip()[:300], "steps": steps[:12], "output": out}
+    return None, {"name": name, "description": str(p.get("description") or "").strip()[:300], "steps": steps[:12], "output": out,
+                  "subagents": bool(p.get("subagents"))}
 
 
 def save(crew, p: dict) -> dict | None:
@@ -102,7 +103,7 @@ def export_file(crew, ids) -> dict:
         out = dict(w.get("output") or {"kind": "board"})
         if out.get("kind") == "workflow":
             out["workflow"] = (find(crew, out.get("workflow")) or {}).get("name") or ""
-        items.append({"name": w["name"], "description": w.get("description", ""), "off": bool(w.get("off")),
+        items.append({"name": w["name"], "description": w.get("description", ""), "off": bool(w.get("off")), "subagents": bool(w.get("subagents")),
                       "steps": [{k: st[k] for k in ("agent", "title", "details", "gate", "every", "checks", "par") if k in st} for st in w["steps"]],
                       "output": out})
     return {"ok": True, "file": {"crew": "workflows", "version": FILE_VERSION, "items": items}}

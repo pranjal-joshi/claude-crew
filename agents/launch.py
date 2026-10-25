@@ -10,7 +10,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import procs
+from . import procs, toolkit
 from .files import local_mcp_servers, sync_claude_files
 from .procs import CREW_SERVER_RE, IS_WIN, StdinWriter, orphans_to_kill
 from .util import git, write_atomic
@@ -102,6 +102,8 @@ def start(crew, a: dict) -> bool:
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps({"mcpServers": servers}, indent=1), encoding="utf-8")
     cmd += [f"--mcp-config={f}"]  # "=" form: the flag is variadic and would swallow what follows
+    if not boss:
+        cmd += toolkit.flags(crew, a)  # [] when it loads everything
     if boss:  # the boss only needs the crew tools and a few readers: a small context keeps every turn cheap
         cmd += ["--strict-mcp-config", "--disable-slash-commands", "--tools=Read,Grep,Glob,WebSearch,WebFetch,Bash"]
     flags = subprocess.CREATE_NEW_PROCESS_GROUP if IS_WIN else 0
@@ -281,7 +283,8 @@ def end_tree(crew, p: subprocess.Popen, name: str) -> None:
 def launch_key(crew, a: dict) -> tuple:
     # MCP servers found later are allowed from the agent's next start; no restart (that would drop the live context).
     # Rules added from the permission inbox do restart it (the session is kept).
-    return (crew.config["permission_mode"], a["model"], a["effort"], tuple(crew.config.get("allowed_tools") or []), tuple(crew._once_rules(a)))
+    return (crew.config["permission_mode"], a["model"], a["effort"], tuple(crew.config.get("allowed_tools") or []), tuple(crew._once_rules(a)),
+            json.dumps(a.get("toolkit"), sort_keys=True))
 
 
 def once_rules(crew, a: dict) -> list[str]:

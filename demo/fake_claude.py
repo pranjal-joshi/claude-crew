@@ -246,5 +246,9 @@ for line in sys.stdin:
     for step in steps:
         step()
     cost += float(os.environ.get("CREW_DEMO_COST") or random.uniform(0.08, 0.32))
+    hour = int(time.time()) // 3600 * 3600  # Claude's plan limits, as Claude Code streams them after a call
+    out({"type": "rate_limit_event", "rate_limit_info": {"status": "allowed", "rateLimitType": "five_hour", "isUsingOverage": False,
+         "unifiedWindows": {"five_hour": {"utilization": round(min(0.97, 0.1 + cost / 4), 3), "resetsAt": hour + 3 * 3600},
+                            "seven_day": {"utilization": round(min(0.95, 0.42 + cost / 20), 3), "resetsAt": hour + 4 * 86400}}}})
     out({"type": "result", "subtype": "success", "is_error": False, "session_id": sid, "total_cost_usd": round(cost, 4), "result": summary,
          "permission_denials": denials(title)})

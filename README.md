@@ -37,7 +37,7 @@ Crew is pure standard-library Python (3.10 or newer) and installs as a `crew` co
 
 ```bash
 pipx install claude-crew                      # from PyPI, once published
-pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.6.0/claude_crew-0.6.0-py3-none-any.whl   # a release wheel
+pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.8.0/claude_crew-0.8.0-py3-none-any.whl   # a release wheel
 pipx install git+https://github.com/pranjal-joshi/claude-crew   # latest main
 ```
 
@@ -111,6 +111,8 @@ The **Workflows** tab (<kbd>W</kbd>) chains agents in a fixed order. Run one wit
 
 **Gates: stop or go on.** An agent can decide whether work should go ahead with the crew tool `decide` (continue or stop, with a one-line reason). *Continue* closes its task without review and starts the next workflow step with its summary, unless that step's link is ✋: then it waits for your approval as usual, with the agent's verdict on the review card; *stop* closes it marked ⏹ stopped and ends the run, so nothing else starts. Put a gate agent such as **Picker** first in a workflow that an ADO trigger runs: it checks each new item against the ownership in its role and passes on only what is ours. Outside a workflow, a gate that continues hands the work on with `handoff` first.
 
+**Steps as subagents.** Tick *Run steps as subagents* on a workflow where one agent works several steps: it keeps one session for the run and does each step in a subagent named after the workflow, run and step, so its own context holds the briefs and results, not every step's reading.
+
 Each link has a gate: ✋ waits for you to approve the step, ⚡ continues on its own when the agent finishes, and ⟳ **checks until done**: for a goal that takes hours or days, such as a PR merging or a deployment landing. A ⟳ step's agent does what it can, then Crew asks it to check again every so often (30 minutes by default) in the same session, with a short "check again" message instead of the whole brief. The step passes when the agent calls `decide` with continue, ends the run on stop, and goes to Review for you after the set number of checks. A waiting card shows ⟳ with its next check.
 
 To keep a long wait cheap, the agent sets a **watch** (crew tool `watch`): one read-only `gh`, `az` or `git` command, such as `gh pr view 123 --json state --jq .state`, plus an optional `done` regex. Crew runs it on the step's schedule without the model and wakes the agent only when the output changes or matches `done`, so a PR that takes two days costs a few turns instead of one every half hour. Only read-only subcommands are allowed, with no shell: no pipes, redirects or `gh api` writes. The card shows 👁 while it watches.
@@ -149,7 +151,9 @@ A finished task lands in **Review** as a decision sheet: a verdict line, **Appro
 
 Text can use `{id}`, `{title}`, `{pr}`, `{pipeline}`, `{branch}`, `{agent}` and `{summary}`. Buttons run no shell commands themselves, which is why the boss may create them (crew tools `set_card_button` and `delete_card_button`); only you press them. They are saved in `crew.json` under `card_actions`.
 
-Every card shows its cost. Set a **per-task** and a **per-day** budget (click the tokens/$ stat). A task that hits its budget is flagged and can't be sent back; a spent day budget stops running agents until the next local day or a higher budget.
+Every card shows its cost. Click the token chip in the header for **budgets**: per task and per day in dollars, and a **token budget** counted from when Crew starts. A task that hits its budget is flagged and can't be sent back; a spent day budget stops running agents until the next local day or a higher budget. The token chip turns amber at half its budget and red at 80%, where a prompt asks you to acknowledge it; at 100% running turns finish and nothing new starts. The same menu shows Claude's own **5-hour session** and **weekly** limits with their reset times, read from what Claude Code streams.
+
+**Tools per agent.** Every tool description goes out with every turn, so an agent that loads everything you have (all built-in tools, every MCP server, plugin and connector) can start each turn at 80k+ tokens. In an agent's settings, **Tools** switches from *Everything* to *Picked*: tick groups of built-in tools, the MCP servers and connectors it needs, and skills, each with a rough token cost, or press **✨ Use recommended** for a set based on its role and tags. Unticked tools aren't loaded at all; the crew tools always are.
 
 ## Stop, kill, clear
 
@@ -160,7 +164,7 @@ Every card shows its cost. Set a **per-task** and a **per-day** budget (click th
 
 Give each agent an icon (two dozen dev line icons) and a colour in its settings; the glyph switches between black and white to stay readable. Every agent and every card has a **⋮** menu at its top right: rename, settings, stop, kill or delete an agent; move, mark done or delete a card. The forward button next to a card's ⋮ hands it to an agent (or lets the boss pick), and hand-offs show the same arrow with who it went to. Click a card on the board to open the agent that handled it. Drag agents in the left rail to reorder the crew; the order is saved to `crew.json`. Collapse the rail with « to a slim column of avatars and status dots, and » brings it back (remembered per browser).
 
-**Crew memory.** Agents save what they work out about your project with the crew tool `remember`: how a deploy is confirmed, which pipeline steps are non-blocking, who owns what. Every agent reads these facts when it starts a task. A fact has a key, so saving the same key corrects it instead of adding another. The 🧠 chip in the header lists them, and you can add, edit or forget them there.
+**Crew memory.** Agents save what they work out about your project with the crew tool `remember`: how a deploy is confirmed, which pipeline steps are non-blocking, who owns what. Every agent reads these facts when it starts a task. A fact has a key, so saving the same key corrects it instead of adding another. **Crew memory…** in the header ⋮ menu lists them, and you can add, edit or forget them there.
 
 **One card per PR or work item.** When an open card is already about a PR or a work item, news about it (the PR merged, a pipeline run carrying it finished, an alert about it) goes to that card, 📎, instead of starting new work. A waiting ⟳ card wakes up to read it.
 
@@ -299,7 +303,7 @@ flowchart LR
 - Each agent is a long-lived `claude -p --input-format stream-json --output-format stream-json` process. Crew writes tasks and your messages to its stdin and reads every event from its stdout.
 - A one-second loop checks triggers, then gives idle agents work: tasks pinned to them first, then unassigned tasks whose tag matches the agent's tags.
 - Subagents are tracked from the stream itself. An `Agent` tool call starts one, events tagged with its `parent_tool_use_id` belong to it, and its tool result ends it.
-- State (board, triggers, sessions, tokens, transcripts) is saved per project under `~/.crew/state/`. Agent process ids are kept in `~/.crew/pids/`, so leftovers from a crash are ended at startup. Worktrees live in `~/.crew/wt/`, which keeps paths short enough for Windows.
+- State (board, triggers, sessions, tokens, transcripts) is saved per project under `~/.crew/state/`. Agent process ids are kept in `~/.crew/pids/`, so leftovers from a crash are ended at startup. Worktrees live in `~/.crew/wt/`, which keeps paths short enough for Windows. Feed events are also appended to `~/.crew/events/` and earlier versions of `crew.json` are kept in `~/.crew/config-history/`.
 
 ## Configuration
 
@@ -347,7 +351,7 @@ Headless agents can't answer permission prompts. In **Accept edits** mode, file 
 - **Per-run tokens.** The page gets one secret when it loads, and `crew_mcp` gets another through its environment. Every `POST /api/act/*` needs one of them (`X-Crew-Auth`), on top of the `X-Crew` header, so a random local process or an agent's Bash can't just call the API.
 - **Agents and the boss are limited.** The MCP token is checked against an allowlist of the actions the crew tools use (tasks, hand-offs, agents, workflows, non-poll triggers). It can't create poll triggers (shell commands), change the permission mode, switch project or browse folders. Those need the page.
 - **LAN.** With `--lan`, a device that signs in with the key gets the page, so it can use the board, but it can't browse the host's disk or switch projects.
-- **Your files.** `crew.json` and state are saved atomically with a `.bak`; a corrupt state file is set aside as `.corrupt`. Synced local files (`.mcp.json`, `settings.local.json`, `CLAUDE.local.md`) are kept out of commits.
+- **Your files.** `crew.json` and state are saved atomically with a `.bak`; a corrupt state file is set aside as `.corrupt` and the `.bak` is loaded instead. Synced local files (`.mcp.json`, `settings.local.json`, `CLAUDE.local.md`) are kept out of commits.
 
 ## FAQ
 

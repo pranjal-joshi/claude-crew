@@ -63,7 +63,7 @@ def start_run(crew, w: dict, title: str, details: str = "", source: dict | None 
     run = {"id": f"r{crew.next_run}", "wf": w["id"], "name": w["name"], "title": title[:200],
            "details": (details or "").strip()[:SUMMARY_MAX], "steps": json.loads(json.dumps(w["steps"])),
            "status": "running", "step": 0, "tasks": [None] * n, "results": [None] * n, "started": now(), "note": "",
-           "source": source, "ado": (source or {}).get("ado")}
+           "source": source, "ado": (source or {}).get("ado"), "subagents": bool(w.get("subagents"))}
     crew.next_run += 1
     crew.runs.append(run)
     start_group(crew, run, 0)
@@ -121,15 +121,40 @@ def start_step(crew, run: dict, i: int) -> None:
         brief.append(f"Run `git merge {' '.join(merge)}` in your worktree first so you build on that work.")
     if step.get("gate") == "until":
         brief.append(until_brief(step))
+    label = f"{run['name']} · {run['id']} · step {i + 1}"
+    if run.get("subagents"):
+        brief.append(subagent_brief(label))
     t = {"id": crew.next_id, "title": title, "details": ((body + "\n\n---\n") if body else "") + "\n\n".join(brief),
          "tag": (a["tags"] or ["feature"])[0], "col": "backlog", "who": a["name"], "pinned": a["name"], "created": now(),
          "run": {"id": run["id"], "step": i, "name": run["name"], "n": n}}
     if run.get("ado"):
         t["ado"] = run["ado"]
+    if run.get("subagents") and (sid := run_session(crew, run, a["name"], i)):
+        t["sessions"], t["run_session"] = {a["name"]: sid}, True  # this run's session for this agent, not a fresh one
     crew.next_id += 1
     crew.tasks.append(t)
     run["tasks"][i] = t["id"]
     crew.event("workflow", f"⛓ {run['name']} {i + 1}/{n}{' ∥' if len(gs[g]) > 1 else ''} → {a['name']}: {title}", a["name"])
+
+
+# Subagent steps: an agent that works several steps of one run keeps one session for the run, and does each step in a
+# subagent named after the workflow, run and step. The step's reading and trial and error stay in the subagent; the
+# run's session holds the briefs and what each subagent reported, and its cached prompt is reused from step to step.
+def subagent_brief(label: str) -> str:
+    return (f"Do this step in a subagent: call the Agent tool once with the description \"{label}\" and this whole brief "
+            "(all of it except this paragraph) as its prompt, then wait for it. Don't do the work yourself; if you have no "
+            "Agent tool, do it directly. Crew tools (decide, watch, handoff, raise_alert…) are yours: call them here, from "
+            "what the subagent reports. Earlier steps of this run you did are in this session as their subagents' reports: "
+            "use them, don't redo them. End with the step's summary.")
+
+
+def run_session(crew, run: dict, name: str, i: int) -> str | None:
+    """The session an agent used for its latest earlier step in this run, if any."""
+    for k in sorted(range(len(run["steps"])), key=lambda k: -(crew._task(run["tasks"][k]) or {}).get("created", 0)):
+        tk = crew._task(run["tasks"][k]) if k != i and run["tasks"][k] else None
+        if tk and tk.get("who") == name and (sid := (tk.get("sessions") or {}).get(name)):
+            return sid
+    return None
 
 
 # A PR watch that wakes the agent for everything it must act on: a failed check (GitHub check runs and Azure Pipelines
@@ -174,6 +199,9 @@ def recheck_body(t: dict, step: dict) -> str:
     else:
         seen = (f"Your watch `{pr['cmd']}` woke you ({w.get('wake')}). It now prints:\n{pr.get('out') or '(nothing)'}\n\n"
                 if pr and w.get("wake") else "")
+    if pr and w.get("wake") == "the watch command fails":
+        seen += ("It errors on every run, so it can never match done or fail. Check what you watch by hand, then set a "
+                 "working command with the crew tool `watch` (simpler --query or --jq), or remove it.\n\n")
     if pr and w.get("wake") in ("failed", "output changed"):
         seen += ("If a pipeline run failed and you only watch it (a deploy step), don't fix it yourself: when a code change "
                  "must fix it, call the crew tool `fix_pipeline` with the reason (it starts a fix run, or joins one already "
@@ -325,7 +353,7 @@ def restart(crew, run: dict, g0: int) -> dict:
     """Run again from step g0 (0: the whole workflow, with its current steps). Earlier steps keep their results; g0 and
     later start as new tasks, so each gets a fresh session. The caller has closed the run's open cards."""
     if g0 == 0 and (w := find(crew, run["wf"])):
-        run.update(steps=json.loads(json.dumps(w["steps"])), name=w["name"])
+        run.update(steps=json.loads(json.dumps(w["steps"])), name=w["name"], subagents=bool(w.get("subagents")))
     n = len(run["steps"])
     run["tasks"] = (run["tasks"][:g0] + [None] * n)[:n]
     run["results"] = (run["results"][:g0] + [None] * n)[:n]

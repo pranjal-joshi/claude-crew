@@ -25,6 +25,7 @@ WRITE_FLAGS = {"-X", "--method", "-f", "-F", "--field", "--raw-field", "--input"
 AZ_UNSAFE = re.compile(r'[%^&|<>"!`\x00-\x1f]')  # az is a .cmd file on Windows: cmd.exe would read these
 OPS = set(";&|<>")  # shell operators: refused only outside quotes, since a jq filter's | is just an argument
 OUT_MAX, TIMEOUT = 1500, 60
+ERRS = 3  # a watch command failing this many runs in a row wakes its agent: it can't tell done from fail
 WATCH_EVERY = 2  # minutes between watch runs: cheap, no model, so CI results arrive quickly
 
 
@@ -59,7 +60,11 @@ def run(argv: list[str], cwd) -> tuple[str, bool]:
     if not exe:
         return f"{argv[0]} not found", False
     try:
-        r = subprocess.run([exe, *argv[1:]], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        try:  # the wheel's package, or a clone run as python server.py
+            from ..triggers.azure import argv as az_argv
+        except ImportError:
+            from triggers.azure import argv as az_argv
+        r = subprocess.run(az_argv(exe, argv[1:]) if argv[0] == "az" else [exe, *argv[1:]], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=TIMEOUT, stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0)
     except subprocess.TimeoutExpired:
         return f"timed out after {TIMEOUT} s", False
@@ -126,7 +131,7 @@ def tick(crew) -> None:
 
 def _probe(crew, t: dict) -> None:
     pr = t["wait"]["probe"]
-    out, _ok = run(shlex.split(pr["cmd"]), crew.project)
+    out, ok = run(shlex.split(pr["cmd"]), crew.project)
     with crew.lock:
         w = t.get("wait") or {}
         w.pop("probing", None)
@@ -158,8 +163,11 @@ def _probe(crew, t: dict) -> None:
         w["watched"] = w.get("watched", 0) + 1
         if failed:
             pr["failed"] = h
-        if hit or failed or changed or over:
-            w.update(wake=("done matched" if hit else "failed" if failed else "output changed" if changed else "last check"), next=0)
+        pr["errs"] = 0 if ok or hit or failed else pr.get("errs", 0) + 1
+        broken = pr["errs"] == ERRS  # once: the agent fixes its watch, or says why the error is fine
+        if hit or failed or changed or over or broken:
+            w.update(wake=("done matched" if hit else "failed" if failed else "output changed" if changed else
+                           "the watch command fails" if broken else "last check"), next=0)
             if over and not hit:
                 w["checks"] = max(w.get("checks", 0), step["checks"] - 1)  # this look is the last one, then a person takes over
             crew.event("wait", f"👁 #{t['id']}: {w['wake']} · waking {t.get('who') or 'its agent'}", t.get("who"))

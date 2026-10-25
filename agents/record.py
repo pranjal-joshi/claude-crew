@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from . import toolkit
 from .util import git
 
 CONTEXTS = ["fresh", "keep"]
@@ -14,7 +15,7 @@ NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,23}")
 RESERVED = {"boss", "you", "anyone", "auto"}
 ICON_RE = re.compile(r"[a-z][a-z0-9-]{0,23}")  # a key from the UI's icon set
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
-CONFIG_KEYS = ("model", "effort", "context", "role", "tags", "icon", "color", "off")
+CONFIG_KEYS = ("model", "effort", "context", "role", "tags", "icon", "color", "off", "toolkit")
 ROLE_MAX = 4000  # an agent role goes into its system prompt: room for a real brief, not a novel
 
 
@@ -33,6 +34,8 @@ def config_change(key: str, value) -> str:
     """How a configure event names one changed setting."""
     if key == "off":
         return "turned off: takes no new work" if value else "turned on"
+    if key == "toolkit":
+        return "tools: " + ("everything" if not value else f"{len(value['groups'])} groups, {len(value['mcp'])} MCP, skills {'on' if value['skills'] else 'off'}")
     if key in ("role", "tags", "icon", "color"):
         return f"{key} updated"
     if key == "effort":
@@ -47,6 +50,7 @@ def new_agent(crew, spec: dict) -> dict:
         "icon": spec.get("icon") if ICON_RE.fullmatch(str(spec.get("icon") or "")) else None,
         "color": spec.get("color") if COLOR_RE.fullmatch(str(spec.get("color") or "")) else None,
         "off": bool(spec.get("off")),  # off: takes no new work; a task it is running finishes
+        "toolkit": toolkit.clean(spec.get("toolkit")),  # None: loads everything; else the tools it keeps (toolkit.py)
         "status": "idle", "task": None, "session": None,
         "cost": 0.0, "proc_cost": 0.0, "log": [], "activity": "", "since": None,
         "cwd": str(crew.project), "branch": None, "error": None, "launched": None,
@@ -71,7 +75,7 @@ def roster(crew) -> list[dict]:
     """The agents as crew.json keeps them."""
     return [{"name": a["name"], "role": a["role"], "tags": a["tags"], "model": a["model"],
              "effort": a["effort"], "context": a["context"],
-             **{k: a[k] for k in ("icon", "color", "off") if a.get(k)}} for a in crew.agents.values()]
+             **{k: a[k] for k in ("icon", "color", "off", "toolkit") if a.get(k)}} for a in crew.agents.values()]
 
 
 def configure(crew, a: dict, p: dict) -> dict | None:
@@ -92,6 +96,8 @@ def configure(crew, a: dict, p: dict) -> dict | None:
         a["context"] = p["context"]
     if "off" in p:
         a["off"] = bool(p["off"])
+    if "toolkit" in p:  # null: everything; "recommended": picked from its role and tags; else {groups, mcp, skills}
+        a["toolkit"] = toolkit.recommend(crew, a) if p["toolkit"] == "recommended" else toolkit.clean(p["toolkit"])
     if "icon" in p:
         if p["icon"] and not ICON_RE.fullmatch(str(p["icon"])):
             return {"error": "unknown icon"}

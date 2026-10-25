@@ -8,6 +8,7 @@ What lives here: everything about an agent that is not the board. `server.py` ke
 | `launch.py` | Worktrees, building the `claude` command line and starting the process, `send`, `kill_proc`, the pidfile and orphan reaping, per-task sessions (`task_session`, `forget_sessions`), `stop_agent`, and the kill / release / clear chat / respawn actions. |
 | `procs.py` | Process helpers with no Crew in them: the stdin writer thread, process-tree termination, command-line checks. Tests patch `agents.procs.terminate_tree` and friends. |
 | `files.py` | The agent's Claude Code environment: untracked `.claude` files synced into a worktree, local MCP servers, the slash-command catalog. |
+| `health.py` | Self-checks the dispatcher runs every second (`check`: repairs states nothing should leave behind, once they stay wrong for `REPAIR_AFTER` seconds) and automatic retries of turns that failed for a passing reason (`schedule_retry`, `tick_retries`, `succeeded`). |
 | `util.py` | `git()`, `is_git()` and `write_atomic()`. |
 | `presets/` | The built-in crew, one module per agent. |
 

@@ -37,7 +37,7 @@ except ImportError:
     import workflows
     from triggers import azure
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the
@@ -80,6 +80,27 @@ def load_json_file(path: Path) -> dict:
         raise ValueError(str(e)) from e
     if not isinstance(data, dict):
         raise ValueError("not a JSON object")
+    return data
+
+
+# ---- the state file's shape --------------------------------------------------------
+# Bump STATE_SCHEMA when the saved state changes shape, and add the step that upgrades the old shape to MIGRATIONS
+# (MIGRATIONS[n] turns schema n into n + 1). Files saved before schemas existed are schema 0.
+STATE_SCHEMA = 1
+MIGRATIONS: list = [
+    lambda d: d,  # 0 -> 1: the same shape, now with a schema number
+]
+EVENT_LOG_MAX = 5_000_000  # bytes in the event log before it rolls over to <name>.1
+CONFIG_HISTORY = 20        # earlier versions of crew.json kept in ~/.crew/config-history/
+
+
+def migrate_state(data: dict) -> dict:
+    """Bring a saved state up to STATE_SCHEMA, one step at a time."""
+    n = data.get("schema", 0) if isinstance(data.get("schema", 0), int) else 0
+    while n < STATE_SCHEMA:
+        data = MIGRATIONS[n](data)
+        n += 1
+    data["schema"] = max(n, STATE_SCHEMA)
     return data
 
 
@@ -170,6 +191,10 @@ def parse_denials(raw) -> list[dict]:
     return out
 
 
+def fmt_tokens(n: int) -> str:
+    return f"{n / 1e6:.1f}M" if n >= 1e6 else f"{n / 1e3:.0f}k" if n >= 1e3 else str(n)
+
+
 def today() -> str:
     return time.strftime("%Y-%m-%d")
 
@@ -208,6 +233,7 @@ class Crew:
         self.next_denial = 1
         self.day, self.day_spend, self.day_hit = today(), 0.0, None  # today's spend across agents and the boss
         self.mcp_allow: set[str] = set()   # MCP server prefixes seen in agents' tool lists
+        self.tool_seen: dict = {}  # every built-in tool and MCP tool count init events listed (agents.toolkit), kept across restarts
         self.triggers: list[dict] = []
         self.next_trig = 1
         self.runs: list[dict] = []
@@ -216,6 +242,12 @@ class Crew:
         self.next_alert = 1
         self.facts: list[dict] = []  # crew memory: project facts agents save with `remember` and read at each task's start
         self.facts_v = 1
+        self.event_file = WORK_ROOT / "events" / f"{self.key}.jsonl"  # every feed event, kept past restarts
+        self._suspects: dict[str, float] = {}  # health checks: states that looked wrong, and since when
+        self.turn_costs: list[float] = []  # recent turns' cost, to keep the daily budget from being overshot
+        # Tokens since this Crew started (not saved: a restart starts them at zero), checked against budget_tokens.
+        self.tok = {"in": 0, "cache": 0, "out": 0, "since": time.time(), "by": {}, "ack": 0, "hit": False, "warned": None}
+        self.plan: dict = {}  # Claude's plan limits, from the rate_limit_event Claude Code streams after each call
         self.agents: dict[str, dict] = {}
         for spec in config["agents"]:
             self.agents[spec["name"]] = agents.record.new_agent(self, spec)
@@ -243,12 +275,32 @@ class Crew:
             saved["card_actions"] = self.config.get("card_actions", [])
         if self.config.get("boss"):
             saved["boss"] = self.config["boss"]
-        for k in ("budget_task_usd", "budget_day_usd"):
+        for k in ("budget_task_usd", "budget_day_usd", "budget_tokens"):
             if k in self.config:
                 saved[k] = self.config[k]
         if "allowed_tools" in saved or self.config.get("allowed_tools") != DEFAULT_CONFIG["allowed_tools"]:
             saved["allowed_tools"] = self.config.get("allowed_tools") or []  # rules added from the permission inbox
-        write_atomic(self.config_path, json.dumps(saved, indent=2))
+        text = json.dumps(saved, indent=2)
+        self._keep_config_version(text)
+        write_atomic(self.config_path, text)
+
+    def _keep_config_version(self, text: str) -> None:
+        """Before crew.json changes, copy it to ~/.crew/config-history/<project key>/ (the last CONFIG_HISTORY kept),
+        so a bad change from the UI or the boss can be undone by copying a file back."""
+        try:
+            old = self.config_path.read_text(encoding="utf-8")
+        except OSError:
+            return
+        if old == text:
+            return
+        try:
+            d = self.work_root / "config-history" / self.key
+            d.mkdir(parents=True, exist_ok=True)
+            (d / f"crew-{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns() % 10**9:09d}.json").write_text(old, encoding="utf-8")
+            for f in sorted(d.glob("crew-*.json"))[:-CONFIG_HISTORY]:
+                f.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     def _launch_key(self, a: dict) -> tuple:
         return agents.launch.launch_key(self, a)
@@ -268,12 +320,27 @@ class Crew:
                 os.replace(self.state_file, bad)
             except OSError:
                 pass
-            print(f"crew: state file {self.state_file} is unreadable ({e}); moved to {bad.name} and starting empty", file=sys.stderr)
-            self.event("error", f"state file was corrupt; moved to {bad.name} and started empty")
-            return
+            bak = self.state_file.with_name(self.state_file.name + ".bak")
+            try:  # the copy write_atomic keeps: at most a minute or so older than the broken file
+                data = load_json_file(bak)
+            except ValueError:
+                print(f"crew: state file {self.state_file} is unreadable ({e}); moved to {bad.name} and starting empty", file=sys.stderr)
+                self.event("error", f"state file was corrupt; moved to {bad.name} and started empty")
+                return
+            print(f"crew: state file {self.state_file} is unreadable ({e}); moved to {bad.name} and loaded {bak.name}", file=sys.stderr)
+            self.event("error", f"state file was corrupt; moved to {bad.name} and loaded the backup")
         if data.get("project") != str(self.project):
             return
+        if isinstance(data.get("schema"), int) and data["schema"] > STATE_SCHEMA:  # saved by a newer Crew: keep a copy
+            keep = self.state_file.with_name(f"{self.state_file.name}.schema-{data['schema']}")
+            try:
+                shutil.copyfile(self.state_file, keep)
+            except OSError:
+                pass
+            print(f"crew: {self.state_file.name} was saved by a newer Crew (schema {data['schema']}); a copy is in {keep.name}", file=sys.stderr)
+        data = migrate_state(data)
         self.mcp_allow = set(data.get("mcp_allow", []))
+        self.tool_seen = data.get("tool_seen") or {}
         self.triggers = data.get("triggers", [])
         self.runs = data.get("runs", [])[-50:]
         self.alerts = data.get("alerts", [])[-200:]
@@ -289,6 +356,8 @@ class Crew:
         self.tasks = data.get("tasks", [])
         owner: dict[str, int] = {}  # one session, one task: a later task that picked up another's session starts fresh
         for tk in sorted(self.tasks, key=lambda x: x.get("created") or 0):
+            if tk.get("run_session"):
+                continue  # a subagent step shares its run's session on purpose (workflows/runs.py)
             ss = tk.get("sessions") or {}
             for n, sid in list(ss.items()):
                 if owner.setdefault(sid, tk["id"]) != tk["id"]:
@@ -323,8 +392,8 @@ class Crew:
                 w.update(status="review", task=t["id"])
 
     def _save(self) -> None:
-        data = {"project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
-                "mcp_allow": sorted(self.mcp_allow), "triggers": self._public_triggers(), "next_trig": self.next_trig,
+        data = {"schema": STATE_SCHEMA, "project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
+                "mcp_allow": sorted(self.mcp_allow), "tool_seen": self.tool_seen, "triggers": self._public_triggers(), "next_trig": self.next_trig,
                 "runs": self.runs[-50:], "next_run": self.next_run,
                 "alerts": self.alerts[-200:], "next_alert": self.next_alert, "facts": self.facts, "facts_v": self.facts_v,
                 "day": self.day, "day_spend": round(self.day_spend, 6), "day_hit": self.day_hit,
@@ -345,8 +414,21 @@ class Crew:
 
     def event(self, kind: str, text: str, agent: str | None = None) -> None:
         with self.lock:
-            self.feed.append({"t": now(), "kind": kind, "text": text, "agent": agent})
+            e = {"t": now(), "kind": kind, "text": text, "agent": agent}
+            self.feed.append(e)
             self.feed = self.feed[-60:]
+            self._log_event(e)
+
+    def _log_event(self, e: dict) -> None:
+        """Append an event to the event log (lock held). It rolls over to <name>.1 at EVENT_LOG_MAX bytes."""
+        try:
+            self.event_file.parent.mkdir(parents=True, exist_ok=True)
+            if self.event_file.exists() and self.event_file.stat().st_size > EVENT_LOG_MAX:
+                os.replace(self.event_file, self.event_file.with_name(self.event_file.name + ".1"))
+            with open(self.event_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(e, ensure_ascii=False) + "\n")
+        except OSError:
+            pass  # the log is a record, never a reason to fail
 
     def log(self, a: dict, kind: str, text: str, **extra) -> None:
         a["log"].append({"t": now(), "kind": kind, "text": text, **extra})
@@ -463,20 +545,22 @@ class Crew:
         with self.lock:
             roster = []
             for a in self.agents.values():
-                roster.append({k: v for k, v in a.items() if k != "log"} | {"log": a["log"][-120:], "alive": self._alive(a["name"])})
+                roster.append({k: v for k, v in a.items() if k != "log"} | {"log": a["log"][-120:], "alive": self._alive(a["name"]),
+                              "kit_est": agents.toolkit.estimate(self, a.get("toolkit")), "kit_rec": agents.toolkit.recommend(self, a)})
             boss = {k: v for k, v in self.boss.items() if k != "log"} | {"log": self.boss["log"][-160:], "alive": self._alive("boss")}
             self._roll_day()
             tasks = [t | {"busy": self._busy[t["id"]]} if t["id"] in self._busy else t for t in self.tasks]
             return {"version": self.version, "project": str(self.project), "git": self.git, "boss": boss,
                     "agents": roster, "tasks": tasks, "feed": self.feed[-30:],
                     "budget": {"task_usd": self._budget("budget_task_usd"), "day_usd": self._budget("budget_day_usd"),
-                               "day_spent": round(self.day_spend, 4), "blocked": self._day_blocked()},
+                               "day_spent": round(self.day_spend, 4), "blocked": self._day_blocked(), "tokens": self._tok_public()},
+                    "plan": self.plan,
                     "permission_mode": self.config["permission_mode"], "modes": MODES,
                     "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
                     "project_name": self.project.name, "app_version": __version__, "mcp_allow": sorted(self.mcp_allow),
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(), "ado_base": self._ado_base(),
                     "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []), "card_actions": self.config.get("card_actions", []),
-                    "runs": self.runs[-30:], "contexts": CONTEXTS, "alerts": self._public_alerts(), "facts": self.facts,
+                    "runs": self.runs[-30:], "contexts": CONTEXTS, "toolkit": agents.toolkit.catalog(self), "alerts": self._public_alerts(), "facts": self.facts,
                     "awake": getattr(self, "awake", False), "awake_mode": getattr(self, "awake_mode", ""), "demo": self.demo,
                     "scratch": self.project.parent.resolve() == WORK_ROOT.resolve()}
 
@@ -569,6 +653,10 @@ class Crew:
                     a["status"], a["error"] = "error", "claude exited unexpectedly"
                     self.log(a, "error", a["error"])
                     self.event("error", f"{a['name']} exited unexpectedly", a["name"])
+                    if (t := self._task(a["task"])) and t["col"] == "doing":  # the session is kept: a retry resumes it
+                        if not agents.health.schedule_retry(self, a, t, a["error"]):
+                            t.update(col="backlog", who=t.get("pinned"))
+                        a["task"] = None
         self.touch()
 
     def _on_event(self, a: dict, d: dict) -> None:
@@ -587,6 +675,7 @@ class Crew:
             a["skill_names"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("skills") or [])[:200]
             a["plugins"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("plugins") or [])[:100]
             a["commands"] = sorted({str(x if isinstance(x, str) else x.get("name", "")).lstrip("/") for x in d.get("slash_commands") or []} - {""})[:300]
+            agents.toolkit.note_init(self, d.get("tools") or [])
             found = {"__".join(tool.split("__")[:2]) for tool in d.get("tools") or [] if tool.startswith("mcp__")}
             if found - self.mcp_allow:
                 self.mcp_allow |= found  # other agents pick these up when they next (re)start
@@ -602,6 +691,7 @@ class Crew:
                 tk["in"] += int(u.get("input_tokens") or 0) + int(u.get("cache_creation_input_tokens") or 0)
                 tk["cache"] += int(u.get("cache_read_input_tokens") or 0)
                 tk["out"] += int(u.get("output_tokens") or 0)
+                self._count_tokens(a, u)
                 if not d.get("parent_tool_use_id"):  # the main thread's window, not a subagent's
                     a["ctx"] = sum(int(u.get(k) or 0) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
             for b in m.get("content", []):
@@ -628,6 +718,9 @@ class Crew:
                     else:
                         self.log(a, "tool", b.get("name", "tool"), detail=hint, sub=sub)
                     a["activity"] = (f"↳ {sub}: " if sub else "") + f"{b.get('name')} {hint}".strip()[:120]
+        elif t == "rate_limit_event":
+            if isinstance(info := d.get("rate_limit_info"), dict):
+                self.plan = {**info, "at": now()}
         elif t == "user":
             self._note_bg(a, d)
             for b in (d.get("message", {}).get("content") or []):
@@ -712,6 +805,8 @@ class Crew:
             self._note_prs(task, d.get("result"))
         self._addressed(a)  # an /address-review turn is over: its task goes back to Review or Done
         self._charge(task, delta)
+        if delta > 0:
+            self.turn_costs = (self.turn_costs + [delta])[-20:]
         self._note_denials(a, d.get("permission_denials"), a["task"])
         if a.get("compacting"):  # a /compact turn: no task changes
             a.update(status=a["compacting"], compacting=None, activity="")
@@ -726,10 +821,12 @@ class Crew:
                 a["log"][-1]["kind"] = "error"
             self.event("error", f"{a['name']}: {a['error'][:120]}", a["name"])
             if task:
-                self._task_event(task, "error", summary=a["error"])
-                task["col"], task["who"] = "backlog", task.get("pinned")
+                if not agents.health.schedule_retry(self, a, task, a["error"]):
+                    self._task_event(task, "error", summary=a["error"])  # a retry isn't over yet: no error event
+                    task["col"], task["who"] = "backlog", task.get("pinned")
                 a["task"] = None
             return
+        agents.health.succeeded(self, task)
         dec = (task or {}).get("decision")
         if dec and dec["verdict"] == "continue" and self._step_gate(task) == "approve":
             dec = None  # a workflow step gated ✋ still waits for you: the decision shows on the review card
@@ -919,6 +1016,17 @@ class Crew:
         bd = self._budget("budget_day_usd")
         return bool(bd) and self.day_spend >= bd
 
+    def _day_no_room(self) -> bool:
+        """Cost is only known when a turn ends, so agents running at once could each push past the daily budget.
+        Each running agent is counted at the average recent turn's cost; one more starts only if that still fits.
+        With nothing running, work always starts (until the budget is actually reached)."""
+        bd = self._budget("budget_day_usd")
+        running = sum(1 for a in self.agents.values() if a["status"] == "running") + (self.boss["status"] == "running")
+        if not bd or not running or not self.turn_costs:
+            return False
+        avg = sum(self.turn_costs) / len(self.turn_costs)
+        return self.day_spend + (running + 1) * avg > bd
+
     def _over_task(self, t: dict) -> bool:
         bt = self._budget("budget_task_usd")
         return bool(bt) and (t.get("cost") or 0) >= bt
@@ -962,6 +1070,46 @@ class Crew:
             self.raise_alert("Daily budget reached: agents paused", "warning",
                              f"{msg}. No new work starts until tomorrow or until you raise the budget (header → Budgets).", key=f"budget:{self.day}")
 
+    # ---- token budget: tokens since Crew started ---------------------------------------------------
+    TOK_WARN = 0.8  # share of budget_tokens that asks you to acknowledge
+
+    def _tok_total(self) -> int:
+        return self.tok["in"] + self.tok["cache"] + self.tok["out"]
+
+    def _count_tokens(self, a: dict, u: dict) -> None:
+        n = {"in": int(u.get("input_tokens") or 0) + int(u.get("cache_creation_input_tokens") or 0),
+             "cache": int(u.get("cache_read_input_tokens") or 0), "out": int(u.get("output_tokens") or 0)}
+        for k, v in n.items():
+            self.tok[k] += v
+        self.tok["by"][a["name"]] = self.tok["by"].get(a["name"], 0) + sum(n.values())
+        lim = int(self._budget("budget_tokens"))
+        if not lim:
+            return
+        used = self._tok_total()
+        if used >= lim and not self.tok["hit"]:
+            self.tok["hit"] = True
+            self.event("budget", f"token budget reached ({fmt_tokens(used)} of {fmt_tokens(lim)} since Crew started): "
+                                 "running turns finish, nothing new starts")
+            self.raise_alert("Token budget reached: no new work starts", "warning",
+                             f"{fmt_tokens(used)} of {fmt_tokens(lim)} tokens used since Crew started. Running turns finish; "
+                             "raise the budget (header → tokens) or restart Crew to go on.", key="budget:tokens")
+        elif used >= lim * self.TOK_WARN and self.tok["warned"] != lim:
+            self.tok["warned"] = lim
+            self.event("budget", f"{int(used * 100 / lim)}% of the token budget used ({fmt_tokens(used)} of {fmt_tokens(lim)})")
+
+    def _tok_blocked(self) -> bool:
+        lim = self._budget("budget_tokens")
+        return bool(lim) and self._tok_total() >= lim
+
+    def _tok_public(self) -> dict:
+        lim = int(self._budget("budget_tokens"))
+        used = self._tok_total()
+        level = 100 if lim and used >= lim else 80 if lim and used >= lim * self.TOK_WARN else 0
+        return {"in": self.tok["in"], "cache": self.tok["cache"], "out": self.tok["out"], "total": used, "since": self.tok["since"],
+                "by": dict(sorted(self.tok["by"].items(), key=lambda x: -x[1])), "limit": lim,
+                "pct": round(used * 100 / lim, 1) if lim else None, "level": level, "ack": self.tok["ack"],
+                "blocked": bool(lim) and used >= lim}
+
     def _budget_refresh(self) -> None:
         """A new day or changed budgets: clear flags that no longer apply and resume what only the budget was holding."""
         bd = self._budget("budget_day_usd")
@@ -985,14 +1133,24 @@ class Crew:
         if resumed:
             self.event("budget", "budget cleared: held work resumes")
             self.resolve_alert(f"budget:{self.day}", "budget raised or cleared")
+        if self.tok["hit"] and not self._tok_blocked():
+            self.tok["hit"] = False
+            self.resolve_alert("budget:tokens", "token budget raised or cleared")
+        lim = self._budget("budget_tokens")
+        if not lim or self._tok_total() < lim * self.TOK_WARN:
+            self.tok["ack"], self.tok["warned"] = 0, None  # below the warning line again: the next crossing asks again
+        elif self._tok_total() < lim and self.tok["ack"] > 80:
+            self.tok["ack"] = 80
 
     # ---- tasks -----------------------------------------------------------------
     def _task(self, tid) -> dict | None:
         return next((t for t in self.tasks if t["id"] == tid), None)
 
     def _begin(self, a: dict, t: dict) -> bool:
-        if self._day_blocked():
-            return False  # the daily budget is spent: the task waits in the backlog
+        if self._day_blocked() or self._tok_blocked():
+            return False  # the daily or token budget is spent: the task waits in the backlog
+        if self._day_no_room():
+            return False  # what's running already may use the rest of today's budget: wait for it to finish
         if self._over_task(t):
             self.event("budget", f"#{t['id']} is over its task budget (${t.get('cost') or 0:.2f} of ${self._budget('budget_task_usd'):.2f}): "
                                  "raise the budget to run it again", a["name"])
@@ -1171,7 +1329,8 @@ class Crew:
     def dispatch(self) -> None:
         with self.lock:
             moved = self._roll_day() | self._check_writers()
-            if not self._day_blocked():  # a spent daily budget dispatches nothing until tomorrow or a higher budget
+            moved |= bool(agents.health.check(self)) | agents.health.tick_retries(self)
+            if not self._day_blocked() and not self._tok_blocked():  # a spent budget dispatches nothing until it is raised
                 for a in self.agents.values():
                     if a.get("off") or self._git_busy(a["name"]):
                         continue
@@ -1184,7 +1343,7 @@ class Crew:
                     if a["status"] != "idle" and not watch_only:
                         continue  # a card in review with changes keeps its agent: nothing may touch that worktree
                     t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and not self._over_task(t) and
-                              (t.get("wait") or {}).get("next", 0) <= now() and
+                              (t.get("wait") or {}).get("next", 0) <= now() and t.get("retry_at", 0) <= now() and
                               (not (t.get("wait") or {}).get("probe") or (t.get("wait") or {}).get("wake")) and
                               not (t.get("wait") or {}).get("fixing") and
                               (not watch_only or t.get("who") == a["name"] and self._until_step(t)) and
@@ -1252,6 +1411,21 @@ class Crew:
     def _trigger(self, tid) -> dict | None:
         return next((tr for tr in self.triggers if tr["id"] == tid), None)
 
+    def _unstarted_twin(self, tr: dict, title: str, details: str) -> dict | None:
+        """A task this trigger made earlier with the same title and details that no agent has started yet (for a
+        workflow trigger: its run's first task). A firing that would only repeat it adds nothing."""
+        for t in self.tasks:
+            src = t.get("source") or {}
+            if src.get("trigger") == tr["id"] and t["col"] == "backlog" and not t.get("started") and t["title"] == title \
+                    and (t.get("details") or "").strip() == details[:8000]:
+                return t
+        for run in self.runs:
+            if run["status"] == "running" and (run.get("source") or {}).get("trigger") == tr["id"] and run["title"] == title[:200] \
+                    and run["details"] == details[:workflows.runs.SUMMARY_MAX] and run["step"] == 0 \
+                    and (t := self._task(run["tasks"][0])) and t["col"] == "backlog" and not t.get("started"):
+                return t
+        return None
+
     def _fire(self, tr: dict, ctx: dict, note: str = "") -> dict:
         """Turn one firing into a backlog task. Caller holds the lock."""
         lt = time.localtime()
@@ -1259,6 +1433,12 @@ class Crew:
                "weekday": time.strftime("%A", lt), "trigger": tr["name"]} | ctx
         spec = tr["task"]
         title = fill(spec.get("title") or tr["name"], ctx).strip()[:200] or tr["name"]
+        if same := self._unstarted_twin(tr, title, fill(spec.get("details") or "", ctx).strip()):
+            same["refired"] = same.get("refired", 0) + 1  # the same work is still waiting: one task, not a pile of copies
+            tr["fired"] = tr.get("fired", 0) + 1
+            tr["last"], tr["note"] = now(), note[:200]
+            self.event("trigger", f"⚡ {tr['name']} fired again: #{same['id']} is still waiting, no new task")
+            return same
         if (w := self._workflow(spec.get("workflow"))) is not None:
             run = self._start_run(w, title, fill(spec.get("details") or "", ctx), source={"trigger": tr["id"], "name": tr["name"]})
             tr["fired"] = tr.get("fired", 0) + 1
@@ -2018,10 +2198,23 @@ class Crew:
                         if not 0 <= v <= 1_000_000:
                             return {"error": "budgets are dollar amounts; 0 turns one off"}
                         self.config[f] = round(v, 2)
+                if "tokens" in p:
+                    try:
+                        v = int(float(p["tokens"] or 0))
+                    except (TypeError, ValueError):
+                        return {"error": "the token budget is a number of tokens; 0 turns it off"}
+                    if not 0 <= v <= 10**12:
+                        return {"error": "the token budget is a number of tokens; 0 turns it off"}
+                    self.config["budget_tokens"] = v
                 self._save_config()
                 self._budget_refresh()
                 self.event("config", "budgets · task " + (f"${self._budget('budget_task_usd'):.2f}" if self._budget("budget_task_usd") else "off")
-                           + " · day " + (f"${self._budget('budget_day_usd'):.2f}" if self._budget("budget_day_usd") else "off"))
+                           + " · day " + (f"${self._budget('budget_day_usd'):.2f}" if self._budget("budget_day_usd") else "off")
+                           + " · tokens " + (fmt_tokens(int(self._budget("budget_tokens"))) if self._budget("budget_tokens") else "off"))
+            elif action == "budget_ack":  # UI only: you saw the token warning
+                lvl = int(p.get("level") or 0)
+                if lvl in (80, 100):
+                    self.tok["ack"] = max(self.tok["ack"], lvl)
             else:
                 return {"error": f"bad action {action}"}
         self.touch()

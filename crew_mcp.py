@@ -92,8 +92,11 @@ TOOLS = [
          "at the same time as the step before it; the step after them waits until all of them are done and gets every "
          "summary. Step titles may use {input}. `output` says what happens when a "
          "run finishes: {kind: board} (default), {kind: report, path: folder in the project} (markdown report), "
-         "{kind: webhook, url}, or {kind: workflow, workflow: id} (start another workflow with the same goal).",
-         {"id": S, "name": S, "description": S, "steps": {"type": "array", "items": STEP}, "output": {"type": "object"}},
+         "{kind: webhook, url}, or {kind: workflow, workflow: id} (start another workflow with the same goal). `subagents`: true "
+         "keeps one session per agent for a run, and each step runs in a subagent named after the workflow, run and step "
+         "(for workflows where one agent works several steps).",
+         {"id": S, "name": S, "description": S, "steps": {"type": "array", "items": STEP}, "output": {"type": "object"},
+          "subagents": {"type": "boolean"}},
          ["name", "steps"], boss=True),
     tool("set_card_button", "Add a button to the board's task cards, or replace one with the same `label` (or `id`). It shows on "
          "cards that match `when` and, pressed by the user, does `do`. when: {tags: [agent tags; the card's agent must have one], "

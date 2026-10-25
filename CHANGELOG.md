@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-25
+
+### Added
+- **🧰 Tools per agent.** Every tool description goes out with every turn, so an agent that loads everything you have set up (every built-in tool, MCP server, plugin and claude.ai connector) pays for all of it on each call: about 85k tokens before the first word on a busy setup, against about 8k for the core tools. An agent's settings now have a **Tools** section: *Everything* (as before, the default) or *Picked*: groups of built-in tools (files & shell, subagents, web, background jobs, PowerShell, scheduling, orchestration, artifacts, other), each MCP server or connector, and skills on or off, each with a rough per-turn token cost. **✨ Use recommended** picks a set from the agent's role and tags. Picked tools become `--tools`, unpicked MCP servers go in `--disallowedTools` (which drops their definitions, connectors included), and skills off is `--disable-slash-commands`. The crew tools are always on. Saved in `crew.json` as the agent's `toolkit`. Deferred tool search (`ENABLE_TOOL_SEARCH`) made no difference in `-p` mode, so a toolkit picks instead.
+- **⑂ Workflow steps as subagents.** A workflow can *Run steps as subagents* (a tick box in the editor, or `subagents: true` from the boss): an agent that works several steps of one run keeps one session for that run and does each step in a subagent named after the workflow, run and step. Different runs never share a session.
+- **Token budget and Claude's limits.** The header's token chip counts tokens since Crew started (it starts at zero after a restart), green, amber, then red against an optional **token budget** (`5M`, `800k`). At 80% a prompt asks you to acknowledge it; at 100% running turns finish and nothing new starts until you raise the budget or restart Crew. Click the chip for the breakdown (in, cache reads, out, top agents), the budget, your dollar budgets, and Claude's own **5-hour session** and **weekly** limits with their reset times, read from the `rate_limit_event` Claude Code streams (no extra calls, no credentials). Saved in `crew.json` as `budget_tokens`.
+- **Automatic retries.** A turn that fails for a passing reason (API overloaded or rate-limited, a timeout, a dropped connection, the Claude process dying) goes back to the same agent after 30 s, then 2 min, resuming its session. After that it waits for you with an alert. A lasting error (bad key, not signed in) is not retried.
+- **Self-checks.** Every second the dispatcher looks for states nothing should leave behind: an agent "running" with no process, a task In progress that nobody is working on, an unknown status or column, an agent pointing at a deleted task. A state that stays wrong for 20 s is repaired and noted in the feed (`repair`).
+- **Event log.** Every feed event is also appended to `~/.crew/events/<project>.jsonl` (rolls over at 5 MB), so you can see what happened after a restart.
+- **crew.json history.** Before crew.json changes, the previous version is copied to `~/.crew/config-history/<project>/` (the last 20 are kept). Copy one back to undo a bad change.
+
+### Changed
+- **The header puts review first.** A blue **◎ N to review** button opens the next card waiting for you (click again for the one after); running and queued are quiet text; the token chip is one button that opens Budgets, where the dollar-amount toggle now lives; 🧠 Crew memory moved to the ⋮ menu; the permission mode and search sit on the right; the connection dot reads *offline* when the page loses the server.
+- **Look before you approve.** On a Review card **Review changes** is the primary button and ✓ Approve a quiet outline beside it. The Review column is outlined while it has cards.
+- **Scheduled jobs fold into one line** at the top of the Backlog that says what fires next.
+- **Agent settings fill the panel** (the chat comes back with Done), with dividers between rows and a smaller icon picker. A picked tool list folds into a one-line summary.
+- **Repeated trigger firings merge.** A trigger that fires again while its earlier task (or workflow run) with the same title and details is still waiting, unstarted, adds nothing new. The waiting task counts the extra firings.
+- **The daily budget counts running agents.** Cost is only known when a turn ends, so agents started together could each overshoot the daily budget. Each running agent now counts at the recent average turn cost, and another starts only while that still fits. When nothing is running, work always starts.
+
+### Fixed
+- **`az` arguments with `( ) , ; =` on Windows.** `az` is a `.cmd` file, and cmd.exe broke on a `--query` filter without spaces; each argument is now quoted there, for triggers and watches alike.
+- **A corrupt state file falls back to its `.bak`** instead of starting an empty board.
+- **The state file has a schema number.** Upgrades step through migrations. A file saved by a newer Crew is copied aside (`.schema-N`) before this version writes over it.
+- **An agent whose process died mid-task** no longer leaves the task In progress: it is retried or goes back to the backlog.
+
 ## [0.7.1] - 2026-10-24
 
 ### Fixed

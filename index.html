@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#18191f">
-<script>(function(){var t='system';try{t=localStorage.getItem('crew.theme')||t}catch(e){}var l=t==='light'||t==='system'&&matchMedia('(prefers-color-scheme: light)').matches;document.documentElement.dataset.theme=l?'light':'dark';var m=document.querySelector('meta[name=theme-color]');if(m)m.content=l?'#F6EEDD':'#18191f'})()</script>
+<script>(function(){var t='system';try{t=localStorage.getItem('crew.theme')||t}catch(e){}var l=t==='light'||t==='system'&&matchMedia('(prefers-color-scheme: light)').matches;document.documentElement.dataset.theme=l?'light':'dark';var m=document.querySelector('meta[name=theme-color]');if(m)m.content=l?'#F6EEDD':'#18191f';})()</script>
 <meta name="crew-token" content="__CREW_TOKEN__">
 <meta name="crew-lan" content="__CREW_LAN__">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1015,7 +1015,39 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
 .den .dtool{font:600 11.5px var(--mono);color:var(--text)}
 .den .dcmd{display:block;font:12px var(--mono);color:var(--muted);background:var(--inset);border-radius:6px;padding:5px 8px;white-space:pre-wrap;word-break:break-all;max-height:84px;overflow:auto}
 .den .dbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
-.budgetf{padding:4px 10px 8px;display:grid;gap:8px;min-width:260px}
+.budgetf{padding:4px 10px 8px;display:grid;gap:8px;min-width:280px;max-width:340px}
+.budgetf .brow i,.pbar i.x{font-style:normal;color:var(--faint);font-size:11.5px}
+.pmeta{font-size:11.5px;color:var(--faint)}
+.pbar{display:grid;gap:3px}
+.tbar{display:inline-block;width:42px;height:4px;border-radius:3px;background:var(--line);overflow:hidden;vertical-align:middle}
+.tbar.wide{width:100%;height:6px}
+.tbar i{display:block;height:100%;background:var(--violet);border-radius:3px;transition:width .3s}
+.ok .tbar i,.pbar.ok .tbar i{background:var(--green)}
+.warm .tbar i,.pbar.warm .tbar i{background:var(--amber)}
+.hot .tbar i,.pbar.hot .tbar i{background:var(--red)}
+.tokstat{cursor:pointer}
+.tokstat .dot{background:var(--violet)}
+.tokstat.ok .dot{background:var(--green)}
+.tokstat.warm{border-color:color-mix(in srgb,var(--amber) 55%,var(--line))}.tokstat.warm .dot{background:var(--amber)}
+.tokstat.hot{border-color:color-mix(in srgb,var(--red) 60%,var(--line));color:var(--text)}.tokstat.hot .dot{background:var(--red)}
+.tokstat .tlim{color:var(--faint)}
+.kit{display:grid;gap:8px;min-width:0;width:100%}
+.kithead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.kitest{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.kitcol{display:grid;gap:2px}
+.kitlist{display:grid;gap:8px}
+.kitlist>summary{cursor:pointer;font-size:12px;color:var(--muted);list-style:none;display:flex;gap:6px;align-items:baseline;min-width:0}
+.kitlist>summary::-webkit-details-marker{display:none}
+.kitlist>summary::before{content:"▸";flex:none;color:var(--faint)}
+.kitlist[open]>summary::before{content:"▾"}
+.kitlist>summary:hover{color:var(--text)}
+.kitlist[open]>summary{color:var(--faint)}
+.kitl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:2px 0}
+.kitrow{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;cursor:pointer}
+.kitrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kitrow em{font-style:normal;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.kitrow i{font-style:normal;font-size:10.5px}
+.kitrec{color:var(--green);border:1px solid currentColor;border-radius:4px;padding:0 4px}
 .budgetf label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .budgetf .brow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
 .budgetf .brow b{color:var(--text)}
@@ -1072,6 +1104,39 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
 @container (max-width:820px){.rview{grid-template-columns:1fr}}
 .rs .rsh{flex-wrap:wrap}.rs .stt{order:5;flex-basis:100%;white-space:normal;overflow-wrap:anywhere;color:var(--text)}.rs .sst{margin-left:auto}
 .rs .mini{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;background:var(--hover);color:var(--muted);font-size:10px;flex:none}
+
+/* header: the review queue is the one chip that looks like a button; running/queued are quiet text; the permission
+   mode and search sit on the right with the other settings */
+.top .stats{order:1;margin-left:auto;gap:6px;align-items:center}
+.top #mode{order:2}.top #palBtn{order:3;display:inline-flex}.top #awake{order:4}.top #hMenu{order:5}.top #conn{order:6}
+#mode .pl{display:none}
+.stat.needs{cursor:pointer;font-family:inherit;color:var(--muted)}
+.stat.needs.hot{color:var(--blue);border-color:color-mix(in srgb,var(--blue) 50%,transparent);background:var(--blue-soft);font-weight:600}
+.stat.needs.hot b{color:var(--blue)}.stat.needs.hot:hover{border-color:var(--blue)}
+.stat.quiet{background:transparent;border-color:transparent;padding:0 6px}
+.stat.usage{cursor:pointer;font-family:inherit}.stat.usage:hover{border-color:var(--line2)}
+.conn:not(.ok){width:auto;height:auto;border-radius:999px;background:var(--red-soft);color:var(--red);font:600 10.5px var(--mono);padding:2px 7px}
+.conn:not(.ok)::after{content:"offline"}
+@media (max-width:1100px){#palBtn{display:none}}
+/* the Review column stands out while it has cards; the folded scheduled jobs still say what fires next */
+.col[data-col="review"]:has(.card){border-color:color-mix(in srgb,var(--blue) 40%,var(--line))}
+.col[data-col="review"]:has(.card) .colh{color:var(--blue)}
+.schedh{white-space:nowrap;overflow:hidden}
+.schedh .nxt{text-transform:none;letter-spacing:0;font-weight:500;color:var(--faint);min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis}
+/* cards: look before you approve. "Review changes" is the primary button, "Approve" a quiet outline beside it */
+.card .cta:has(.approvec){flex-wrap:nowrap}
+.card .cta .approvec{flex:0 1 auto;order:2;background:transparent;color:var(--green);border:1px solid color-mix(in srgb,var(--green) 45%,transparent);font-weight:500;justify-content:center}
+.card .cta .approvec:hover{background:var(--green-soft);filter:none}
+.card .cta [data-review]{order:1;flex:1 1 auto;justify-content:center;background:var(--blue)!important;color:var(--on-blue)!important;border-color:transparent!important;font-weight:600}
+.card .cta [data-review]:hover{filter:brightness(1.08)}
+.card .cta [data-run-stop-card]{order:3}
+/* agent settings take the whole panel instead of a scroller above the transcript */
+.drawer .dset{max-height:none;flex:1 1 auto;border-bottom:0}
+.drawer:has(.dset:not([hidden])) .stream,.drawer:has(.dset:not([hidden])) .composer{display:none}
+.dset .row2{padding-top:10px;border-top:1px solid var(--line)}
+.dset .kvline+.row2{border-top:0;padding-top:0}
+.iconpick{grid-template-columns:repeat(auto-fill,28px);gap:5px}.iconpick button{width:28px;height:28px;border-radius:7px}
+.kitest{color:var(--text);font-weight:600}
 </style>
 </head>
 <body>
@@ -1286,6 +1351,14 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
   </div>
 </div>
 
+<div class="scrim" id="tokModal">
+  <div class="modal" role="alertdialog" aria-labelledby="tokTitle" style="width:min(440px,calc(100vw - 32px))">
+    <div class="mh" id="tokTitle">Token budget</div>
+    <div class="mb" id="tokBody"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:0 16px 14px"><button class="btn" data-tok-raise>Change budget</button><button class="btn primary" data-tok-ack>Got it</button></div>
+  </div>
+</div>
+
 <div class="scrim" id="confirm">
   <div class="modal confirm" role="alertdialog">
     <div class="mh" id="cfTitle"></div>
@@ -1300,6 +1373,9 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S = null, view = {details: (() => { try { return localStorage.getItem('crew.details') === '1'; } catch { return false; } })(), drawer: null, filter: 'all', dragging: false, newTag: 'feature', newWho: '', seenFeed: 0};
+
+view.schedFold = true;  // the scheduled jobs start as one line at the top of the Backlog that says what fires next
+function toggleCost() { showCost = !showCost; try { localStorage.setItem('crew.showCost', showCost ? '1' : '0'); } catch {} render(); }
 
 const MODE_INFO = {
   acceptEdits: {label: 'Accept edits', sub: 'Edits auto-approved. Shell and web only via the allowlist in crew.json.'},
@@ -1389,28 +1465,16 @@ function render() {
   const running = S.agents.filter(a => a.status === 'running').length;
   const subsLive = S.agents.reduce((s, a) => s + Object.keys(a.subs || {}).length, 0);
   const queued = n('backlog'), toReview = n('review');
-  const sum = [`<b>${running}</b> running`, ...(queued ? [`<b>${queued}</b> queued`] : []), `<b>${toReview}</b> to review`].join(' · ');
-  $('#stats').innerHTML = `<div class="stat" title="Agents running now${queued ? ', tasks waiting in the backlog' : ''} and tasks waiting for your review"><span class="dot" style="background:${running ? 'var(--green)' : toReview ? 'var(--blue)' : 'var(--faint)'}"></span><span>${sum}</span>${subsLive ? ` <span class="subtag live" title="subagents running inside agents">${SUBI}${subsLive}</span>` : ''}</div>` +
-    (running || S.boss?.status === 'running' || (S.runs || []).some(r => r.status === 'running') ? `<button class="stat stopall" data-stop-all aria-label="Stop all" title="Stop every running agent and workflow run. Sessions are kept; tasks wait on hold.">■<span class="sl"> Stop all</span></button>` : '') +
-    (S.agents.some(a => a.status === 'paused') ? `<button class="stat resumeall" data-resume-all aria-label="Resume all" title="Let paused agents pick up work again">▶<span class="sl"> Resume</span></button>` : '') +
-    (() => {
-      const ready = S.tasks.filter(mergeReady), urls = [...new Set(ready.map(t => t.gh.url))];
-      if (!urls.length) return '';
-      const tip = ready.map(t => `PR #${t.gh.number} · #${t.id} ${t.title}`).join('\n');
-      return urls.length === 1
-        ? `<a class="stat readyb" href="${esc(urls[0])}" target="_blank" rel="noopener" title="Ready to merge on GitHub:\n${esc(tip)}">✓<b>1</b><span class="sl"> ready to merge</span></a>`
-        : `<button class="stat readyb" data-ready-merge title="Ready to merge on GitHub:\n${esc(tip)}">✓<b>${urls.length}</b><span class="sl"> ready to merge</span></button>`;
-    })() +
-    `<button class="stat memb" data-memory title="Crew memory: project facts every agent reads at the start of a task">🧠<b>${(S.facts || []).length}</b><span class="sl"> memory</span></button>` +
-    (blockedAll().length ? `<button class="stat blockedb" data-blocked title="Tool calls the permission mode refused: allow or dismiss them">⛔<b>${blockedAll().length}</b><span class="sl"> blocked</span></button>` : '') +
-    `<div class="stat tokstat" title="Tokens this session (input + cache reads + output), all agents${showCost && S.budget ? ` · spent today ${money(S.budget.day_spent)}` : ''}"><span class="dot" style="background:var(--violet)"></span><b class="tok">${fmtTok(S.agents.reduce((s, a) => s + tokTotal(a), 0))}</b>tokens${showCost ? ` · <b>${money(spend)}</b>` : ''}<button class="eye" data-toggle-cost title="${showCost ? 'Hide' : 'Show'} price" aria-label="${showCost ? 'Hide' : 'Show'} price">${showCost ? '$' : '<s>$</s>'}</button><button class="eye" data-budgets title="Budgets: stop a task or the day at a spend limit" aria-label="Budgets">▾</button></div>`;
+  $('#stats').innerHTML = stats({running, queued, toReview, subsLive, spend});
   if ($('#blockedModal').classList.contains('on')) drawBlocked();
+  tokWarnCheck();
   if ($('#memModal').classList.contains('on') && !$('#memModal').contains(document.activeElement)) drawMemory();
   if ($('#cbModal').classList.contains('on')) drawCardBtns();
 
   const authErr = S.agents.find(a => /authenticat|login|OAuth/i.test(a.error || ''));
   const b = $('#banner'), notes = [];
   if (authErr) notes.push(`<span>⚠ Claude Code is signed out, so agents can't run. In a terminal, run <code>claude /login</code>, then respawn the agents.</span>`);
+  if (S.budget?.tokens?.blocked) notes.push(`<span>⛔ Token budget reached (${fmtTok(S.budget.tokens.total)} of ${fmtTok(S.budget.tokens.limit)} since Crew started). Running turns finish; nothing new starts until you raise it or restart Crew.</span><button class="btn sm" data-budgets style="margin-left:auto">Budgets</button>`);
   if (S.budget?.blocked) notes.push(`<span>⛔ Daily budget reached (${usd(S.budget.day_spent)} of ${usd(S.budget.day_usd)}). Running agents were stopped and nothing new starts until tomorrow or you raise it.</span><button class="btn sm" data-budgets style="margin-left:auto">Budgets</button>`);
   b.classList.toggle('on', notes.length > 0);
   b.style.flexWrap = 'wrap';
@@ -1420,6 +1484,32 @@ function render() {
   renderAwake(); renderRail(); if (!view.dragging) renderBoard(); renderDrawer(); renderFeed();
   restoreFocus(fk);
 }
+// Header. The review queue is the one number that needs you, so it is the one chip that looks like a button and
+// opens the next decision sheet; running/queued are quiet text; memory moves to the ⋮ menu; the token chip is a
+// single target that opens Budgets (where the price toggle now lives).
+function stats({running, queued, toReview, subsLive, spend}) {
+  const T = S.budget?.tokens || {}, lv = tokLevel(T), w5 = planWin('five_hour');
+  const ready = S.tasks.filter(mergeReady), urls = [...new Set(ready.map(t => t.gh.url))];
+  const tip = ready.map(t => `PR #${t.gh.number} · #${t.id} ${t.title}`).join('\n');
+  return `<button class="stat needs ${toReview ? 'hot' : ''}" data-review-next title="${toReview ? 'Open the next decision sheet' : 'Nothing waits for your review'}">◎ <b>${toReview}</b> to review</button>` +
+    `<div class="stat quiet" title="Agents running now${queued ? ', and tasks waiting in the backlog' : ''}"><span class="dot" style="background:${running ? 'var(--green)' : 'var(--faint)'}"></span><span><b>${running}</b> running${queued ? ` · <b>${queued}</b> queued` : ''}</span>${subsLive ? ` <span class="subtag live" title="subagents running inside agents">${SUBI}${subsLive}</span>` : ''}</div>` +
+    (running || S.boss?.status === 'running' || (S.runs || []).some(r => r.status === 'running') ? `<button class="stat stopall" data-stop-all aria-label="Stop all" title="Stop every running agent and workflow run. Sessions are kept; tasks wait on hold.">■<span class="sl"> Stop all</span></button>` : '') +
+    (S.agents.some(a => a.status === 'paused') ? `<button class="stat resumeall" data-resume-all aria-label="Resume all" title="Let paused agents pick up work again">▶<span class="sl"> Resume</span></button>` : '') +
+    (!urls.length ? '' : urls.length === 1
+      ? `<a class="stat readyb" href="${esc(urls[0])}" target="_blank" rel="noopener" title="Ready to merge on GitHub:\n${esc(tip)}">✓<b>1</b><span class="sl"> ready to merge</span></a>`
+      : `<button class="stat readyb" data-ready-merge title="Ready to merge on GitHub:\n${esc(tip)}">✓<b>${urls.length}</b><span class="sl"> ready to merge</span></button>`) +
+    (blockedAll().length ? `<button class="stat blockedb" data-blocked title="Tool calls the permission mode refused: allow or dismiss them">⛔<b>${blockedAll().length}</b><span class="sl"> blocked</span></button>` : '') +
+    `<button class="stat tokstat usage ${lv}" data-budgets title="Tokens since Crew started, all agents${T.limit ? ` · ${T.pct}% of the ${fmtTok(T.limit)} budget` : ' · no token budget'}${w5 ? ` · Claude 5-hour limit ${pctOf(w5.utilization)}%` : ''}${showCost && S.budget ? ` · spent today ${money(S.budget.day_spent)}` : ''}&#10;Click for budgets, Claude's limits and the price toggle"><span class="dot"></span><b class="tok">${fmtTok(T.total || 0)}</b>${T.limit ? `<span class="tlim">/ ${fmtTok(T.limit)}</span>` : ''}<span class="sl"> tokens</span>${T.limit ? `<span class="tbar" aria-hidden="true"><i style="width:${Math.min(100, T.pct || 0)}%"></i></span>` : ''}${showCost ? ` · <b>${money(spend)}</b>` : ''}<span class="faint">▾</span></button>`;
+}
+document.addEventListener('click', e => {  // the "to review" chip walks through the review queue
+  const b = e.target.closest('[data-review-next]'); if (!b) return;
+  e.stopPropagation();
+  const q = S.tasks.filter(t => t.col === 'review').sort((x, y) => x.id - y.id);
+  if (!q.length) return toast('Nothing waits for your review', 'var(--faint)');
+  const i = q.findIndex(t => t.id === view.drawer?.review);
+  view.drawer = {review: q[(i + 1) % q.length].id};
+  if ((view.tab || 'board') !== 'board') gotoTab('board'); else render();
+}, true);
 // a re-render replaces the cards, chips and drawer buttons: put keyboard focus back where it was
 function focusKey() {
   const a = document.activeElement;
@@ -1613,6 +1703,8 @@ function schedHtml(col) {
   if (col === 'doing') return trs.map(tr => schedCard(tr, true)).join('');
   const folded = view.schedFold, on = trs.filter(t => t.enabled).length;
   const head = `<div class="schedh" data-sched-fold role="button" tabindex="0" aria-expanded="${!folded}" title="${folded ? 'Show' : 'Hide'} scheduled jobs">${folded ? '▸' : '▾'} Scheduled · ${on}${on < trs.length ? ` on, ${trs.length - on} off` : ''}<span class="ln"></span></div>`;
+  const nx = folded && trs.find(t => t.enabled && t.next);  // the folded line still says what fires next
+  if (nx) return head.replace('<span class="ln">', `<span class="nxt">· next ${esc(nx.name)} <span data-until="${nx.next}">${untilTxt(nx.next)}</span></span><span class="ln">`);
   if (folded) return head;
   return head + trs.map(tr => schedCard(tr, false)).join('');
 }
@@ -1656,7 +1748,7 @@ document.addEventListener('click', async e => {
   if (run) return schedRun(tr);
   openTriggers(); editTrig(tr);
 }, true);
-document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-sched],[data-sched-fold]')) e.target.click(); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('[data-sched],[data-sched-fold],.tokstat')) e.target.click(); });
 // Workflow runs on the board: one frame per run, in the column of its current step (the task it is on, or its last
 // task once it ended). The run's other tasks leave their columns and show as rows inside the frame.
 function runGroups() {
@@ -2035,7 +2127,7 @@ function cbForm(b) {
   $('#cbHas').value = b?.when.has || '';
   $('#cbTags').value = (b?.when.tags || []).join(', ');
   const cols = b?.when.cols || ['review', 'done'];
-  $('#cbCols').innerHTML = CB_COLS.map(([v, l]) => `<label><input type="checkbox" value="${v}" ${cols.includes(v) ? 'checked' : ''}>${l}</label>`).join('');
+  $('#cbCols').innerHTML = CB_COLS.map(([v, l]) => `<label><input type="checkbox" value="${v}" ${cols.includes(v) ? 'checked' : ''}>${l}</label>`).join('');  // B: the column's own name
   $('#cbFormTitle').textContent = b ? `Edit ${b.label}` : 'Add a button';
   $('[data-cb-save]').textContent = b ? 'Save changes' : 'Save button';
   $('[data-cb-cancel]').hidden = !b;
@@ -2080,21 +2172,75 @@ function allowDenial(name, id, once) {
     });
   setTimeout(() => { const i = $('#ruleIn'); if (i) { i.focus(); i.select(); i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#cfOk').click(); } }; } }, 0);
 }
+// Tokens since Crew started against the token budget: ok under 50%, warm to 80%, hot past it (and you acknowledge).
+const tokLevel = T => !T.limit ? '' : T.pct >= 80 ? 'hot' : T.pct >= 50 ? 'warm' : 'ok';
+const pctOf = u => Math.round((u > 1.5 ? u : u * 100) || 0);  // Claude Code reports utilization as a 0-1 share
+const planWin = k => S.plan?.unifiedWindows?.[k];
+const PLAN_LABEL = {five_hour: ['Current session', '5-hour window'], seven_day: ['Weekly', 'all models'], seven_day_opus: ['Weekly', 'Opus'], seven_day_sonnet: ['Weekly', 'Sonnet'], seven_day_fable: ['Weekly', 'Fable']};
+function parseTok(v) {
+  const m = String(v || '').trim().toLowerCase().replace(/[, _]/g, '').match(/^(\d+(?:\.\d+)?)([km]?)$/);
+  return m ? Math.round(+m[1] * ({k: 1e3, m: 1e6}[m[2]] || 1)) : (String(v || '').trim() ? NaN : 0);
+}
+function resetIn(ts) {
+  if (!ts) return '';
+  const s = ts - Date.now() / 1000;
+  if (s <= 0) return 'resets now';
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return s < 86400 ? `resets in ${h ? h + 'h ' : ''}${m}m` : 'resets ' + new Date(ts * 1000).toLocaleString([], {weekday: 'short', hour: 'numeric', minute: '2-digit'});
+}
+function planBars() {
+  const P = S.plan || {}, wins = Object.entries(P.unifiedWindows || {});
+  if (!wins.length) return '<div class="note" style="padding:0">Claude\'s session and weekly limits show here after an agent\'s next turn.</div>';
+  return wins.map(([k, w]) => { const p = pctOf(w.utilization), [l, sub] = PLAN_LABEL[k] || [k.replace(/_/g, ' '), ''];
+    return `<div class="pbar ${p >= 80 ? 'hot' : p >= 50 ? 'warm' : 'ok'}"><div class="brow"><span>${esc(l)}${sub ? ` <i>${esc(sub)}</i>` : ''}</span><b>${p}% used</b></div><span class="tbar wide"><i style="width:${Math.min(100, p)}%"></i></span><div class="pmeta">${resetIn(w.resetsAt)}</div></div>`; }).join('')
+    + `<div class="pmeta">${P.status && P.status !== 'allowed' ? `<b style="color:var(--red)">${esc(P.status.replace(/_/g, ' '))}</b> · ` : ''}${P.isUsingOverage ? 'using extra usage · ' : P.overageStatus === 'rejected' ? 'no extra usage · ' : ''}as of ${shortAgo(P.at)} ago</div>`;
+}
+function tokBlock(T) {
+  const by = Object.entries(T.by || {}).slice(0, 4);
+  return `<div class="brow"><span>Since Crew started <i>${shortAgo(T.since)} ago</i></span><b>${fmtTok(T.total)}${T.limit ? ' / ' + fmtTok(T.limit) : ''}</b></div>
+    ${T.limit ? `<div class="pbar ${tokLevel(T)}"><span class="tbar wide"><i style="width:${Math.min(100, T.pct)}%"></i></span><div class="pmeta">${T.pct}% of the token budget${T.blocked ? ' · nothing new starts' : ''}</div></div>` : ''}
+    <div class="pmeta">${fmtTok(T.in)} in · ${fmtTok(T.cache)} cache reads · ${fmtTok(T.out)} out${by.length ? ' · ' + by.map(([n, v]) => `${esc(n)} ${fmtTok(v)}`).join(', ') : ''}</div>`;
+}
 function openBudgets(anchor) {
-  const b = S.budget || {};
+  const b = S.budget || {}, T = b.tokens || {};
   MENU_ACTIONS = [];
-  showMenu(anchor, `<div class="mh">Budgets</div><div class="budgetf">
+  showMenu(anchor, `<div class="mh">Tokens</div><div class="budgetf">
+    ${tokBlock(T)}
+    <label>Token budget until Crew restarts<input class="field" id="bTok" value="${T.limit ? fmtTok(T.limit).replace(/\.0+(?=[kM])/, '') : ''}" placeholder="off, e.g. 5M or 800k"></label></div>
+    <div class="mh">Claude's limits</div><div class="budgetf">${planBars()}</div>
+    <div class="mh">Budgets</div><div class="budgetf">
     <div class="brow"><span>Spent today</span><b>${usd(b.day_spent)}</b></div>
     <label>Per task, USD<input class="field" id="bTask" type="number" min="0" step="0.5" value="${b.task_usd || ''}" placeholder="off"></label>
     <label>Per day, USD<input class="field" id="bDay" type="number" min="0" step="1" value="${b.day_usd || ''}" placeholder="off"></label>
-    <div class="note" style="padding:0">Empty or 0 is off. Claude reports cost when a turn ends, so a limit is checked then: a task over its budget is flagged and can't be sent back; a day over its budget stops running agents and starts nothing new until tomorrow or a higher budget.</div>
-    <button class="btn primary sm" data-save-budgets>Save budgets</button></div>`);
+    <div class="note" style="padding:0">Empty or 0 is off. Claude reports cost when a turn ends, so a limit is checked then: a task over its budget is flagged and can't be sent back; a day over its budget stops running agents and starts nothing new until tomorrow or a higher budget. The token budget counts from when Crew starts: at 80% it asks you to acknowledge, at 100% running turns finish and nothing new starts.</div>
+    <button class="btn primary sm" data-save-budgets>Save budgets</button></div>` +
+    '<div class="sep"></div>' + item(showCost ? 'Hide dollar amounts' : 'Show dollar amounts', toggleCost, {sub: 'On cards, in the rail and in the header'}));  // the price toggle lives here, not in the chip
   $('#bTask')?.addEventListener('keydown', e => { if (e.key === 'Enter') document.querySelector('[data-save-budgets]')?.click(); });
   $('#bDay')?.addEventListener('keydown', e => { if (e.key === 'Enter') document.querySelector('[data-save-budgets]')?.click(); });
+  $('#bTok')?.addEventListener('keydown', e => { if (e.key === 'Enter') document.querySelector('[data-save-budgets]')?.click(); });
 }
+// Past 80% (and again at 100%) of the token budget: a prompt that stays until you acknowledge it.
+function tokWarnCheck() {
+  const T = S.budget?.tokens, m = $('#tokModal');
+  if (!T || !T.level || T.level <= (T.ack || 0)) { if (m.classList.contains('on') && m.dataset.level) { m.classList.remove('on'); delete m.dataset.level; } return; }
+  if (m.classList.contains('on') && +m.dataset.level === T.level) { $('#tokLive').innerHTML = tokBlock(T); $('#tokPlan').innerHTML = planBars(); return; }
+  m.dataset.level = T.level;
+  $('#tokTitle').textContent = T.level >= 100 ? '⛔ Token budget reached' : `⚠ ${Math.floor(T.pct)}% of the token budget used`;
+  $('#tokBody').innerHTML = `<div class="budgetf" style="padding:0"><div id="tokLive">${tokBlock(T)}</div>
+    <div>${T.level >= 100 ? 'Running turns finish, but nothing new starts until you raise the budget or restart Crew.' : 'Work carries on. At 100% running turns finish and nothing new starts.'}</div>
+    <div class="kitl" style="margin-top:4px">Claude's limits</div><div id="tokPlan" class="budgetf" style="padding:0">${planBars()}</div></div>`;
+  m.classList.add('on');
+}
+$('#tokModal').addEventListener('click', async e => {
+  const b = e.target.closest('[data-tok-ack],[data-tok-raise]'); if (!b) return;
+  const lvl = +$('#tokModal').dataset.level;
+  await act('budget_ack', {level: lvl});
+  $('#tokModal').classList.remove('on'); delete $('#tokModal').dataset.level;
+  if ('tokRaise' in b.dataset) setTimeout(() => openBudgets($('.tokstat')), 0);
+});
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-blocked],[data-den-allow],[data-den-once],[data-den-dismiss],[data-budgets],[data-save-budgets]');
-  if (!b) return;
+  if (!b || e.target.closest('[data-toggle-cost]')) return;  // the $ eye sits inside the clickable token chip
   e.stopPropagation();
   const d = b.dataset, pick = v => { const [n, id] = v.split(':'); return [n, +id]; };
   if ('blocked' in d) { drawBlocked(); return $('#blockedModal').classList.add('on'); }
@@ -2103,7 +2249,9 @@ document.addEventListener('click', async e => {
   if (d.denDismiss) { const [n, id] = pick(d.denDismiss); return act('denial_dismiss', {agent: n, id}); }
   if ('budgets' in d) { e.stopImmediatePropagation(); return openBudgets(b); }
   if ('saveBudgets' in d) {
-    const r = await act('budgets', {task_usd: $('#bTask').value || 0, day_usd: $('#bDay').value || 0});
+    const tok = parseTok($('#bTok')?.value);
+    if (Number.isNaN(tok)) { $('#bTok').focus(); return toast('Token budget: a number like 5M, 800k or 2000000', 'var(--red)'); }
+    const r = await act('budgets', {task_usd: $('#bTask').value || 0, day_usd: $('#bDay').value || 0, tokens: tok});
     if (r.ok) { closeMenu(); toast('Budgets saved', 'var(--green)'); }
   }
 }, true);
@@ -2116,7 +2264,7 @@ function renderSettings(a) {
   const box = $('#dset'); if (!box) return;
   box.hidden = !view.showSettings;
   if (!view.showSettings) return;
-  const sig = JSON.stringify([agentKv(a), a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags, a.context, a.icon, a.color, (S.triggers || []).filter(t => trigAgent(t) === a.name)]);
+  const sig = JSON.stringify([agentKv(a), a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags, a.context, a.icon, a.color, a.toolkit, a.kit_est, S.toolkit, (S.triggers || []).filter(t => trigAgent(t) === a.name)]);
   if (sig === view.setSig || box.contains(document.activeElement)) return;
   view.setSig = sig;
   const busy = a.status === 'running';
@@ -2126,6 +2274,7 @@ function renderSettings(a) {
     <div class="row2"><span class="k">Model</span><div class="seg tight" data-cfg="model">${['', ...S.models].map(m => `<button data-v="${m}" class="${(a.model || '') === m ? 'on' : ''}" title="${MODEL_INFO[m]?.[1] || ''}">${MODEL_INFO[m]?.[0] || m}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Effort</span><div class="seg tight" data-cfg="effort">${['', ...S.efforts].map(e => `<button data-v="${e}" class="${(a.effort || '') === e ? 'on' : ''}">${e || 'Default'}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Context</span><div class="seg tight" data-cfg="context">${[['fresh', 'Fresh per task'], ['keep', 'Keep across tasks']].map(([v, l]) => `<button data-v="${v}" class="${a.context === v ? 'on' : ''}" title="${v === 'fresh' ? 'New Claude session for each new task: cheaper, no stale context. Messages, Send back and re-running a task it already worked on continue that task’s own session.' : 'One session across tasks: remembers earlier work, but every turn re-reads it.'}">${l}</button>`).join('')}</div></div>
+    <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Tools</span>${toolkitBox(a)}</div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Icon</span><div class="iconpick">${['', ...Object.keys(AGENT_ICONS)].map(k => `<button data-icon="${k}" class="${(a.icon || '') === k ? 'on' : ''}" title="${k || 'First letter'}" style="${(a.icon || '') === k ? avCss(a) : ''}">${k ? iconSvg(k, 16) : esc(a.name[0])}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Color</span><div class="swatches">${['', ...AGENT_COLORS].map(c => `<button data-color="${c}" class="${(a.color || '') === c ? 'on' : ''}" title="${c || 'Default'}" style="${c ? `background:${c};color:${inkOn(c)}` : ''}">${(a.color || '') === c ? '✓' : c ? '' : '∅'}</button>`).join('')}</div></div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Role</span><textarea class="field rolebox" id="cfgRole" rows="6" title="Enter saves · Shift+Enter for a new line · drag the corner to resize">${esc(a.role)}</textarea></div>
@@ -2138,6 +2287,7 @@ function renderSettings(a) {
   // a clicked button keeps focus, and the panel doesn't redraw while it holds focus: drop it, then redraw
   const pick = (k, v) => { a[k] = v || null; document.activeElement?.blur(); view.setSig = ''; render(); save(k, v); };
   box.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => pick('icon', b.dataset.icon));
+  wireToolkit(box, a, v => { a.toolkit = v === 'recommended' ? a.kit_rec : v; document.activeElement?.blur(); view.setSig = ''; render(); save('toolkit', v); });
   box.querySelectorAll('[data-color]').forEach(b => b.onclick = () => pick('color', b.dataset.color));
   const role = $('#cfgRole'), tags = $('#cfgTags');
   fitRole(role); role.oninput = () => fitRole(role);
@@ -2145,6 +2295,36 @@ function renderSettings(a) {
   role.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); role.blur(); } };
   tags.onblur = () => { if (tags.value !== a.tags.join(', ')) save('tags', tags.value); };
   tags.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); tags.blur(); } };
+}
+
+// Tools an agent loads. Every tool description goes out with every turn, so fewer tools = cheaper turns.
+const kTok = n => n >= 1000 ? '≈' + Math.round(n / 1000) + 'k' : '≈' + n;
+function kitSame(x, y) { return JSON.stringify(x && {g: [...x.groups].sort(), m: [...x.mcp].sort(), s: x.skills}) === JSON.stringify(y && {g: [...y.groups].sort(), m: [...y.mcp].sort(), s: y.skills}); }
+function toolkitBox(a) {
+  const C = S.toolkit || {groups: [], servers: []}, k = a.toolkit, rec = a.kit_rec;
+  const head = `<div class="kithead"><div class="seg tight"><button data-kit-mode="all" class="${k ? '' : 'on'}" title="Every built-in tool, MCP server, connector and skill you have: what a plain claude would load">Everything</button><button data-kit-mode="pick" class="${k ? 'on' : ''}" title="Only the tools ticked below">Picked</button></div>
+    <span class="kitest" title="Roughly what the tool descriptions cost on every turn, before any work">${kTok(a.kit_est || 0)} tokens / turn</span>
+    ${rec && !kitSame(k, rec) ? `<button class="btn sm" data-kit-rec title="From its role and tags: ${esc(rec.groups.join(', '))}${rec.mcp.length ? ' + ' + esc(rec.mcp.map(p => p.replace(/^mcp__/, '')).join(', ')) : ''}">✨ Use recommended</button>` : (k ? '<span class="muted" style="font-size:11.5px">✓ recommended</span>' : '')}</div>`;
+  if (!k) return `<div class="kit">${head}<div class="note" style="padding:0">Loads everything you have set up. Pick tools to make each of its turns cheaper.</div></div>`;
+  const recG = new Set(rec?.groups || []), recM = new Set(rec?.mcp || []);
+  const groups = C.groups.map(g => `<label class="kitrow" title="${esc(g.hint)}${g.tools.length ? '&#10;' + esc(g.tools.join(', ')) : ''}"><input type="checkbox" data-kit-g="${g.key}" ${k.groups.includes(g.key) ? 'checked' : ''} ${g.key === 'core' ? 'disabled' : ''}><span>${esc(g.label)}${recG.has(g.key) ? ' <i class="kitrec">rec</i>' : ''}</span><em>${kTok(g.tokens)}</em></label>`).join('');
+  const servers = C.servers.length ? C.servers.map(s => `<label class="kitrow" title="${esc(s.name)} · ${s.status || 'unknown'}${s.tools ? ' · ' + s.tools + ' tools' : ''}"><input type="checkbox" data-kit-m="${esc(s.prefix)}" ${k.mcp.includes(s.prefix) ? 'checked' : ''}><span>${esc(s.name)}${s.status !== 'connected' ? ' <i class="muted">' + esc(s.status || '') + '</i>' : ''}${recM.has(s.prefix) ? ' <i class="kitrec">rec</i>' : ''}</span><em>${s.tools ? kTok(s.tools * C.mcp_tool_tokens) : '?'}</em></label>`).join('')
+    : '<div class="note" style="padding:0">No MCP servers seen yet: they show here once any agent has started.</div>';
+  const lbl = g => C.groups.find(x => x.key === g)?.label || g;
+  const summary = [...k.groups.map(lbl), ...(k.skills ? ['Skills'] : []), ...C.servers.filter(s => k.mcp.includes(s.prefix)).map(s => s.name)].join(' · ');
+  return `<div class="kit">${head}
+    <details class="kitlist" ${view.kitOpen ? 'open' : ''}><summary title="Show or hide the tool list">${esc(summary)}</summary>
+    <div class="kitcol"><div class="kitl">Built-in</div>${groups}<label class="kitrow" title="Your skills and plugin skills, listed in its prompt; it loads one only when it uses it"><input type="checkbox" data-kit-s ${k.skills ? 'checked' : ''}><span>Skills</span><em>${kTok(C.skills_tokens)}</em></label></div>
+    <div class="kitcol"><div class="kitl">MCP servers &amp; connectors</div>${servers}</div>
+    <div class="note" style="padding:0">Unticked tools aren't loaded at all: if it needs one later, tick it here. The crew tools are always on.</div></details></div>`;
+}
+function wireToolkit(box, a, save) {
+  box.querySelector('.kitlist')?.addEventListener('toggle', e => { view.kitOpen = e.target.open; });  // stays as you left it across redraws
+  box.querySelectorAll('[data-kit-mode]').forEach(b => b.onclick = () => save(b.dataset.kitMode === 'all' ? null : (a.toolkit || 'recommended')));
+  box.querySelector('[data-kit-rec]')?.addEventListener('click', () => save('recommended'));
+  const read = () => ({groups: [...box.querySelectorAll('[data-kit-g]:checked')].map(x => x.dataset.kitG),
+    mcp: [...box.querySelectorAll('[data-kit-m]:checked')].map(x => x.dataset.kitM), skills: !!box.querySelector('[data-kit-s]')?.checked});
+  box.querySelectorAll('[data-kit-g],[data-kit-m],[data-kit-s]').forEach(x => x.onchange = () => save(read()));
 }
 
 // add-agent modal
@@ -2452,7 +2632,7 @@ function renderReviewDrawer(d, t) {
   $('#fb')?.addEventListener('input', autosize);
 }
 
-const FEED_COLOR = {memory:'var(--violet)',decide:'var(--accent)',alert:'var(--red)',handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)',blocked:'var(--amber)',budget:'var(--red)'};
+const FEED_COLOR = {memory:'var(--violet)',decide:'var(--accent)',alert:'var(--red)',handoff:'var(--violet)',clear:'var(--faint)',trigger:'var(--amber)',workflow:'var(--teal)',start:'var(--green)',review:'var(--blue)',approve:'var(--green)',reject:'var(--amber)',kill:'var(--red)',error:'var(--red)',respawn:'var(--accent)',add:'var(--faint)',queue:'var(--faint)',tell:'var(--accent)',blocked:'var(--amber)',budget:'var(--red)',repair:'var(--amber)',retry:'var(--amber)'};
 function renderFeed() {
   const f = S.feed;
   const last = f.length ? f[f.length - 1].t : 0;
@@ -3096,7 +3276,7 @@ function drawTrigForm() {
     spec = `<div><div class="label">Channel or chat<span class="faint lc">required: paste a link to it, or to any message in it</span></div>
         <input class="field" data-s="where" value="${esc(sp.where)}" placeholder="https://teams.microsoft.com/l/message/19%3a…%40thread.skype/…" maxlength="600" autocomplete="off">
         <div class="faint" style="font-size:11.5px;margin-top:4px">In Teams, hover a message in the channel → ⋯ → <i>Copy link</i>. A plain name works only where your organization lets the connector list teams.</div></div>
-      <div><div class="label">Name it<span class="faint lc">optional, shown on the trigger</span></div><input class="field" data-s="name" value="${esc(sp.name || '')}" placeholder="AI Studio feedback channel" maxlength="100" autocomplete="off"></div>
+      <div><div class="label">Name it<span class="faint lc">optional, shown on the trigger</span></div><input class="field" data-s="name" value="${esc(sp.name || '')}" placeholder="Team feedback channel" maxlength="100" autocomplete="off"></div>
       <div class="two"><div><div class="label">Fire on</div>${seg('s', 'mode', [['mention', '@mentions of me'], ['all', 'every new message']], sp.mode)}</div>
       <div><div class="label">Check every (min)</div><input class="field" type="number" min="5" data-s="every" value="${sp.every}"></div></div>
       <div><div class="label">Only about<span class="faint lc">optional</span></div><input class="field" data-s="about" value="${esc(sp.about)}" placeholder="e.g. deployments, outages or bugs in checkout" maxlength="200" autocomplete="off"></div>
@@ -3535,7 +3715,9 @@ function drawWfIns() {
     box.innerHTML = `<h4>Workflow</h4>
       ${wfField('What it\'s for', `<textarea class="field" data-w="description" rows="3" placeholder="Optional">${esc(wfe.description || '')}</textarea>`)}
       <div class="role" style="-webkit-line-clamp:unset">${wfe.steps.length} step${wfe.steps.length > 1 ? 's' : ''}: ${chainTxt(wfe.steps)}. Each step is a task for one agent; it gets the goal plus every earlier step's summary and merges the previous branch. Steps in brackets run at the same time, and the next step waits for all of them.</div>
-      <div class="thint">Click a block to edit it. ✋ on a line waits for your approval, ⚡ continues on its own; click to switch. ＋ adds a step after the line, or one that runs at the same time.</div>`;
+      <div class="thint">Click a block to edit it. ✋ on a line waits for your approval, ⚡ continues on its own; click to switch. ＋ adds a step after the line, or one that runs at the same time.</div>
+      ${(() => { const rep = [...new Set(wfe.steps.map(st => st.agent).filter((n, i, all) => all.indexOf(n) !== i))];
+        return `<label class="kitrow" style="white-space:normal;align-items:start;cursor:pointer"><input type="checkbox" data-wsub ${wfe.subagents ? 'checked' : ''} style="margin-top:3px"><span style="white-space:normal">Run steps as subagents<br><span class="faint" style="font-size:11.5px">An agent keeps one session for the whole run and does each step in a subagent named after the workflow, run and step. ${rep.length ? `Here ${esc(rep.join(', '))} ${rep.length > 1 ? 'work' : 'works'} more than one step.` : 'Pays off when one agent works several steps.'}</span></span></label>`; })()}`;
   }
 }
 async function wfSaveNow(close) {
@@ -3573,6 +3755,7 @@ $('#wfModal').addEventListener('click', async e => {
 $('#wfModal').addEventListener('input', e => {
   const el = e.target, d = el.dataset;
   if (d.w) wfe[d.w] = el.value;
+  if ('wsub' in d) wfe.subagents = el.checked;
   if (d.o) wfe.output[d.o] = el.value;
   if (d.s && wfSel?.[0] === 's') wfe.steps[wfStepNode(+wfSel.slice(1))][d.s] = el.value;
   if (d.o || d.s) { drawWfStage(); if (d.s === 'agent') drawWfIns(); }
@@ -3914,6 +4097,8 @@ $('#hMenu').onclick = e => {
   let h = '';
   if (['localhost', '127.0.0.1'].includes(location.hostname)) h += item('Open on phone…', openLan, {sub: 'Scan a code from a phone on the same Wi-Fi'}) + '<div class="sep"></div>';
   if (matchMedia('(max-width:760px)').matches && (view.tab || 'board') === 'board') h += item('Clear board…', () => setTimeout(() => clearMenu($('#hMenu'))), {sub: 'Remove finished or all tasks'}) + '<div class="sep"></div>';
+  const nf = (S?.facts || []).length;  // the memory chip lives here, out of the header
+  h += item(`Crew memory…<span class="faint"> · ${nf} fact${nf === 1 ? '' : 's'}</span>`, () => { $('#memQ').value = ''; memForm(null); $('#memModal').classList.add('on'); setTimeout(() => $('#memText').focus(), 0); }, {sub: 'Project facts every agent reads when it starts a task'}) + '<div class="sep"></div>';
   h += item('Card buttons…', openCardBtns, {sub: 'Your own one-click actions on task cards'}) + '<div class="sep"></div>';
   h += '<div class="mh">Agents</div>' + item('Export agents…', () => openIO('export'), {sub: 'Save all or some agents as a JSON file'}) +
     item('Import agents…', () => openIO('import'), {sub: 'Add agents from an exported file'}) + '<div class="sep"></div>';
@@ -4255,7 +4440,7 @@ function buildPalette() {
     ...(S.workflows || []).map(w => ({ic: '▶', label: `Run workflow: ${w.name}`, run: () => openRun(w)})),
     {ic: '⚡', label: 'New trigger', run: () => { openTriggers(); editTrig(null); }},
     ...(S.triggers || []).map(tr => ({ic: '⚡', label: `Run trigger: ${tr.name}`, run: () => act('trigger_run', {id: tr.id})})),
-    {ic: '$', label: showCost ? 'Hide prices' : 'Show prices', run: () => document.querySelector('[data-toggle-cost]')?.click()},
+    {ic: '$', label: showCost ? 'Hide prices' : 'Show prices', run: toggleCost},
     ...S.agents.map(a => ({ic: '⚙', label: `Model & role: ${a.name}`, run: () => { view.drawer = {agent: a.name}; view.showSettings = true; view.setSig = ''; render(); }})),
     ...S.agents.map(a => ({ic: '−', label: `Remove agent ${a.name}`, run: () => { view.drawer = {agent: a.name}; view.showSettings = true; render(); setTimeout(() => document.querySelector('[data-remove-agent]')?.click(), 0); }})),
     ...S.agents.map(a => ({ic: '›', label: `Message ${a.name}`, run: () => { view.drawer = {agent: a.name}; render(); setTimeout(() => $('#msg')?.focus(), 0); }})),

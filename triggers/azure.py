@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -11,6 +12,16 @@ AZ_UNSAFE = re.compile(r'[%^&|<>"!`\x00-\x1f]')  # az is a .cmd file on Windows:
 
 class AzError(Exception):
     pass
+
+
+def argv(exe: str, args) -> list[str] | str:
+    """What subprocess runs for exe + args. az is a .cmd file on Windows: cmd.exe re-reads its arguments, and one
+    with ( ) , ; = or { } but no space (a --query filter) breaks its parse ("... was unexpected at this time"), so
+    each argument is put in double quotes there. AZ_UNSAFE keeps quotes and % ! out of them."""
+    if os.name != "nt" or not exe.lower().endswith((".cmd", ".bat")):
+        return [exe, *args]
+    quote = lambda a: '"' + a + "\\" * (len(a) - len(a.rstrip("\\"))) + '"'  # a trailing \ would escape the quote
+    return " ".join([quote(exe), *map(quote, args)])
 
 
 def az_hint(err: str) -> str:
@@ -34,7 +45,7 @@ def az(*args: str, raw: bool = False, timeout: int = 90):
         if AZ_UNSAFE.search(a):
             raise AzError(f"unsupported character in {a[:40]!r}")
     try:
-        r = subprocess.run([exe, *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
+        r = subprocess.run(argv(exe, args), capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=timeout, stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
         raise AzError(f"az timed out after {timeout} s") from None

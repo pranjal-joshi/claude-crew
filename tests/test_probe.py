@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock
 
 from tests.helpers import TempCrewCase, server
 
@@ -44,6 +45,8 @@ class Watch(TempCrewCase):
         self._run, self._thread = probe.run, probe.threading.Thread
         probe.run = lambda argv, cwd: (self.out[0], True)
         probe.threading.Thread = Now
+        self.addCleanup(setattr, server.Crew, "_ado_dflt", server.Crew._ado_dflt)
+        server.Crew._ado_dflt = {}  # Now runs threads inline: never read this machine's az defaults
         self.addCleanup(setattr, probe, "run", self._run)
         self.addCleanup(setattr, probe.threading, "Thread", self._thread)
         self.ci = next(iter(self.crew.agents.values()))
@@ -124,6 +127,23 @@ class Watch(TempCrewCase):
         self._poll()
         self.assertEqual(self.t["col"], "doing")
 
+    def test_a_command_that_keeps_failing_wakes_it_once(self):
+        probe.run = lambda argv, cwd: (self.out[0], self.out[0] != "boom")
+        self._watch(done="completed", fail="failed")
+        self._end_turn()
+        self.out[0] = "boom"  # e.g. cmd.exe could not read the az --query: it never matches done or fail
+        for _ in range(probe.ERRS - 1):
+            self._poll()
+        self.assertEqual(self.t["col"], "backlog")
+        self._poll()
+        self.assertEqual(self.t["col"], "doing")
+        self.assertIn("the watch command fails", self.sent[-1])
+        self.assertIn("boom", self.sent[-1])
+        self._end_turn("set a simpler watch")
+        for _ in range(probe.ERRS + 2):  # the same error does not wake it again
+            self._poll()
+        self.assertEqual(self.t["col"], "backlog")
+
     def test_the_watch_ends_after_the_steps_time_budget(self):
         self._watch(fail="FAILED")
         self._end_turn()
@@ -155,6 +175,21 @@ class Watch(TempCrewCase):
         self._watch()
         self.assertTrue(self.crew.act("watch", {"from": self.ci["name"], "command": ""}, via="mcp").get("ok"))
         self.assertNotIn("probe", self.t["wait"])
+
+
+
+class AzOnWindows(unittest.TestCase):
+    """az is az.cmd on Windows: cmd.exe broke on a --query with ( ) , { } and no space, so every argument is quoted."""
+
+    def test_cmd_files_get_every_argument_quoted(self):
+        argv = server.triggers.azure.argv
+        with unittest.mock.patch.object(server.triggers.azure.os, "name", "nt"):
+            exe, q = r"C:\az\az.CMD", "[?starts_with(v,'3a')].{n:id}"
+            self.assertEqual(argv(exe, ["build", "--query", q, "C:\\x\\"]),
+                             f'"{exe}" "build" "--query" "{q}" "C:\\x\\\\"')  # a trailing \ is doubled
+            self.assertEqual(argv("/usr/bin/az", ["a"]), ["/usr/bin/az", "a"])
+        with unittest.mock.patch.object(server.triggers.azure.os, "name", "posix"):
+            self.assertEqual(argv("az.cmd", ["a b"]), ["az.cmd", "a b"])
 
 
 if __name__ == "__main__":

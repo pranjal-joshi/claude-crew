@@ -271,7 +271,9 @@ class Budgets(TempCrewCase):
             self.assertIn("error", self.crew.act("budgets", {"task_usd": bad}))
         self.assertEqual(self.crew.act("budgets", {"task_usd": "", "day_usd": "2.5"}), {"ok": True})
         self.assertEqual((self.crew._budget("budget_task_usd"), self.crew._budget("budget_day_usd")), (0.0, 2.5))
-        self.assertEqual(self.crew.snapshot()["budget"], {"task_usd": 0.0, "day_usd": 2.5, "day_spent": 0.0, "blocked": False})
+        b = self.crew.snapshot()["budget"]
+        self.assertEqual({k: b[k] for k in ("task_usd", "day_usd", "day_spent", "blocked")}, {"task_usd": 0.0, "day_usd": 2.5, "day_spent": 0.0, "blocked": False})
+        self.assertEqual((b["tokens"]["total"], b["tokens"]["limit"]), (0, 0))
 
     def test_day_budget_stops_everyone_and_blocks_dispatch(self):
         self.crew.config["budget_day_usd"] = 1.0
