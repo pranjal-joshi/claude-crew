@@ -10,7 +10,7 @@ from unittest import mock
 
 import agents
 from tests.helpers import ROOT, TempCrewCase, server
-from tests.test_git import G, GitCrewCase, run
+from tests.test_git import GitCrewCase, run
 
 RESULT = {"type": "result", "subtype": "success", "is_error": False, "result": "done", "total_cost_usd": 0.1}
 
