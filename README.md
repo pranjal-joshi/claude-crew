@@ -37,7 +37,7 @@ Crew is pure standard-library Python (3.10 or newer) and installs as a `crew` co
 
 ```bash
 pipx install claude-crew                      # from PyPI, once published
-pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.8.0/claude_crew-0.8.0-py3-none-any.whl   # a release wheel
+pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.9.0/claude_crew-0.9.0-py3-none-any.whl   # a release wheel
 pipx install git+https://github.com/pranjal-joshi/claude-crew   # latest main
 ```
 
@@ -69,6 +69,7 @@ Crew gives that queue a home:
 - **One board** for every task, with Backlog, In progress, Review and Done columns.
 - **Agents that pull their own work.** Each agent has a role and tags; idle agents take matching tasks.
 - **No stepping on each other.** Every agent works in its own git worktree on its own `crew/<name>` branch.
+- **Waiting on you never holds work up.** An agent can run several tasks at once (its **Parallel** setting), each in its own Claude process, worktree and branch. A card waiting in Review keeps its worktree only while its changes are in it; the agent takes other work on another lane meanwhile.
 - **You stay the reviewer.** Finished work lands in Review as a decision sheet: the agent's summary, a verdict line (files, +/-, tests) and a per-file diff. Approve commits it, then one click merges the branch or opens a PR. Send back resumes the same session with your feedback.
 - **Work that starts itself.** Schedules, events, file watches, command polls and webhooks turn into tasks, so the standup gets written at 11:00 and every approved feature gets tests.
 
@@ -153,7 +154,15 @@ Text can use `{id}`, `{title}`, `{pr}`, `{pipeline}`, `{branch}`, `{agent}` and 
 
 Every card shows its cost. Click the token chip in the header for **budgets**: per task and per day in dollars, and a **token budget** counted from when Crew starts. A task that hits its budget is flagged and can't be sent back; a spent day budget stops running agents until the next local day or a higher budget. The token chip turns amber at half its budget and red at 80%, where a prompt asks you to acknowledge it; at 100% running turns finish and nothing new starts. The same menu shows Claude's own **5-hour session** and **weekly** limits with their reset times, read from what Claude Code streams.
 
+**Several tasks at once.** In an agent's settings, **Parallel** (1, the default, up to 8) is how many tasks it may run at the same time. Each runs in a *lane*: its own Claude process, worktree and branch, `crew/<name>` for the first and `crew/<name>.2`, `crew/<name>.3` … for the others, made the first time they are needed and reused after. The agent card shows one chip per lane. Claude sessions resume from any folder, so a task isn't tied to a lane: a send-back, a reply or Address review picks up the card's session in whichever lane is free, and may go past the limit because you asked for it. A card waiting in **Review** keeps its lane only while its uncommitted changes are in that worktree; a card without changes (the agent committed, or changed nothing) holds none. Either way the agent goes on with other work, so a card waiting for you never stops the next one from starting. Approve, Merge and Open PR use the branch of the lane the task ran on.
+
 **Tools per agent.** Every tool description goes out with every turn, so an agent that loads everything you have (all built-in tools, every MCP server, plugin and connector) can start each turn at 80k+ tokens. In an agent's settings, **Tools** switches from *Everything* to *Picked*: tick groups of built-in tools, the MCP servers and connectors it needs, and skills, each with a rough token cost, or press **✨ Use recommended** for a set based on its role and tags. Unticked tools aren't loaded at all; the crew tools always are.
+
+## Insights
+
+The **Insights** tab (<kbd>I</kbd>) is the crew's last 30 days (or 7 or 14), day by day: tokens per day with the input, cache and output split and the top agents on hover, spend, PRs the crew raised and merged, tasks started, done and sent back, PR reviews addressed, ⟳ monitors set with how many checks ran without the model, workflow runs, trigger firings, hand-offs and alerts. Tokens by agent ranks who used what, and a daily table lists every number.
+
+Crew counts each thing as it happens and keeps 90 days in the project's state, so a restart or **Clear board** leaves the history alone. A PR counts once however often agents cite it, and counts as raised only when the crew opened it, not when a brief handed it over (a PR CI monitor's PR still counts when it merges). Crew asks GitHub, read-only through `gh`, every 10 minutes whether the open ones merged. The first start after upgrading fills in earlier days from the tasks still on the board.
 
 ## Stop, kill, clear
 
@@ -238,12 +247,14 @@ At most 10 items start per check, and closed, done and removed items are skipped
 | 🧹 **Fresh context per task** | A new session per task keeps tokens down; send-back still resumes. Per-agent switch. |
 | 🧠 **Model and effort per agent** | Opus for the builder, Sonnet for the tester, Fable for research: each agent gets its own model and effort level (low to max). |
 | 🪢 **Subagents, visible** | When an agent fans out to subagents, you see each one live on the agent card, a count on the task, and a labelled thread in the transcript. |
-| 🌳 **Worktree isolation** | One worktree and branch per agent, kept even if the worktree folder goes missing. |
+| 🌳 **Worktree isolation** | One worktree and branch per agent (per lane, when it runs several tasks at once), kept even if the worktree folder goes missing. |
+| ⑂ **Parallel lanes** | An agent runs up to *Parallel* tasks at once. A card waiting for review never holds the next task up. |
 | 🔍 **Review gate** | A decision sheet: summary, verdict line and per-file diff. Approve and commit (<kbd>A</kbd>, with undo), send back, or hand off. |
 | 🔘 **Card buttons** | Your own one-click actions on task cards: run a skill in the card's agent, start a workflow, or hand off. Add them in the UI or ask the boss. |
 | 🔀 **Merge or PR** | One click merges an approved branch, or opens a PR with `gh`. Conflicts are listed and can go back to the agent. |
 | 🚫 **Blocked inbox** | Tool calls the permission mode refused are listed: Allow & retry, Allow once, or Dismiss. |
 | 💲 **Budgets** | Cost on every card, plus a per-task and a per-day budget that stops runs. |
+| 📈 **Insights** | A 30-day history: tokens per day, PRs raised and merged, tasks, reviews addressed, monitors. |
 | ↪️ **Hand-offs** | Drag any card, in any column, onto another agent. The earlier summary, branch and commit go along as context. |
 | ✦ **Boss chat** | A chat bar that runs the crew: tasks, workflows, agents and triggers, from plain requests. Replies render Markdown and Mermaid diagrams, and you can paste screenshots into it. |
 | ⌨ **Slash picker** | Type `/` in any chat box for Crew commands plus the agent's Claude Code commands and skills. **Clear chat** wipes a chat and its context. |

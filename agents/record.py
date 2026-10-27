@@ -15,8 +15,10 @@ NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,23}")
 RESERVED = {"boss", "you", "anyone", "auto"}
 ICON_RE = re.compile(r"[a-z][a-z0-9-]{0,23}")  # a key from the UI's icon set
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
-CONFIG_KEYS = ("model", "effort", "context", "role", "tags", "icon", "color", "off", "toolkit")
+CONFIG_KEYS = ("model", "effort", "context", "role", "deliverable", "tags", "icon", "color", "off", "toolkit", "max_parallel")
+PARALLEL_MAX = 8  # tasks one agent may run at once (agents/lanes.py)
 ROLE_MAX = 4000  # an agent role goes into its system prompt: room for a real brief, not a novel
+DELIVERABLE_MAX = 500  # what every reply of the agent is: one line, also repeated on chat follow-ups
 
 
 def clean_tags(tags) -> list[str]:
@@ -36,16 +38,29 @@ def config_change(key: str, value) -> str:
         return "turned off: takes no new work" if value else "turned on"
     if key == "toolkit":
         return "tools: " + ("everything" if not value else f"{len(value['groups'])} groups, {len(value['mcp'])} MCP, skills {'on' if value['skills'] else 'off'}")
-    if key in ("role", "tags", "icon", "color"):
+    if key in ("role", "deliverable", "tags", "icon", "color"):
         return f"{key} updated"
+    if key == "max_parallel":
+        return f"up to {value} task{'s' if value != 1 else ''} at once"
     if key == "effort":
         return f"{value or 'default'} effort"
     return f"{key} {value or 'default'}" if key == "context" else (value or "default model")
 
 
+def clean_parallel(v) -> int | None:
+    """max_parallel from the UI, the boss or a file: 1..PARALLEL_MAX, None when it isn't a number."""
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return None
+    return n if 1 <= n <= PARALLEL_MAX else None
+
+
 def new_agent(crew, spec: dict) -> dict:
     return {
-        "name": spec["name"], "role": spec.get("role", ""), "tags": list(spec.get("tags", [])),
+        "name": spec["name"], "key": spec["name"],  # key: its process, worktree and pidfile name (a lane's is <name>.<n>)
+        "max_parallel": clean_parallel(spec.get("max_parallel")) or 1, "role": spec.get("role", ""), "tags": list(spec.get("tags", [])),
+        "deliverable": str(spec.get("deliverable") or "").strip()[:DELIVERABLE_MAX],  # "": the preset's, else a generic one
         "model": spec.get("model") or None, "effort": spec.get("effort") or None,
         "icon": spec.get("icon") if ICON_RE.fullmatch(str(spec.get("icon") or "")) else None,
         "color": spec.get("color") if COLOR_RE.fullmatch(str(spec.get("color") or "")) else None,
@@ -67,15 +82,16 @@ def new_agent(crew, spec: dict) -> dict:
     }
 
 def attach_worktree(crew, a: dict) -> None:
-    wt = crew.work_root / "wt" / crew.key / a["name"]
+    wt = crew.work_root / "wt" / crew.key / a["key"]
     if crew.git and (wt / ".git").exists():
-        a["cwd"], a["branch"] = str(wt), f"crew/{a['name']}"
+        a["cwd"], a["branch"] = str(wt), f"crew/{a['key']}"
 
 def roster(crew) -> list[dict]:
     """The agents as crew.json keeps them."""
     return [{"name": a["name"], "role": a["role"], "tags": a["tags"], "model": a["model"],
              "effort": a["effort"], "context": a["context"],
-             **{k: a[k] for k in ("icon", "color", "off", "toolkit") if a.get(k)}} for a in crew.agents.values()]
+             **{k: a[k] for k in ("deliverable", "icon", "color", "off", "toolkit") if a.get(k)},
+             **({"max_parallel": a["max_parallel"]} if a.get("max_parallel", 1) > 1 else {})} for a in crew.agents.values()]
 
 
 def configure(crew, a: dict, p: dict) -> dict | None:
@@ -90,12 +106,18 @@ def configure(crew, a: dict, p: dict) -> dict | None:
         a["effort"] = p["effort"] or None
     if "role" in p:
         a["role"] = str(p["role"]).strip()[:ROLE_MAX]
+    if "deliverable" in p:
+        a["deliverable"] = str(p["deliverable"] or "").strip()[:DELIVERABLE_MAX]
     if "tags" in p:
         a["tags"] = clean_tags(p["tags"])
     if p.get("context") in CONTEXTS:
         a["context"] = p["context"]
     if "off" in p:
         a["off"] = bool(p["off"])
+    if "max_parallel" in p:
+        if (n := clean_parallel(p["max_parallel"])) is None:
+            return {"error": f"max_parallel: 1 to {PARALLEL_MAX}"}
+        a["max_parallel"] = n
     if "toolkit" in p:  # null: everything; "recommended": picked from its role and tags; else {groups, mcp, skills}
         a["toolkit"] = toolkit.recommend(crew, a) if p["toolkit"] == "recommended" else toolkit.clean(p["toolkit"])
     if "icon" in p:
@@ -107,8 +129,9 @@ def configure(crew, a: dict, p: dict) -> dict | None:
             return {"error": "color must be #rrggbb"}
         a["color"] = p["color"] or None
     crew._save_config()
-    if a["status"] != "running" and crew._alive(a["name"]) and tuple(a.get("launched") or ()) != crew._launch_key(a):
-        crew._kill_proc(a["name"])  # restarts with the new settings on its next task (session kept)
+    for ln in crew._lanes(a):
+        if ln["status"] != "running" and crew._alive(ln["key"]) and tuple(ln.get("launched") or ()) != crew._launch_key(ln):
+            crew._kill_proc(ln["key"])  # restarts with the new settings on its next task (session kept)
     changed = [k for k in CONFIG_KEYS if a.get(k) != before[k]]
     if changed:  # one event per real change, naming what changed (no repeat of the model line on every edit)
         crew.event("config", f"{a['name']} · " + ", ".join(config_change(k, a.get(k)) for k in changed), a["name"])
@@ -124,10 +147,10 @@ def add(crew, p: dict) -> dict | None:
         return {"error": f"{name} already exists"}
     if p.get("model") and p["model"] not in MODELS or p.get("effort") and p["effort"] not in EFFORTS:
         return {"error": "unknown model or effort"}
-    crew.agents[name] = new_agent(crew, {"name": name, "role": (p.get("role") or "").strip()[:ROLE_MAX],
+    crew.agents[name] = new_agent(crew, {"name": name, "role": (p.get("role") or "").strip()[:ROLE_MAX], "deliverable": p.get("deliverable"),
                                          "tags": clean_tags(p.get("tags") or []),
                                          "model": p.get("model"), "effort": p.get("effort"),
-                                         "icon": p.get("icon"), "color": p.get("color")})
+                                         "icon": p.get("icon"), "color": p.get("color"), "max_parallel": p.get("max_parallel")})
     attach_worktree(crew, crew.agents[name])
     crew._save_config()
     crew.event("agent", f"+ {name} joined the crew", name)
@@ -143,29 +166,36 @@ def rename(crew, a: dict, p: dict) -> dict | None:
         return {"error": f"{new} is reserved"}
     if new.lower() != old.lower() and new.lower() in {n.lower() for n in crew.agents}:
         return {"error": f"{new} already exists"}
-    if a["status"] == "running":
+    lanes = crew._lanes(a)
+    if any(ln["status"] == "running" or ln.get("preparing") for ln in lanes):
         return {"error": f"{old} is working: stop it first"}
     if crew._git_busy(old):
         return {"error": f"{old} has a commit or merge in progress: one moment"}
-    crew._kill_proc(old)
-    if crew.git and a.get("branch"):  # keep the worktree and branch in step with the name
-        path, branch = crew.work_root / "wt" / crew.key / new, f"crew/{new}"
-        case_only = new.lower() == old.lower()  # Windows paths and git refs ignore case: go via a temp name
-        if Path(a["cwd"]).exists() and Path(a["cwd"]).name != new:
-            for hop in ([path.with_name(new + "-renaming")] if case_only else []) + [path]:
-                r = git(crew.project, "worktree", "move", a["cwd"], str(hop))
-                if r.returncode != 0:
-                    return {"error": "could not move the worktree: " + r.stderr.strip()[:200]}
-                a["cwd"] = str(hop)
-        if branch != a["branch"]:
-            for hop in ([f"crew/{new}-renaming"] if case_only else []) + [branch]:
-                r = git(crew.project, "branch", "-m", a["branch"], hop)
-                if r.returncode != 0:
-                    crew.log(a, "sys", f"kept branch {a['branch']}: {r.stderr.strip()[:120]}")
-                    break
-                a["branch"] = hop
-    a["name"] = new
-    a["session"] = None  # sessions are filed by folder; the next message starts fresh
+    for ln in lanes:
+        crew._kill_proc(ln["key"])
+    moves = {}  # old lane key -> new: worktrees, branches and the tasks that point at them follow the name
+    wt = crew.work_root / "wt" / crew.key
+    if crew.git:  # other lanes' folders from earlier runs move too
+        known = {ln["key"]: ln for ln in lanes}
+        extra = sorted(f.name for f in wt.glob(f"{old}.*") if f.name.rsplit(".", 1)[-1].isdigit()) if wt.is_dir() else []
+        for key in [ln["key"] for ln in lanes if ln.get("branch")] + [k for k in extra if k not in known]:
+            ln = known.get(key) or {"cwd": str(wt / key), "branch": f"crew/{key}"}
+            nkey = new + key[len(old):]
+            if err := _move_lane(crew, ln, wt / nkey, f"crew/{nkey}", nkey.lower() == key.lower()):
+                return {"error": err}
+            moves[key] = nkey
+    for ln in lanes:
+        nkey = moves.setdefault(ln["key"], new + ln["key"][len(old):])
+        ln["key"], ln["name"] = nkey, new
+        ln["session"] = None  # sessions follow their tasks; the next chat message starts fresh
+    for tk in crew.tasks:
+        if (k := tk.get("lane") or (tk.get("who") == old and old)) in moves:
+            tk["lane"] = moves[k]
+            for f, val in (("cwd", str(wt / moves[k])), ("branch", f"crew/{moves[k]}")):
+                if tk.get(f):
+                    tk[f] = val
+    if old in crew.lanes:
+        crew.lanes[new] = crew.lanes.pop(old)
     crew._forget_sessions(old)
     renamed = [(new if n == old else n, ag) for n, ag in crew.agents.items()]
     crew.agents.clear()
@@ -192,12 +222,34 @@ def rename(crew, a: dict, p: dict) -> dict | None:
     crew.event("agent", f"{old} is now {new}", new)
 
 
+def _move_lane(crew, ln: dict, path: Path, branch: str, case_only: bool) -> str | None:
+    """Move a lane's worktree and rename its branch. Windows paths and git refs ignore case, so a case-only rename
+    goes via a temp name. Returns why it failed, or None."""
+    if Path(ln["cwd"]).exists() and Path(ln["cwd"]).name != path.name:
+        for hop in ([path.with_name(path.name + "-renaming")] if case_only else []) + [path]:
+            r = git(crew.project, "worktree", "move", ln["cwd"], str(hop))
+            if r.returncode != 0:
+                return "could not move the worktree: " + r.stderr.strip()[:200]
+            ln["cwd"] = str(hop)
+    if branch != ln["branch"]:
+        for hop in ([branch + "-renaming"] if case_only else []) + [branch]:
+            r = git(crew.project, "branch", "-m", ln["branch"], hop)
+            if r.returncode != 0:
+                if "log" in ln:
+                    crew.log(ln, "sys", f"kept branch {ln['branch']}: {r.stderr.strip()[:120]}")
+                break
+            ln["branch"] = hop
+    return None
+
+
 def remove(crew, a: dict) -> dict | None:
     if len(crew.agents) <= 1:
         return {"error": "keep at least one agent"}
     if crew._git_busy(a["name"]):
         return {"error": f"{a['name']} has a commit or merge in progress: one moment"}
-    crew._kill_proc(a["name"])
+    for ln in crew._lanes(a):
+        crew._kill_proc(ln["key"])
+    crew.lanes.pop(a["name"], None)
     for tk in crew.tasks:
         if tk.get("who") == a["name"] or tk.get("pinned") == a["name"]:
             if tk["col"] == "doing":
@@ -241,16 +293,21 @@ def import_agents(crew, specs, update: bool) -> dict:
                   "model": spec.get("model") or None, "effort": spec.get("effort") or None}
         for k, rx in (("icon", ICON_RE), ("color", COLOR_RE)):
             fields[k] = spec.get(k) if rx.fullmatch(str(spec.get(k) or "")) else None
+        if n := clean_parallel(spec.get("max_parallel")):
+            fields["max_parallel"] = n
         if spec.get("context") in CONTEXTS:
             fields["context"] = spec["context"]
+        if spec.get("deliverable"):
+            fields["deliverable"] = str(spec["deliverable"]).strip()[:DELIVERABLE_MAX]
         if name.lower() in have:
             if not update:
                 skipped.append({"name": have[name.lower()], "why": "already exists"})
                 continue
             a = crew.agents[have[name.lower()]]
             a.update(fields)
-            if a["status"] != "running" and crew._alive(a["name"]) and tuple(a.get("launched") or ()) != crew._launch_key(a):
-                crew._kill_proc(a["name"])  # restarts with the new settings on its next task (session kept)
+            for ln in crew._lanes(a):
+                if ln["status"] != "running" and crew._alive(ln["key"]) and tuple(ln.get("launched") or ()) != crew._launch_key(ln):
+                    crew._kill_proc(ln["key"])  # restarts with the new settings on its next task (session kept)
             updated.append(a["name"])
         else:
             crew.agents[name] = new_agent(crew, {"name": name, **fields})

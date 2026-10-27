@@ -135,6 +135,7 @@ class Denials(TempCrewCase):
             self.crew.act("denial_allow", {"agent": "builder", "id": d["id"], "once": True})
         self.assertEqual(t["allow_once"], ["Bash(npm run lint:*)"])
         self.assertNotIn("Bash(npm run lint:*)", self.crew.config["allowed_tools"])
+        a["task"] = 1  # the (mocked) retry puts a lane back on the card: it starts with the rule
         self.assertEqual(self.crew._once_rules(a), ["Bash(npm run lint:*)"])
         self.crew.act("approve", {"task": 1})  # the task ends: the rule goes with it
         self.assertNotIn("allow_once", t)
@@ -168,7 +169,7 @@ class DemoFlow(TempCrewCase):
     def run_denied_task(self):
         self.crew.act("add", {"title": "Deny the lint run", "agent": "builder"})
         self.crew.dispatch()
-        wait_for(lambda: self.a["status"] == "review", "the first turn to end")
+        wait_for(lambda: (self.crew._task(1) or {}).get("col") == "review", "the first turn to end")
         return self.crew._task(1)
 
     def test_denial_cost_pidfile_allow_and_retry(self):
@@ -182,7 +183,7 @@ class DemoFlow(TempCrewCase):
         r = self.crew.act("denial_allow", {"agent": "builder", "id": self.a["denials"][0]["id"]})
         self.assertEqual(r, {"ok": True})
         self.assertEqual(t["col"], "doing")  # asked to retry, like a send-back
-        wait_for(lambda: self.a["status"] == "review", "the retry to end")
+        wait_for(lambda: t["col"] == "review" and self.a["status"] != "running", "the retry to end")
         self.assertEqual(self.a["denials"], [])
         self.assertIn("lint: no problems", [e["text"] for e in self.a["log"] if e["kind"] == "text"])
         self.assertNotEqual(self.crew.procs["builder"].pid, pid)  # restarted with the new flags, session resumed
@@ -192,7 +193,7 @@ class DemoFlow(TempCrewCase):
     def test_allow_once_retry_then_the_rule_ends_with_the_task(self):
         t = self.run_denied_task()
         self.crew.act("denial_allow", {"agent": "builder", "id": self.a["denials"][0]["id"], "once": True})
-        wait_for(lambda: self.a["status"] == "review", "the retry to end")
+        wait_for(lambda: t["col"] == "review" and self.a["status"] != "running", "the retry to end")
         self.assertEqual(t["allow_once"], ["Bash(npm run lint:*)"])
         self.assertNotIn("Bash(npm run lint:*)", self.crew.config["allowed_tools"])
         self.crew.act("approve", {"task": 1})

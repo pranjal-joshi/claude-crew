@@ -24,7 +24,7 @@ class Event(Trigger):
         if (t.get("source") or {}).get("trigger") == tr["id"] or t.get("depth", 0) >= MAX_CHAIN:
             return  # no self-loops, no runaway chains
         w = crew.agents.get(t.get("who") or "")
-        branch = w["branch"] if w and w.get("branch") else ""
+        branch = t.get("branch") or (w["branch"] if w and w.get("branch") else "")
         crew._fire(tr, {"id": t["id"], "title": t["title"], "tag": t["tag"], "who": t.get("who") or "",
                         "summary": (summary if summary is not None else t.get("summary") or "")[:3000],
                         "branch": branch, "commit": t.get("commit") or "",

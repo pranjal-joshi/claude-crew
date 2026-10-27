@@ -297,7 +297,8 @@ class FaultyProcess(TempCrewCase):
 
     def test_garbage_lines_are_logged_and_the_turn_still_lands(self):
         self.run_fault("garbage")
-        self.assertEqual((self.a["status"], self.t["col"], self.t["summary"]), ("review", "review", "done despite the noise"))
+        # outside git a card in Review has no worktree to keep: the agent is free at once
+        self.assertEqual((self.a["status"], self.t["col"], self.t["summary"]), ("idle", "review", "done despite the noise"))
         self.assertTrue(any(x["kind"] == "sys" and "not JSON" in x["text"] for x in self.a["log"]))
 
     def test_error_results(self):
@@ -312,7 +313,7 @@ class FaultyProcess(TempCrewCase):
 
     def test_a_good_turn(self):
         self.run_fault("ok")
-        self.assertEqual((self.a["status"], self.t["col"]), ("review", "review"))
+        self.assertEqual((self.a["status"], self.t["col"]), ("idle", "review"))
 
 
 if __name__ == "__main__":

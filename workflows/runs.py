@@ -66,6 +66,8 @@ def start_run(crew, w: dict, title: str, details: str = "", source: dict | None 
            "source": source, "ado": (source or {}).get("ado"), "subagents": bool(w.get("subagents"))}
     crew.next_run += 1
     crew.runs.append(run)
+    from . import insights
+    insights.bump(crew, "runs")
     start_group(crew, run, 0)
     return run
 
@@ -159,10 +161,11 @@ def run_session(crew, run: dict, name: str, i: int) -> str | None:
 
 # A PR watch that wakes the agent for everything it must act on: a failed check (GitHub check runs and Azure Pipelines
 # statuses), a merge conflict, changes requested, and every new review (Copilot only ever COMMENTs). Its own replies,
-# posted as you, are left out so they don't wake it.
+# posted as you, are left out so they don't wake it, and so is a Copilot review with nothing new to act on ("generated no
+# new comments", or "No open issues" with no "previously missed" ones).
 WATCH_EXAMPLE = ('gh pr view 123 --json state,mergeable,reviewDecision,statusCheckRollup,reviews --jq \'[.state,.mergeable,.reviewDecision,'
                  '[.statusCheckRollup[]|select((.conclusion//.state//"")|test("FAILURE|ERROR|TIMED_OUT"))|"FAILED \\(.name//.context) \\(.detailsUrl//.targetUrl)"],'
-                 '[.reviews[]|select(.author.login!="YOUR_LOGIN")|"REVIEW \\(.author.login) \\(.state) \\(.submittedAt)"]]\'')
+                 '[.reviews[]|select(.author.login!="YOUR_LOGIN" and ((.body//"")|(test("generated no new comments") or (test("No open issues") and (test("previously missed")|not)))|not))|"REVIEW \\(.author.login) \\(.state) \\(.submittedAt)"]]\'')
 WATCH_FAIL = "FAILED|CONFLICTING|CHANGES_REQUESTED|REVIEW"
 
 
@@ -232,9 +235,9 @@ def on_task_event(crew, t: dict, col: str, summary: str | None) -> None:
     elif col == "review" and step.get("gate") == "auto":
         crew._jobs.append(("approve", t["id"], "workflow"))  # committed outside the lock; "done" then advances the run
     elif col == "done":
-        w = crew.agents.get(t.get("who") or "")
+        w = crew._holder(t) or crew.agents.get(t.get("who") or "")
         run["results"][i] = {"who": t.get("who") or "", "summary": cut(t.get("summary") or "", SUMMARY_MAX, t["id"]),
-                             "branch": w["branch"] if w and w.get("branch") else "", "commit": t.get("commit") or ""}
+                             "branch": t.get("branch") or (w["branch"] if w and w.get("branch") else ""), "commit": t.get("commit") or ""}
         run["note"] = ""
         g = group_of(run["steps"], i)
         if waiting := [k for k in g if not run["results"][k]]:  # a parallel step is still going: the next group waits
@@ -304,7 +307,7 @@ def output(crew, run: dict) -> None:
 
 
 def decide(crew, p: dict) -> dict | None:
-    src = crew.agents.get(p.get("from") or "")
+    src = crew._src(p)  # the lane that called
     verdict, reason = p.get("verdict"), " ".join(str(p.get("reason") or "").split())[:300]
     if verdict not in ("continue", "stop", "blocked"):
         return {"error": "verdict: continue, stop or blocked"}

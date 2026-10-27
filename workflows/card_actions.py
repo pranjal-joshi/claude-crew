@@ -116,7 +116,7 @@ def matches(crew, b: dict, t: dict) -> bool:
 def fill(text: str, t: dict, crew) -> str:
     a = crew.agents.get(t.get("who") or "") or {}
     vals = {"id": f"#{t['id']}", "title": t["title"], "pr": pr_of(t), "pipeline": (t.get("pipes") or [""])[-1],
-            "branch": a.get("branch") or "", "agent": t.get("who") or "", "summary": (t.get("summary") or "")[:4000]}
+            "branch": t.get("branch") or a.get("branch") or "", "agent": t.get("who") or "", "summary": (t.get("summary") or "")[:4000]}
     for k in PLACEHOLDERS:
         text = text.replace("{" + k + "}", vals[k])
     return text
@@ -134,10 +134,9 @@ def run(crew, t: dict, p: dict) -> dict:
         w = crew.agents.get(t.get("who") or "")
         if not w:
             return {"error": f"#{t['id']} has no agent to ask"}
-        if w["status"] == "running":
-            return {"error": f"{w['name']} is working: try again when it's done"}
-        if w["status"] == "killed":
-            return {"error": f"{w['name']} is killed; respawn it first"}
+        w, why = crew._lane_for_user(w, t)  # a free lane: other work on the agent doesn't hold this up
+        if not w:
+            return {"error": why}
         crew._task_session(w, t)
         if not crew._start(w):
             return {"error": w["error"]}
@@ -173,8 +172,8 @@ def run(crew, t: dict, p: dict) -> dict:
     details += f"\n\n---\nFrom #{t['id']} {t['title']}" + (f" ({t['who']})" if t.get("who") else "") + "."
     if pr_of(t):
         details += f"\nPR: {pr_of(t)}"
-    if src.get("branch"):
-        details += f"\nIts branch is {src['branch']}: `git merge {src['branch']}` if you need its changes."
+    if br := t.get("branch") or src.get("branch"):
+        details += f"\nIts branch is {br}: `git merge {br}` if you need its changes."
     if t.get("summary"):
         details += f"\n\nIts summary:\n{t['summary'][:4000]}"
     nt = {"id": crew.next_id, "title": t["title"][:200], "details": details.strip()[:8000], "tag": tag, "col": "backlog",

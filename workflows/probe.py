@@ -6,6 +6,7 @@ as long as those checks would (checks × every minutes), then the agent gets a l
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shlex
@@ -74,13 +75,35 @@ def run(argv: list[str], cwd) -> tuple[str, bool]:
     return out[:OUT_MAX * 4], not r.returncode
 
 
+SEEN_MAX = 300  # failing items a watch remembers
+
+
+def items(out: str) -> list[str]:
+    """A watch's output as separate items, so a new failure is told from one already seen whatever else changed
+    around it: the string values of JSON output (gh --jq, az -o json), else its lines."""
+    try:
+        data = json.loads(out)
+    except ValueError:
+        return [x.strip() for x in out.splitlines() if x.strip()]
+    found, todo = [], [data]
+    while todo:
+        x = todo.pop()
+        if isinstance(x, dict):
+            todo += list(x.values())
+        elif isinstance(x, list):
+            todo += x
+        elif x is not None:
+            found.append(str(x))
+    return found
+
+
 def digest(out: str) -> str:
     return hashlib.sha1(out.encode("utf-8", "replace")).hexdigest()
 
 
 def set_watch(crew, p: dict) -> dict:
     """Crew tool `watch`: the running agent puts a command on its ⟳ step; an empty command removes it."""
-    src = crew.agents.get(p.get("from") or "")
+    src = crew._src(p)  # the lane that called
     t = crew._task(src["task"]) if src and src.get("task") else None
     if not t and src and src["status"] == "running":  # a turn you started on its waiting step: a message, Address review
         t = next((x for x in (crew._task(src.get("addressing")), crew._task(src.get("last_task")))
@@ -103,9 +126,12 @@ def set_watch(crew, p: dict) -> dict:
         return {"error": err}
     old = w.get("probe") or {}
     w["probe"] = {"cmd": shlex.join(argv), "done": done, "fail": fail, "since": old.get("since") or time.time()}
-    if old.get("failed"):
-        w["probe"]["failed"] = old["failed"]  # the failure the agent already saw does not wake it again
+    for k in ("failed", "failed_items"):  # the failures the agent already saw do not wake it again
+        if old.get(k):
+            w["probe"][k] = old[k]
     crew._note_pipes(t, w["probe"]["cmd"])
+    from . import insights
+    insights.bump(crew, "watches")
     crew.event("wait", f"👁 {src['name']} watches #{t['id']}: {w['probe']['cmd'][:120]}", src["name"])
     crew.touch()
     wakes = [x for x in ("matches done" if done else "", "matches fail with a new failure" if fail else "",
@@ -143,9 +169,12 @@ def _probe(crew, t: dict) -> None:
             return
         h, first = digest(out), "seen" not in pr
         hit = bool(pr["done"] and re.search(pr["done"], out))
+        from . import insights
+        insights.bump(crew, "watch_checks")  # a check that cost no tokens
         if parked:  # blocked, over to a person: only reaching the goal wakes the agent again
             pr.update(seen=h, ran=time.time(), out=out[:OUT_MAX])
             if hit:
+                insights.bump(crew, "watch_wakes")
                 w.pop("blocked")
                 w.update(wake="done matched", next=0)
                 t["col"] = "backlog"
@@ -154,15 +183,21 @@ def _probe(crew, t: dict) -> None:
                 w["next"] = time.time() + WATCH_EVERY * 60
             crew.touch()
             return
-        failed = bool(pr.get("fail") and re.search(pr["fail"], out)) and h != pr.get("failed")
+        # Only a failing item it hasn't seen wakes the agent: a failure it already saw doesn't come back because a field
+        # next to it changed, and a review repeating what it answered (Copilot's "no new comments") isn't new
+        failing = {i for i in items(out) if re.search(pr["fail"], i)} if pr.get("fail") else set()
+        if "failed_items" not in pr and pr.get("failed") == h:
+            pr["failed_items"] = sorted(failing)  # a watch from before items: what it last woke on counts as seen
+        seen = set(pr.get("failed_items") or [])
+        failed = bool(failing - seen)
         if failed and first and "failed" not in pr:  # set at the end of the agent's turn: what fails now, it just saw
-            pr["failed"], failed = h, False
+            pr["failed"], pr["failed_items"], failed = h, sorted(failing)[-SEEN_MAX:], False
         changed = not first and h != pr["seen"] and not pr.get("fail")  # with a fail pattern, progress alone wakes nobody
         over = time.time() - pr.setdefault("since", time.time()) >= step["checks"] * step["every"] * 60
         pr.update(seen=h, ran=time.time(), out=out[:OUT_MAX])
         w["watched"] = w.get("watched", 0) + 1
         if failed:
-            pr["failed"] = h
+            pr["failed"], pr["failed_items"] = h, sorted(seen | failing)[-SEEN_MAX:]
         pr["errs"] = 0 if ok or hit or failed else pr.get("errs", 0) + 1
         broken = pr["errs"] == ERRS  # once: the agent fixes its watch, or says why the error is fine
         if hit or failed or changed or over or broken:
@@ -170,6 +205,7 @@ def _probe(crew, t: dict) -> None:
                            "the watch command fails" if broken else "last check"), next=0)
             if over and not hit:
                 w["checks"] = max(w.get("checks", 0), step["checks"] - 1)  # this look is the last one, then a person takes over
+            insights.bump(crew, "watch_wakes")
             crew.event("wait", f"👁 #{t['id']}: {w['wake']} · waking {t.get('who') or 'its agent'}", t.get("who"))
         else:
             w["next"] = time.time() + WATCH_EVERY * 60

@@ -37,7 +37,7 @@ except ImportError:
     import workflows
     from triggers import azure
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the
@@ -191,6 +191,22 @@ def parse_denials(raw) -> list[dict]:
     return out
 
 
+LOG_FULL = 4000  # a tool call's command or a tool error, as kept in the transcript
+LOG_CUT = {"detail": 240, "text": 1500}  # what each board update carries of a long line ("more": the rest is a click away)
+LOG_CUT_KINDS = ("tool", "toolerr", "you", "sys", "error", "subagent")  # an agent's own answers ("text") always go whole
+
+
+def log_view(log: list[dict]) -> list[dict]:
+    """Transcript lines for a board update: long commands, errors and task briefs cut short, marked "more". Every
+    update carries every agent's last lines, so a few long briefs would otherwise make each one megabytes."""
+    out = []
+    for e in log:
+        if e.get("kind") in LOG_CUT_KINDS and any(len(e.get(k) or "") > n for k, n in LOG_CUT.items()):
+            e = e | {k: e[k][:n] for k, n in LOG_CUT.items() if len(e.get(k) or "") > n} | {"more": True}
+        out.append(e)
+    return out
+
+
 def fmt_tokens(n: int) -> str:
     return f"{n / 1e6:.1f}M" if n >= 1e6 else f"{n / 1e3:.0f}k" if n >= 1e3 else str(n)
 
@@ -242,6 +258,7 @@ class Crew:
         self.next_alert = 1
         self.facts: list[dict] = []  # crew memory: project facts agents save with `remember` and read at each task's start
         self.facts_v = 1
+        self.hist = workflows.insights.empty()  # the Insights tab's day-by-day history, kept past restarts
         self.event_file = WORK_ROOT / "events" / f"{self.key}.jsonl"  # every feed event, kept past restarts
         self._suspects: dict[str, float] = {}  # health checks: states that looked wrong, and since when
         self.turn_costs: list[float] = []  # recent turns' cost, to keep the daily budget from being overshot
@@ -249,6 +266,7 @@ class Crew:
         self.tok = {"in": 0, "cache": 0, "out": 0, "since": time.time(), "by": {}, "ack": 0, "hit": False, "warned": None}
         self.plan: dict = {}  # Claude's plan limits, from the rate_limit_event Claude Code streams after each call
         self.agents: dict[str, dict] = {}
+        self.lanes: dict[str, list[dict]] = {}  # agent name -> its lanes after lane 1 (agents/lanes.py)
         for spec in config["agents"]:
             self.agents[spec["name"]] = agents.record.new_agent(self, spec)
         self.boss = agents.record.new_agent(self, {"name": "boss", "role": "Runs the crew", "tags": [],
@@ -303,7 +321,34 @@ class Crew:
             pass
 
     def _launch_key(self, a: dict) -> tuple:
+        self._sync_lane(a)
         return agents.launch.launch_key(self, a)
+
+    # ---- lanes: one Claude process per task an agent runs at once (agents/lanes.py) ----------------------------
+    def _lanes(self, a: dict) -> list[dict]:
+        return agents.lanes.of(self, a)
+
+    def _all_lanes(self) -> list[dict]:
+        return agents.lanes.every(self)
+
+    def _holder(self, t: dict) -> dict | None:
+        return agents.lanes.holder(self, t)
+
+    def _sync_lane(self, a: dict) -> None:
+        agents.lanes.sync(self, a)
+
+    def _lane_for_user(self, a: dict, t: dict) -> tuple[dict | None, str]:
+        return agents.lanes.for_user(self, a, t)
+
+    def _lane_busy(self, lane: dict) -> bool:
+        """Is a git action (approve, undo, merge, PR, diff) running on a task of this lane's worktree?"""
+        return any((tk := self._task(i)) and (tk.get("lane") or tk.get("who")) == lane["key"] for i in self._busy)
+
+    def _src(self, p: dict) -> dict | None:
+        """The lane a crew tool call came from: crew_mcp sends the agent's name and its lane's key."""
+        a = self.agents.get(p.get("from") or "")
+        ln = agents.lanes.find(self, p.get("lane")) if a and p.get("lane") else None
+        return ln if ln and ln["name"] == a["name"] else a
 
     def _once_rules(self, a: dict) -> list[str]:
         return agents.launch.once_rules(self, a)
@@ -354,6 +399,7 @@ class Crew:
         if data.get("day") == today():  # the day's spend survives a restart; a new day starts at zero
             self.day, self.day_spend, self.day_hit = data["day"], float(data.get("day_spend") or 0), data.get("day_hit")
         self.tasks = data.get("tasks", [])
+        self.hist_quiet = True  # links re-read from saved tasks are not new PRs
         owner: dict[str, int] = {}  # one session, one task: a later task that picked up another's session starts fresh
         for tk in sorted(self.tasks, key=lambda x: x.get("created") or 0):
             if tk.get("run_session"):
@@ -380,6 +426,8 @@ class Crew:
                 t.pop("acting", None)
             if t["col"] == "backlog" and t.get("who") and t["who"] not in self.agents:
                 t["who"] = t["pinned"] = None  # its agent left the roster; let the tags route it
+        self.hist_quiet = False
+        self.hist = workflows.insights.load(self, data.get("insights"))
         if b := data.get("boss"):
             self.boss.update({k: b[k] for k in ("session", "cost", "log", "tokens", "ctx") if k in b})
         for name, saved in data.get("agents", {}).items():
@@ -387,9 +435,17 @@ class Crew:
                 self.agents[name].update({k: saved[k] for k in ("session", "kept", "cost", "log", "tokens", "mcp", "skills", "skill_names", "plugins", "commands") if k in saved})
                 if self.agents[name]["status"] != "idle":
                     self.agents[name]["status"] = "idle"
-        for t in sorted(self.tasks, key=lambda x: x.get("finished") or 0):  # work waiting for you keeps its agent:
-            if t["col"] == "review" and (w := self.agents.get(t.get("who") or "")):  # approving commits its worktree
-                w.update(status="review", task=t["id"])
+        for t in sorted(self.tasks, key=lambda x: x.get("finished") or 0):  # work waiting for you keeps its lane:
+            if t["col"] == "review" and self._keeps_lane(t) and (w := self.agents.get(t.get("who") or "")):  # approving commits that worktree
+                ln = agents.lanes.ensure(self, t.get("lane") or w["key"])
+                if ln and ln["name"] == w["name"]:
+                    ln.update(status="review", task=t["id"])
+
+    def _keeps_lane(self, t: dict) -> bool:
+        """Does this card in Review hold its lane? Only while its uncommitted changes are in that lane's worktree:
+        a card without changes (or outside git) holds none, so the agent keeps working meanwhile."""
+        d = t.get("diff") or {}
+        return self.git and not ("patch" in d and not d.get("pending") and not d["patch"].strip())
 
     def _save(self) -> None:
         data = {"schema": STATE_SCHEMA, "project": str(self.project), "tasks": self.tasks, "next_id": self.next_id,
@@ -397,7 +453,9 @@ class Crew:
                 "runs": self.runs[-50:], "next_run": self.next_run,
                 "alerts": self.alerts[-200:], "next_alert": self.next_alert, "facts": self.facts, "facts_v": self.facts_v,
                 "day": self.day, "day_spend": round(self.day_spend, 6), "day_hit": self.day_hit,
-                "agents": {n: {"session": a["session"], **({"kept": a["kept"]} if "kept" in a else {}), "cost": a["cost"], "tokens": a["tokens"], "log": a["log"][-200:],
+                "insights": self.hist,
+                "agents": {n: {"session": a["session"], **({"kept": a["kept"]} if "kept" in a else {}), "cost": agents.lanes.totals(self, a)[0],
+                               "tokens": agents.lanes.totals(self, a)[1], "log": a["log"][-200:],
                            "mcp": a["mcp"], "skills": a["skills"], "skill_names": a.get("skill_names", []), "plugins": a.get("plugins", []), "commands": a.get("commands", [])}
                        for n, a in self.agents.items()},
                 "boss": {k: self.boss[k] for k in ("session", "cost", "tokens", "ctx")} | {"log": self.boss["log"][-200:]}}
@@ -414,6 +472,8 @@ class Crew:
 
     def event(self, kind: str, text: str, agent: str | None = None) -> None:
         with self.lock:
+            if kind == "handoff":
+                workflows.insights.bump(self, "handoffs")
             e = {"t": now(), "kind": kind, "text": text, "agent": agent}
             self.feed.append(e)
             self.feed = self.feed[-60:]
@@ -431,8 +491,8 @@ class Crew:
             pass  # the log is a record, never a reason to fail
 
     def log(self, a: dict, kind: str, text: str, **extra) -> None:
-        a["log"].append({"t": now(), "kind": kind, "text": text, **extra})
-        a["log"] = a["log"][-400:]
+        a["log"].append({"t": now(), "kind": kind, "text": text, **({"lane": a["n"]} if "n" in a else {}), **extra})
+        del a["log"][:-400]  # in place: an agent's lanes share its log
 
     # ---- alerts ----------------------------------------------------------------------
     def raise_alert(self, title: str, severity: str = "warning", details: str = "", agent: str | None = None,
@@ -456,6 +516,7 @@ class Crew:
               "status": "open", "task": None}
         self.next_alert += 1
         self.alerts.append(al)
+        workflows.insights.bump(self, "alerts")
         if link and (o := workflows.owners.owner(self, {workflows.owners.pr_key(link)})):  # news for the card that owns the PR
             workflows.owners.attach(self, o, f"alert ({severity}): {title}", agent or "Crew")
         self.alerts = [x for x in self.alerts if x["status"] != "resolved"][-150:] + \
@@ -538,16 +599,19 @@ class Crew:
 
     def busy(self) -> bool:
         """Work in flight: an agent or the boss mid-turn, or a workflow run going."""
-        return (any(a["status"] == "running" for a in self.agents.values()) or self.boss["status"] == "running"
+        return (any(a["status"] == "running" for a in self._all_lanes()) or self.boss["status"] == "running"
                 or any(r["status"] == "running" for r in self.runs))
 
     def snapshot(self) -> dict:
         with self.lock:
             roster = []
             for a in self.agents.values():
-                roster.append({k: v for k, v in a.items() if k != "log"} | {"log": a["log"][-120:], "alive": self._alive(a["name"]),
-                              "kit_est": agents.toolkit.estimate(self, a.get("toolkit")), "kit_rec": agents.toolkit.recommend(self, a)})
-            boss = {k: v for k, v in self.boss.items() if k != "log"} | {"log": self.boss["log"][-160:], "alive": self._alive("boss")}
+                roster.append({k: v for k, v in a.items() if k != "log"} | {"log": log_view(a["log"][-120:]),
+                              "alive": any(self._alive(ln["key"]) for ln in self._lanes(a)), "running": int(a["status"] == "running"),
+                              "kit_est": agents.toolkit.estimate(self, a.get("toolkit")), "kit_rec": agents.toolkit.recommend(self, a),
+                              "deliverable_default": agents.launch.deliverable(a | {"deliverable": ""})}
+                              | agents.lanes.view(self, a) | ({"status": "paused"} if a.get("paused") else {}))
+            boss = {k: v for k, v in self.boss.items() if k != "log"} | {"log": log_view(self.boss["log"][-160:]), "alive": self._alive("boss")}
             self._roll_day()
             tasks = [t | {"busy": self._busy[t["id"]]} if t["id"] in self._busy else t for t in self.tasks]
             return {"version": self.version, "project": str(self.project), "git": self.git, "boss": boss,
@@ -589,8 +653,8 @@ class Crew:
         return {"stat": stat, "patch": patch, "note": ""}
 
     # ---- processes -----------------------------------------------------------
-    def _alive(self, name: str) -> bool:
-        p = self.procs.get(name)
+    def _alive(self, key: str) -> bool:
+        p = self.procs.get(key)
         return bool(p and p.poll() is None)
 
     def _start(self, a: dict) -> bool:
@@ -617,11 +681,12 @@ class Crew:
     def reap_orphans(self) -> int:
         return agents.launch.reap_orphans(self)
 
-    def _agent(self, name) -> dict | None:
-        return self.boss if name == "boss" else self.agents.get(name or "")
+    def _agent(self, key) -> dict | None:
+        """The boss, an agent, or one of an agent's lanes, by process key."""
+        return agents.lanes.find(self, key)
 
-    def _kill_proc(self, name: str, wait: bool = False) -> None:
-        agents.launch.kill_proc(self, name, wait)
+    def _kill_proc(self, key: str, wait: bool = False) -> None:
+        agents.launch.kill_proc(self, key, wait)
 
     def _read(self, a: dict, p: subprocess.Popen) -> None:
         for line in p.stdout:
@@ -636,7 +701,7 @@ class Crew:
                 self.touch()
                 continue
             with self.lock:
-                if self.procs.get(a["name"]) is not p:
+                if self.procs.get(a["key"]) is not p:
                     p.stdout.close()
                     return  # killed and replaced
                 self._on_event(a, d)
@@ -645,8 +710,8 @@ class Crew:
         self._pid_drop(p.pid)
         p.stdout.close()
         with self.lock:
-            if self.procs.get(a["name"]) is p:
-                self.procs.pop(a["name"], None)
+            if self.procs.get(a["key"]) is p:
+                self.procs.pop(a["key"], None)
                 a["bg"] = {}  # background jobs end with the process
                 self._addressed(a)
                 if a["status"] in ("running",):
@@ -675,6 +740,8 @@ class Crew:
             a["skill_names"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("skills") or [])[:200]
             a["plugins"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("plugins") or [])[:100]
             a["commands"] = sorted({str(x if isinstance(x, str) else x.get("name", "")).lstrip("/") for x in d.get("slash_commands") or []} - {""})[:300]
+            if "n" in a and (top := self.agents.get(a["name"])):  # what the agent's chip and / picker show
+                top.update({k: a[k] for k in agents.lanes.SHARED if k in a})
             agents.toolkit.note_init(self, d.get("tools") or [])
             found = {"__".join(tool.split("__")[:2]) for tool in d.get("tools") or [] if tool.startswith("mcp__")}
             if found - self.mcp_allow:
@@ -701,7 +768,7 @@ class Crew:
                 elif b.get("type") == "tool_use":
                     inp = b.get("input") or {}
                     hint = inp.get("file_path") or inp.get("command") or inp.get("pattern") or inp.get("url") or inp.get("description") or ""
-                    hint = str(hint).replace(str(a["cwd"]), ".")[:160]
+                    hint = str(hint).replace(str(a["cwd"]), ".")[:LOG_FULL]  # the board shows the first line; click for all
                     if (b.get("name") == "Bash" and inp.get("run_in_background")) or b.get("name") == "Monitor":
                         a.setdefault("bg", {})[b.get("id") or str(now())] = {  # its tool_result says the job's id
                             "id": None, "kind": b["name"], "since": now(), "task": a["task"] or a.get("addressing"),
@@ -730,7 +797,7 @@ class Crew:
                 if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("is_error"):
                     c = b.get("content")
                     txt = c if isinstance(c, str) else json.dumps(c)[:300]
-                    self.log(a, "toolerr", txt[:300])
+                    self.log(a, "toolerr", txt[:LOG_FULL])
         elif t == "result":
             tid = a["task"]
             self._on_result(a, d, st)
@@ -874,9 +941,9 @@ class Crew:
                 task.setdefault("wait", {})["over"] = True  # out of checks: a person looks at it
                 task["wait"].pop("blocked", None)
             task["col"] = "review"
-            self._queue_diff(task)
             task["finished"] = now()
-            a["status"] = "review"
+            a["status"] = "review"  # holds its lane until the diff shows no changes (_lane_after_diff)
+            self._queue_diff(task)
             self.event("review", f"{a['name']} finished #{task['id']} · {task['title']}", a["name"])
             self._task_event(task, "review")
         else:
@@ -884,7 +951,7 @@ class Crew:
         a["activity"] = ""
         self.log(a, "done", f"turn finished · ${total:.3f} this session")
         if a.get("launched") and tuple(a["launched"]) != self._launch_key(a):
-            self._kill_proc(a["name"])  # session is kept; next start uses the new settings
+            self._kill_proc(a["key"])  # session is kept; next start uses the new settings
             self.log(a, "sys", "settings changed · restarts on next task")
 
     def _until_step(self, t: dict) -> dict | None:
@@ -926,7 +993,7 @@ class Crew:
             a["denials"].append({"id": self.next_denial, "tool": f["tool"], "cmd": f["cmd"], "rule": f["rule"], "task": tid, "n": 1, "t": now()})
             self.next_denial += 1
             new.append(f)
-        a["denials"] = a["denials"][-30:]
+        del a["denials"][:-30]  # in place: an agent's lanes share its inbox
         if new:
             f = new[0]
             self.log(a, "sys", f"blocked: {f['tool']} {f['cmd']}"[:200] + (f" (+{len(new) - 1} more)" if len(new) > 1 else "") + " · see the Blocked list")
@@ -935,12 +1002,12 @@ class Crew:
     def _drop_denials(self, tid: int) -> None:
         for ag in self.agents.values():
             if any(x["task"] == tid for x in ag["denials"]):
-                ag["denials"] = [x for x in ag["denials"] if x["task"] != tid]
+                ag["denials"][:] = [x for x in ag["denials"] if x["task"] != tid]
 
     def _end_task_rules(self, t: dict, a: dict) -> None:
         """A task ended: its allow-once rules go, and an idle process started with them restarts without them."""
-        if t.pop("allow_once", None) and a["status"] != "running" and self._alive(a["name"]):
-            self._kill_proc(a["name"])
+        if t.pop("allow_once", None) and a["status"] != "running" and self._alive(a["key"]):
+            self._kill_proc(a["key"])
 
     def _denial_allow(self, a: dict, p: dict) -> dict:
         """Allow a refused call (always, or just until its task ends), then restart the agent with the new flags and ask
@@ -954,7 +1021,7 @@ class Crew:
         once = bool(p.get("once"))
         if once:
             t = self._task(d["task"])
-            if not t or a["task"] != t["id"]:
+            if not t or t.get("who") != a["name"] or t["col"] not in ("doing", "review"):
                 return {"error": "this call isn't tied to the agent's current task: use Allow & retry instead"}
             if rule not in t.setdefault("allow_once", []):
                 t["allow_once"].append(rule)
@@ -963,26 +1030,32 @@ class Crew:
             if rule not in cur:
                 self.config["allowed_tools"] = [*cur, rule]  # a new list: DEFAULT_CONFIG's must stay as it is
             self._save_config()
-        a["denials"] = [x for x in a["denials"] if x["id"] != d["id"] and x["rule"] != rule]
+        a["denials"][:] = [x for x in a["denials"] if x["id"] != d["id"] and x["rule"] != rule]
         self.event("config", f"allowed {rule}" + (" until this task ends" if once else "") + f" · {a['name']}", a["name"])
-        for ag in self.agents.values():  # idle processes pick the rule up on their next start
-            if ag["status"] != "running" and self._alive(ag["name"]) and tuple(ag.get("launched") or ()) != self._launch_key(ag):
-                self._kill_proc(ag["name"])
-        return self._retry(a, d)
+        for ag in self._all_lanes():  # idle processes pick the rule up on their next start
+            if ag["status"] != "running" and self._alive(ag["key"]) and tuple(ag.get("launched") or ()) != self._launch_key(ag):
+                self._kill_proc(ag["key"])
+        return self._retry(next((ln for ln in self._lanes(a) if ln["task"] == d["task"]), a), d)
 
     def _retry(self, a: dict, d: dict) -> dict:
+        t = self._task(d["task"])
+        back = bool(t and t["col"] == "review" and t.get("who") == a["name"])  # its card waits in Review: a send-back
+        if back and a.get("task") != t["id"]:  # its lane went on to other work: a free lane resumes the card's session
+            a = agents.lanes.for_user(self, self.agents.get(a["name"]) or a, t)[0] or a
         if a["status"] == "running":
             return {"ok": True, "note": f"{a['name']} is working: the rule applies from its next start"}
-        if a["status"] in ("killed", "paused"):
-            return {"ok": True, "note": f"{a['name']} is {a['status']}: the rule is saved, nothing was retried"}
+        if a["status"] in ("killed", "paused") or (self.agents.get(a["name"]) or {}).get("paused"):
+            return {"ok": True, "note": f"{a['name']} is {'killed' if a['status'] == 'killed' else 'paused'}: the rule is saved, nothing was retried"}
         if self._day_blocked():
             return {"ok": True, "note": "the daily budget is reached: the rule is saved, nothing was retried"}
-        self._kill_proc(a["name"])  # restarts with the rule in its flags; the session is kept
+        if back:
+            self._task_session(a, t)
+            a["task"] = t["id"]  # before the start: its allow-once rules come from the task
+        self._kill_proc(a["key"])  # restarts with the rule in its flags; the session is kept
         if not self._start(a):
             return {"error": a["error"]}
         msg = f"The command you needed is now allowed; retry it.\n({d['tool']}: {d['cmd'][:200]})"
-        t = self._task(d["task"])
-        if t and t["col"] == "review" and t.get("who") == a["name"] and a["task"] == t["id"]:
+        if back:
             t.update(col="doing", started=now())  # back at work on it, like a send-back
         a.update(status="running", since=now(), activity="retrying…", error=None)
         self.log(a, "you", msg)
@@ -1021,7 +1094,7 @@ class Crew:
         Each running agent is counted at the average recent turn's cost; one more starts only if that still fits.
         With nothing running, work always starts (until the budget is actually reached)."""
         bd = self._budget("budget_day_usd")
-        running = sum(1 for a in self.agents.values() if a["status"] == "running") + (self.boss["status"] == "running")
+        running = sum(1 for a in self._all_lanes() if a["status"] == "running") + (self.boss["status"] == "running")
         if not bd or not running or not self.turn_costs:
             return False
         avg = sum(self.turn_costs) / len(self.turn_costs)
@@ -1036,6 +1109,7 @@ class Crew:
             return
         self._roll_day()
         self.day_spend += delta
+        workflows.insights.bump(self, "cost", delta)
         if t is not None:
             t["cost"] = round((t.get("cost") or 0) + delta, 6)
 
@@ -1049,8 +1123,8 @@ class Crew:
                 t.update(hold=True, budget_hold=True)
             if a["status"] == "running":
                 self._stop_agent(a, f"#{t['id']} {msg}")
-            elif self._alive(a["name"]):
-                self._kill_proc(a["name"])  # the finished work stays in review; a send-back is refused until the budget is raised
+            elif self._alive(a["key"]):
+                self._kill_proc(a["key"])  # the finished work stays in review; a send-back is refused until the budget is raised
             self.log(a, "sys", f"#{t['id']} {msg}")
             self.event("budget", f"#{t['id']} {msg}", a["name"])
         bd = self._budget("budget_day_usd")
@@ -1058,7 +1132,7 @@ class Crew:
             self.day_hit = self.day
             msg = f"budget reached (${self.day_spend:.2f} of ${bd:.2f} today)"
             n = 0
-            for ag in [*self.agents.values(), self.boss]:
+            for ag in [*self._all_lanes(), self.boss]:
                 if ag["status"] == "running":
                     tk = self._task(ag["task"]) if ag["task"] else None
                     self._stop_agent(ag, msg)
@@ -1082,6 +1156,7 @@ class Crew:
         for k, v in n.items():
             self.tok[k] += v
         self.tok["by"][a["name"]] = self.tok["by"].get(a["name"], 0) + sum(n.values())
+        workflows.insights.tokens(self, a["name"], n)
         lim = int(self._budget("budget_tokens"))
         if not lim:
             return
@@ -1117,11 +1192,12 @@ class Crew:
         resumed = False
         if not blocked:
             self.day_hit = None
-            for ag in [*self.agents.values(), self.boss]:
+            for ag in [*self._all_lanes(), self.boss]:
                 if ag.get("budget_paused"):
                     ag["budget_paused"] = False
-                    if ag["status"] == "paused":
-                        ag["status"], resumed = "idle", True
+                    if ag["status"] == "paused" or ag.pop("paused", None):
+                        ag["status"] = "idle" if ag["status"] == "paused" else ag["status"]
+                        resumed = True
         for t in self.tasks:
             over = self._over_task(t)
             if t.get("budget_hit") and not over:
@@ -1155,16 +1231,21 @@ class Crew:
             self.event("budget", f"#{t['id']} is over its task budget (${t.get('cost') or 0:.2f} of ${self._budget('budget_task_usd'):.2f}): "
                                  "raise the budget to run it again", a["name"])
             return False
-        if self._git_busy(a["name"]):
+        if self._lane_busy(a):
             return False
         self._task_session(a, t)
         self._note_prs(t, brief=(t.get("details"),))
         if not self._start(a):
             return False
         a["last_task"] = t["id"]
-        a["denials"] = [x for x in a["denials"] if x["task"] == t["id"]]  # the inbox is per task
+        held = {ln["task"] for ln in self._lanes(self.agents.get(a["name"]) or a)} | {t["id"]}
+        a["denials"][:] = [x for x in a["denials"] if x["task"] in held]  # the inbox is per task (shared by the agent's lanes)
         tk = a["tokens"]
+        workflows.insights.bump(self, "tasks_started")
         t.update(col="doing", who=a["name"], started=now(), tok0=tk["in"] + tk["cache"] + tk["out"] - t.get("tokens", 0))
+        if a.get("kind") != "boss":  # where this task's work lives: approve, diff, merge and PR read it from here
+            t.update(lane=a["key"], **({"cwd": a["cwd"], "branch": a["branch"]} if a.get("branch") else {}))
+            t.pop("lane_only", None)
         a.update(status="running", task=t["id"], since=now(), activity="starting…")
         w = t.get("wait") or {}
         if (w.get("checks") or str(w.get("wake") or "").startswith("fix")) and (step := self._until_step(t)):
@@ -1174,6 +1255,9 @@ class Crew:
             body = f"Task #{t['id']}: {t['title']}"
             if t.get("details"):
                 body += "\n\n" + t["details"]
+        if "n" in a and a.get("branch"):  # another lane: its worktree and branch, not the ones its role may name
+            body += (f"\n\nYou are one of {a['name']}'s parallel lanes: for this task work in {a['cwd']} on branch "
+                     f"{a['branch']} (not crew/{a['name']}). Commit there if your role says to commit; don't switch branches.")
         body += workflows.owners.block(t) + workflows.memory.block(self, t)
         body += self._ado_hint(t, body)
         self.log(a, "you", body)
@@ -1229,6 +1313,9 @@ class Crew:
                 t.pop("prs")
         if mine:
             t["prs"] = list(dict.fromkeys([*(t.get("prs") or []), *mine]))[-5:]
+            handed = set(self._pr_links(*brief, t.get("details")))
+            for u in mine:
+                workflows.insights.pr(self, u, raised=u not in handed)
         self._note_pipes(t, *texts, *brief)
 
     def _note_pipes(self, t: dict, *texts: str | None) -> None:
@@ -1257,7 +1344,7 @@ class Crew:
 
     def _read_pr_owner(self, url: str) -> None:
         with self.lock:
-            branches = {a["branch"] for a in self.agents.values() if a.get("branch")}
+            branches = {a["branch"] for a in self._all_lanes() if a.get("branch")}
         try:
             yours = triggers.pr.owned(url, branches, self.project)
         except Exception:  # can't tell now (no CLI, signed out, offline): left off the card, read again when next mentioned
@@ -1272,7 +1359,7 @@ class Crew:
             self._pr_mine[url] = bool(yours)
             if yours in ("MERGED", "CLOSED"):
                 self._pr_closed.add(url)
-            self._pr_had.pop(url, None)
+            had = self._pr_had.pop(url, None)
             ids = self._pr_wait.pop(url, set())
             cited = {i for u, i in self._pr_cited if u == url}
             self._pr_cited -= {(url, i) for i in cited}
@@ -1280,6 +1367,9 @@ class Crew:
                 for tk in self.tasks:  # a link only the brief named joins while its PR is open
                     if tk["id"] in ids and not (tk["id"] in cited and url in self._pr_closed and url != tk.get("pr")):
                         tk["prs"] = list(dict.fromkeys([*(tk.get("prs") or []), url]))[-5:]
+                        if not had:  # a link saved before a restart was counted then
+                            workflows.insights.pr(self, url, raised=tk["id"] not in cited and url not in self._pr_links(tk.get("details")))
+                workflows.insights.pr_state(self, url, yours if isinstance(yours, str) else None)
         if yours and ids:
             self.touch()
 
@@ -1332,30 +1422,46 @@ class Crew:
             moved |= bool(agents.health.check(self)) | agents.health.tick_retries(self)
             if not self._day_blocked() and not self._tok_blocked():  # a spent budget dispatches nothing until it is raised
                 for a in self.agents.values():
-                    if a.get("off") or self._git_busy(a["name"]):
-                        continue
-                    if a["status"] == "idle" and (h := a.pop("review_hold", None)) and not a.get("task")                             and (rt := self._task(h)) and rt["col"] == "review":
-                        a.update(status="review", task=h)  # its ⟳ check is done: back on the card waiting for you
-                        moved = True
-                    rt = self._task(a.get("task")) if a["status"] == "review" else None
-                    d = (rt or {}).get("diff") or {}
-                    watch_only = bool(rt and rt["col"] == "review" and "patch" in d and not d.get("pending") and not d["patch"].strip())
-                    if a["status"] != "idle" and not watch_only:
-                        continue  # a card in review with changes keeps its agent: nothing may touch that worktree
-                    t = next((t for t in self.tasks if t["col"] == "backlog" and not t.get("hold") and not self._over_task(t) and
-                              (t.get("wait") or {}).get("next", 0) <= now() and t.get("retry_at", 0) <= now() and
-                              (not (t.get("wait") or {}).get("probe") or (t.get("wait") or {}).get("wake")) and
-                              not (t.get("wait") or {}).get("fixing") and
-                              (not watch_only or t.get("who") == a["name"] and self._until_step(t)) and
-                              (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"]))), None)
-                    if t:
-                        if watch_only:  # a review card with no changes doesn't stall the agent's ⟳ checks
-                            a.update(status="idle", task=None, review_hold=rt["id"])
-                        if not self._begin(a, t) and watch_only:
-                            a.update(status="review", task=a.pop("review_hold"))
-                        moved = True
+                    if not a.get("off") and not a.get("paused") and a["status"] not in ("paused", "killed", "error"):
+                        moved |= self._fill_lanes(a)
         if moved:
             self.touch()
+
+    def _ready(self, t: dict, a: dict) -> bool:
+        """Is backlog task t ready for agent a now?"""
+        w = t.get("wait") or {}
+        return (t["col"] == "backlog" and not t.get("hold") and not self._over_task(t) and w.get("next", 0) <= now()
+                and t.get("retry_at", 0) <= now() and (not w.get("probe") or w.get("wake")) and not w.get("fixing")
+                and (t.get("who") == a["name"] or (not t.get("who") and t["tag"] in a["tags"])))
+
+    def _fill_lanes(self, a: dict) -> bool:
+        """Start agent a's backlog work on its free lanes, up to max_parallel running at once. A card waiting in
+        Review never holds the rest up: with changes it keeps its own lane and the work goes to another one."""
+        moved, tried = False, set()
+        while agents.lanes.running(self, a) < agents.lanes.cap(a):
+            free = agents.lanes.free(self, a)
+            live = {ln["session"] for ln in self._lanes(a) if ln["status"] == "running" and ln["session"]}
+            pick = None
+            for t in self.tasks:
+                if t["id"] in tried or not self._ready(t, a) or (t.get("sessions") or {}).get(a["name"]) in live:
+                    continue  # (a session one lane is running can't run in a second lane at the same time)
+                if t.get("lane_only"):  # work that must happen in one worktree, e.g. resolving that branch's merge conflicts
+                    ln = next((x for x in free if x["key"] == t.get("lane")), None)
+                    if not ln and not agents.lanes.find(self, t.get("lane")) and agents.lanes.room(self, a):
+                        ln = agents.lanes.ensure(self, t.get("lane"))
+                        ln = ln if ln and ln["name"] == a["name"] else None
+                else:
+                    ln = free[0] if free else agents.lanes.new(self, a) if agents.lanes.room(self, a) else None
+                if ln:
+                    pick = (ln, t)
+                    break
+            if not pick or pick[0].get("preparing"):
+                break  # nothing to start, or the new lane's worktree is being made: a later tick starts it
+            tried.add(pick[1]["id"])
+            if not self._begin(*pick):
+                break
+            moved = True
+        return moved
 
     def _git_busy(self, name: str) -> bool:
         """Is a git action (approve, undo, merge, PR, diff) running on one of this agent's tasks?"""
@@ -1363,17 +1469,18 @@ class Crew:
 
     def _release(self, t: dict) -> None:
         """Detach a task from whoever holds it, from any column. A running owner is stopped (session kept)."""
-        owner = self.agents.get(t.get("who") or "")
-        if owner and owner["task"] == t["id"]:
+        owner = self._holder(t)
+        if owner:
             if t["col"] == "doing":
-                self._kill_proc(owner["name"])
+                self._kill_proc(owner["key"])
                 self.log(owner, "sys", f"stopped: #{t['id']} was moved")
             owner.update(status="idle", task=None, activity="", since=None)
             self._end_task_rules(t, owner)
         self._drop_denials(t["id"])
         if t.get("summary"):  # hand the previous attempt to whoever picks it up next
             prev = owner["name"] if owner else t.get("who")
-            where = f"branch {owner['branch']}" if owner and owner.get("branch") else "the shared folder"
+            br = t.get("branch") or (owner or {}).get("branch")
+            where = f"branch {br}" if br else "the shared folder"
             if t.get("commit"):
                 where += f", commit {t['commit']}"
             t.setdefault("history", []).append({"who": prev, "summary": t["summary"], "commit": t.get("commit"), "t": now()})
@@ -1443,6 +1550,7 @@ class Crew:
             run = self._start_run(w, title, fill(spec.get("details") or "", ctx), source={"trigger": tr["id"], "name": tr["name"]})
             tr["fired"] = tr.get("fired", 0) + 1
             tr["last"], tr["note"] = now(), note[:200]
+            workflows.insights.bump(self, "fired")
             self.event("trigger", f"⚡ {tr['name']} → ⛓ {w['name']}: {title}")
             return self._task(run["tasks"][0]) or {}
         who = spec.get("agent") if spec.get("agent") in self.agents else None
@@ -1454,6 +1562,7 @@ class Crew:
         self.tasks.append(t)
         tr["fired"] = tr.get("fired", 0) + 1
         tr["last"], tr["note"] = now(), note[:200]
+        workflows.insights.bump(self, "fired")
         self.event("trigger", f"⚡ {tr['name']} → #{t['id']} {title}" + (f" → {who}" if who else ""), who)
         return t
 
@@ -1495,8 +1604,20 @@ class Crew:
         if t["col"] != "review":
             return {"error": "bad action approve"}
         w = self.agents.get(t.get("who") or "")
-        return {"w": w["name"] if w else None, "cwd": Path(w["cwd"]) if w and self.git else None, "by": p.get("by", "you"),
+        cwd = self._task_cwd(t)
+        return {"w": w["name"] if w else None, "cwd": cwd if self.git else None, "by": p.get("by", "you"),
                 "msg": f"#{t['id']} {t['title']}\n\n{(t.get('summary') or '')[:2000]}"}
+
+    def _task_cwd(self, t: dict) -> Path | None:
+        """The worktree task t ran in: where its changes are (its agent's lane 1 for tasks from before lanes)."""
+        if t.get("cwd"):
+            return Path(t["cwd"])
+        w = self.agents.get(t.get("who") or "")
+        return Path(w["cwd"]) if w else None
+
+    def _task_branch(self, t: dict) -> str | None:
+        w = self.agents.get(t.get("who") or "")
+        return t.get("branch") or (w or {}).get("branch")
 
     def _approve_git(self, plan: dict) -> dict:
         cwd = plan["cwd"]
@@ -1517,25 +1638,28 @@ class Crew:
         t["col"] = "done"
         if (t.get("diff") or {}).get("pending"):
             t.pop("diff")
-        if w and w["task"] in (t["id"], None):  # after a restart it may be on other work by now: leave that alone
-            if w["task"] == t["id"] or w["status"] == "review":
-                w.update(status="idle", task=None)
-            self._end_task_rules(t, w)
+        ln = self._holder(t)
+        if ln and ln["status"] != "running":  # its lane is free again; a lane on other work is left alone
+            ln.update(status="idle", task=None)
+        if ln or w:
+            self._end_task_rules(t, ln or w)  # its allow-once rules end with it, held or not
         self._drop_denials(t["id"])
-        self.event("approve", f"{'auto-' if plan['by'] != 'you' else ''}approved #{t['id']}" + (f" · commit {t.get('commit')} on {w['branch']}" if t.get("commit") and w else ""))
+        workflows.insights.bump(self, "approved")
+        self.event("approve", f"{'auto-' if plan['by'] != 'you' else ''}approved #{t['id']}" + (f" · commit {t.get('commit')} on {self._task_branch(t)}" if t.get("commit") and w else ""))
         self._task_event(t, "done")
         return {"ok": True, "undo": bool(t.get("commit_full"))}
 
     def _unapprove_plan(self, t: dict, p: dict) -> dict:
         """Undo an approval: soft-reset the agent's worktree and move the task back to Review."""
         w = self.agents.get(t.get("who") or "")
+        ln = agents.lanes.of_task(self, t)
         if t["col"] != "done" or not t.get("commit_full") or not w or not self.git:
             return {"error": "nothing to undo"}
         if t.get("merged") or t.get("pr"):
             return {"error": "already merged or in a PR: can't undo"}
-        if w["status"] in ("running", "review") or w.get("task"):
-            return {"error": f"{w['name']} has moved on to other work: can't undo"}
-        return {"w": w["name"], "cwd": Path(w["cwd"]), "sha": t["commit_full"]}
+        if ln and (ln["status"] in ("running", "review") or ln.get("task")):
+            return {"error": f"{w['name']} has moved on to other work in that worktree: can't undo"}
+        return {"w": w["name"], "lane": ln["key"] if ln else None, "cwd": self._task_cwd(t), "sha": t["commit_full"]}
 
     def _unapprove_git(self, plan: dict) -> dict:
         cwd = plan["cwd"]
@@ -1552,20 +1676,21 @@ class Crew:
         for k in ("commit", "commit_full"):
             t.pop(k, None)
         t["col"] = "review"
-        if w := self.agents.get(plan["w"]):
-            w.update(status="review", task=t["id"])
+        if ln := agents.lanes.ensure(self, plan.get("lane")):  # its changes are in that worktree again
+            ln.update(status="review", task=t["id"])
         t["diff"] = res["diff"]
+        self._lane_after_diff(t)
         self.event("reject", f"undid approval of #{t['id']}", plan["w"])
         return {"ok": True}
 
     def _merge_plan(self, t: dict, p: dict) -> dict:
         """Merge an approved task's branch into the project's current branch."""
-        w = self.agents.get(t.get("who") or "")
-        if not self.git or t["col"] != "done" or not t.get("commit") or not w or not w.get("branch"):
+        br = self._task_branch(t)
+        if not self.git or t["col"] != "done" or not t.get("commit") or not br:
             return {"error": "only an approved task with a commit can be merged"}
         if t.get("merged"):
             return {"error": "already merged"}
-        return {"br": w["branch"], "w": w["name"], "id": t["id"], "title": t["title"]}
+        return {"br": br, "w": t.get("who"), "id": t["id"], "title": t["title"]}
 
     def _merge_git(self, plan: dict) -> dict:
         br, proj = plan["br"], self.project
@@ -1592,6 +1717,7 @@ class Crew:
             t["merged"] = res["merged"]
             t.pop("merge_error", None)
             if not res.get("already"):
+                workflows.insights.bump(self, "merges")
                 self.event("approve", f"merged #{t['id']} into {t['merged']['into']} · {t['merged']['commit']}", plan["w"])
             return {"ok": True, "merged": t["merged"]}
         if me := res.get("merge_error"):
@@ -1602,12 +1728,12 @@ class Crew:
 
     def _open_pr_plan(self, t: dict, p: dict) -> dict:
         """Push the task's branch (never forced) and open a PR with gh."""
-        w = self.agents.get(t.get("who") or "")
-        if not self.git or t["col"] != "done" or not t.get("commit") or not w or not w.get("branch"):
+        br = self._task_branch(t)
+        if not self.git or t["col"] != "done" or not t.get("commit") or not br:
             return {"error": "only an approved task with a commit can open a PR"}
         if t.get("pr"):
             return {"error": "a PR is already open: " + t["pr"]}
-        return {"br": w["branch"], "w": w["name"], "title": f"#{t['id']} {t['title']}"[:200],
+        return {"br": br, "w": t.get("who"), "title": f"#{t['id']} {t['title']}"[:200],
                 "body": (t.get("summary") or f"Task #{t['id']} from Crew.").strip()[:4000]}
 
     def _open_pr_git(self, plan: dict) -> dict:
@@ -1634,24 +1760,35 @@ class Crew:
         if "pr" not in res:
             return res
         t["pr"] = res["pr"]
+        workflows.insights.pr(self, t["pr"], raised=True)
         self.event("approve", f"opened a PR for #{t['id']}: {t['pr']}", plan["w"])
         return {"ok": True, "pr": t["pr"]}
 
     def _diff_plan(self, t: dict, p: dict) -> dict:
-        w = self.agents.get(t.get("who") or "")
-        return {"cwd": Path(w["cwd"])} if w else {"error": "bad action diff"}
+        cwd = self._task_cwd(t)
+        return {"cwd": cwd} if cwd else {"error": "bad action diff"}
 
     def _diff_git(self, plan: dict) -> dict:
         return {"diff": self.diff_at(plan["cwd"])}
 
     def _diff_apply(self, t: dict, plan: dict, res: dict) -> dict:
         t["diff"] = res["diff"]
+        self._lane_after_diff(t)
         return {"ok": True}
+
+    def _lane_after_diff(self, t: dict) -> None:
+        """A card in Review keeps its lane only while that worktree holds its uncommitted changes. Without changes
+        (the agent committed, or changed nothing) the lane is free for other work; a reply or a send-back resumes the
+        card's session in whichever lane is free. Lock held."""
+        ln = self._holder(t)
+        if ln and ln["status"] == "review" and t["col"] == "review" and not self._keeps_lane(t):
+            ln.update(status="idle", task=None)
 
     def _queue_diff(self, t: dict) -> None:
         """A task reached review: its diff is collected right after the event handler returns, outside the lock."""
         if not self.git:
             t["diff"] = self.diff_at(Path(self.project))
+            self._lane_after_diff(t)
             return
         t["diff"] = {"stat": "", "patch": "", "note": "Collecting the diff…", "pending": True}
         self._jobs.append(("diff", t["id"]))
@@ -1692,10 +1829,11 @@ class Crew:
             return {"error": "no conflict to send back, or the agent is unavailable"}
         files = "\n".join(f"- {f}" for f in me["files"])
         nt = {"id": self.next_id, "title": f"Resolve merge conflicts for #{t['id']} against {me['base']}"[:200], "tag": t["tag"], "col": "backlog",
-              "details": (f"Merging {w['branch']} into {me['base']} conflicts in:\n{files}\n\nIn your worktree run `git merge {me['base']} --no-commit --no-ff`, "
+              "details": (f"Merging {self._task_branch(t)} into {me['base']} conflicts in:\n{files}\n\nIn your worktree run `git merge {me['base']} --no-commit --no-ff`, "
                           "resolve the conflicts keeping both sides' intent, and run the tests. Do not commit: leave the merge staged and Crew commits it when approved."),
               "who": w["name"], "pinned": w["name"], "created": now(), "depth": t.get("depth", 0) + 1,
-              "handoff": {"from": "you", "task": t["id"]}}
+              "handoff": {"from": "you", "task": t["id"]},
+              **({"lane": t["lane"], "lane_only": True} if t.get("lane") else {})}  # the conflict is in that lane's branch
         self.next_id += 1
         self.tasks.append(nt)
         me["sent"] = nt["id"]
@@ -1704,6 +1842,7 @@ class Crew:
 
     def _task_event(self, t: dict, col: str, summary: str | None = None) -> None:
         """Event triggers and workflow runs: a task reached review or done, or its agent hit an error."""
+        workflows.insights.bump(self, {"review": "tasks_review", "done": "tasks_done", "error": "tasks_failed"}.get(col, ""))
         self._wf_event(t, col, summary)
         for tr in self.triggers:
             if tr["enabled"] and (trig := triggers.get(tr["kind"])):
@@ -1792,8 +1931,9 @@ class Crew:
                 # Any column: the task becomes a to-do for `agent` (or anyone when agent is empty).
                 if a and a["status"] in ("killed", "error"):
                     return {"error": f"{a['name']} is {a['status']}; respawn it first"}
-                if a and a["status"] == "paused":
-                    a["status"] = "idle"
+                if a and (a["status"] == "paused" or a.get("paused")):
+                    a.pop("paused", None)
+                    a["status"] = "idle" if a["status"] == "paused" else a["status"]
                 if t["col"] == "doing" and a and t.get("who") == a["name"]:
                     return {"error": f"{a['name']} is already on it"}
                 was = t["col"]
@@ -1803,8 +1943,12 @@ class Crew:
                 t["who"] = t["pinned"] = a["name"] if a else None
                 t.pop("commit", None)
                 t.pop("hold", None)
-                if a and a["status"] == "idle":
-                    self._begin(a, t)
+                ln = None
+                if a and not a.get("off") and a["status"] not in ("paused", "killed", "error") and agents.lanes.running(self, a) < agents.lanes.cap(a):
+                    free = agents.lanes.free(self, a)
+                    ln = free[0] if free else agents.lanes.new(self, a) if agents.lanes.room(self, a) else None
+                if ln and not ln.get("preparing"):
+                    self._begin(ln, t)
                 else:
                     self.event("queue", f"#{t['id']} → {a['name'] if a else 'anyone'}" + (f" (from {was})" if was != "backlog" else ""),
                                a["name"] if a else None)
@@ -1815,10 +1959,9 @@ class Crew:
                         t["who"] = t["pinned"] = None
                         t.pop("commit", None)
                     else:
-                        owner = self.agents.get(t.get("who") or "")
-                        if owner and owner["task"] == t["id"]:
+                        if owner := self._holder(t):
                             if t["col"] == "doing":
-                                self._kill_proc(owner["name"])
+                                self._kill_proc(owner["key"])
                             owner.update(status="idle", task=None, activity="", since=None)
                             self._end_task_rules(t, owner)
                     t["col"] = p["col"]
@@ -1828,9 +1971,9 @@ class Crew:
             elif action == "mode" and p.get("mode") in MODES:
                 self.config["permission_mode"] = p["mode"]
                 self._save_config()
-                for ag in self.agents.values():  # idle processes restart in the new mode; busy ones after their turn
-                    if ag["status"] != "running" and self._alive(ag["name"]):
-                        self._kill_proc(ag["name"])
+                for ag in self._all_lanes():  # idle processes restart in the new mode; busy ones after their turn
+                    if ag["status"] != "running" and self._alive(ag["key"]):
+                        self._kill_proc(ag["key"])
                 self.event("mode", f"permission mode → {p['mode']}")
             elif action == "configure" and a:
                 if res := agents.record.configure(self, a, p):
@@ -1866,6 +2009,8 @@ class Crew:
             elif action == "delete" and t:
                 if t["col"] == "doing":
                     return {"error": "task is running"}
+                if (ln := self._holder(t)) and ln["status"] != "running":  # a card in Review gives its lane back
+                    ln.update(status="idle", task=None)
                 self.tasks.remove(t)
                 self._drop_denials(t["id"])
                 if (run := self._run((t.get("run") or {}).get("id"))) and run["status"] == "running":
@@ -1882,7 +2027,7 @@ class Crew:
                 if not self._start(a):
                     return {"error": a["error"]}
                 self.log(a, "you", text, **({"by": p["from"]} if p.get("from") else {}), **({"images": len(images)} if images else {}))
-                if not self._send(a, text, images):
+                if not self._send(a, agents.launch.follow_up(a, text), images):  # the log keeps your words; the agent also gets the reminder
                     a.update(status="error", activity="")
                     return {"error": a["error"]}
                 if a["status"] in ("idle", "error", "paused", "review"):
@@ -1894,12 +2039,29 @@ class Crew:
                     rt.update(col="doing", started=now())
                     a["activity"] = "working on your message…"
                 self.event("tell", f"→ {a['name']}: {text[:80]}", a["name"])
+            elif action == "log_entry" and (a or p.get("agent") == "boss"):  # UI only: a transcript line the board shows cut short
+                a = a or self.boss
+                e = next((e for e in reversed(a["log"]) if e["t"] == p.get("t") and e["kind"] == p.get("kind")), None)
+                if not e:
+                    return {"error": "that line is no longer in the transcript"}
+                return {"ok": True, "text": e.get("text", ""), "detail": e.get("detail", "")}
             elif action == "bg_output" and a:  # UI only: the tail of a background job's output
-                j = next((j for j in (a.get("bg") or {}).values() if j["id"] == p.get("id")), None)
+                j = next((j for ln in self._lanes(a) for j in (ln.get("bg") or {}).values() if j["id"] == p.get("id")), None)
                 if not j:
                     return {"error": "that job is no longer running"}
                 return {"ok": True, "text": self._bg_read(a, j)}
+            elif action == "bg_stop" and a and a.get("kind") != "boss" and not p.get("id") and len(self._lanes(a)) > 1:
+                n = 0  # every lane's jobs: lanes between turns end their process; a lane mid-turn is asked to stop them
+                for ln in self._lanes(a):
+                    if ln.get("bg") and ln["status"] != "running":
+                        n += len(ln["bg"])
+                        self._kill_proc(ln["key"])
+                if not n:
+                    return {"error": f"{a['name']} has no background jobs it can end now: ■ Stop ends a working lane's jobs too"}
+                self.event("kill", f"■ {a['name']}: stopped {n} background job{'s' if n != 1 else ''} (sessions kept)", a["name"])
             elif action == "bg_stop" and a:  # UI only: one job (the agent stops it) or all of them (its process ends)
+                if p.get("id"):  # the lane running that job
+                    a = next((ln for ln in self._lanes(a) if any(j["id"] == p["id"] for j in (ln.get("bg") or {}).values())), a)
                 jobs = a.get("bg") or {}
                 one = next((j for j in jobs.values() if j["id"] == p.get("id")), None) if p.get("id") else None
                 if p.get("id") and not one:
@@ -1919,16 +2081,19 @@ class Crew:
                     return {"error": f"{a['name']} is working: ■ Stop ends its background jobs too"}
                 else:  # idle between turns: ending the process ends every job; the session resumes next time
                     n = len(jobs)
-                    self._kill_proc(a["name"])
+                    self._kill_proc(a["key"])
                     self.event("kill", f"■ {a['name']}: stopped {n} background job{'s' if n != 1 else ''} (session kept)", a["name"])
             elif action == "stop" and a:
-                if a["status"] != "running" and not self._alive(a["name"]):
+                if not any(ln["status"] == "running" or self._alive(ln["key"]) for ln in self._lanes(a)):
                     return {"error": f"{a['name']} is not running"}
-                self._stop_agent(a)
+                if a.get("kind") == "boss":
+                    self._stop_agent(a)
+                else:
+                    agents.launch.stop_all_lanes(self, a)
                 self.event("kill", f"■ {a['name']} stopped", a["name"])
             elif action == "stop_all":
                 n = 0
-                for ag in [*self.agents.values(), self.boss]:
+                for ag in [*self._all_lanes(), self.boss]:
                     if ag["status"] == "running":
                         self._stop_agent(ag, "stopped (stop all)")
                         n += 1
@@ -1939,7 +2104,7 @@ class Crew:
             elif action == "clear":
                 scope = p.get("scope") if p.get("scope") in ("done", "all") else "done"
                 if scope == "all":
-                    for ag in self.agents.values():
+                    for ag in self._all_lanes():
                         if ag["status"] == "running":
                             self._stop_agent(ag, "stopped: board cleared")
                         ag.update(task=None, status="idle" if ag["status"] in ("review", "running") else ag["status"])
@@ -1956,7 +2121,7 @@ class Crew:
             elif action == "compact" and a:
                 if a["status"] == "running":
                     return {"error": f"{a['name']} is busy; compact after this turn"}
-                if not self._alive(a["name"]):
+                if not self._alive(a["key"]):
                     return {"error": "no live session to compact; its next task starts with a fresh context anyway"}
                 a.update(compacting=a["status"], status="running", since=now(), activity="compacting context…")
                 self.log(a, "you", "/compact")
@@ -1965,7 +2130,7 @@ class Crew:
                     return {"error": a["error"]}
                 self.event("tell", f"{a['name']}: compacting context", a["name"])
             elif action == "handoff":
-                src = self.agents.get(p.get("from") or "")
+                src = self._src(p)  # the lane that called: its task is the parent, its branch has the work
                 to = (p.get("to") or "").strip()
                 title = (p.get("title") or "").strip()
                 if not title:
@@ -2029,10 +2194,9 @@ class Crew:
                     return {"error": f"#{t['id']} has no PR"}
                 if not w:
                     return {"error": "the agent that opened this PR is gone"}
-                if w["status"] == "running":
-                    return {"error": f"{w['name']} is working: try again when it's done"}
-                if w["status"] == "killed":
-                    return {"error": f"{w['name']} is killed; respawn it first"}
+                w, why = agents.lanes.for_user(self, w, t)  # a free lane: other work on the agent doesn't hold this up
+                if not w:
+                    return {"error": why}
                 self._task_session(w, t)
                 if not self._start(w):
                     return {"error": w["error"]}
@@ -2043,15 +2207,17 @@ class Crew:
                     return {"error": w["error"]}
                 w.update(status="running", since=now(), activity="addressing PR review…", error=None, addressing=t["id"])
                 t["reviewing"], t["reviewing_from"], t["col"] = now(), t["col"], "doing"  # In progress until the turn ends
+                workflows.insights.bump(self, "address_reviews")
                 self.event("tell", f"→ {w['name']}: /address-review on #{t['id']}", w["name"])
             elif action == "reject" and t and t["col"] == "review":
                 w = self.agents.get(t["who"])
                 fb = (p.get("text") or "Please revise.").strip()
                 if self._over_task(t):
                     return {"error": f"#{t['id']} reached its budget (${t.get('cost') or 0:.2f} of ${self._budget('budget_task_usd'):.2f}): raise the task budget to send it back"}
-                if w and w["status"] == "running" and w.get("task") not in (None, t["id"]):
-                    return {"error": f"{w['name']} is working on #{w['task']}: send it back when that is done"}
-                if w and w["status"] != "killed":
+                if w and w["status"] != "killed":  # the lane holding its changes, else any free one: busy lanes don't hold this up
+                    w, why = agents.lanes.for_user(self, w, t)
+                    if not w:
+                        return {"error": why}
                     self._task_session(w, t)
                 if not w or w["status"] == "killed" or not self._start(w):
                     t["col"] = "backlog"
@@ -2065,6 +2231,7 @@ class Crew:
                     t["col"] = "review"
                     w.update(status="error", task=None, activity="")
                     return {"error": w["error"]}
+                workflows.insights.bump(self, "sent_back")
                 self.event("reject", f"#{t['id']} sent back to {w['name']}", w["name"])
             elif action in ("trigger_add", "trigger_update"):
                 if (trig := triggers.get(p.get("kind"))) and trig.ui_only and via != "ui":
@@ -2122,7 +2289,7 @@ class Crew:
                     return res
             elif action == "pipeline_fix":  # a waiting ⟳ step (deploy or PR) hands its failed pipeline to a fix run
                 if via == "mcp":
-                    src = self.agents.get(p.get("from") or "")
+                    src = self._src(p)
                     t = self._task(src["task"]) if src and src.get("task") else (self._task(src.get("addressing")) if src else None)
                     if not t:
                         return {"error": "fix_pipeline works on the ⟳ step you are running now"}
@@ -2162,13 +2329,14 @@ class Crew:
                 workflows.runs.delete(self, run)
             elif action == "resume" and t and t.get("hold"):
                 t.pop("hold")
-            elif action == "resume" and a and a["status"] == "paused":
-                a["status"] = "idle"
+            elif action == "resume" and a and (a["status"] == "paused" or a.get("paused")):
+                a.pop("paused", None)  # (paused while a card in Review keeps lane 1)
+                a["status"] = "idle" if a["status"] == "paused" else a["status"]
                 self.log(a, "sys", "resumed")
             elif action == "resume_all":
                 for ag in self.agents.values():
-                    if ag["status"] == "paused":
-                        ag["status"] = "idle"
+                    if ag["status"] == "paused" or ag.pop("paused", None):
+                        ag["status"] = "idle" if ag["status"] == "paused" else ag["status"]
             elif action == "boss_model":
                 if p.get("model") and p["model"] not in MODELS:
                     return {"error": "unknown model"}
@@ -2179,7 +2347,7 @@ class Crew:
                     self._kill_proc("boss")
             elif action == "denial_dismiss" and a:  # UI only
                 before = len(a["denials"])
-                a["denials"] = [x for x in a["denials"] if x["id"] != p.get("id")]
+                a["denials"][:] = [x for x in a["denials"] if x["id"] != p.get("id")]
                 if len(a["denials"]) == before:
                     return {"error": "that blocked call is no longer in the inbox"}
             elif action == "denial_allow" and a:  # UI only
@@ -2444,6 +2612,11 @@ class Handler(BaseHTTPRequestHandler):
             self._page()
         elif self.path == "/api/state":
             self._json(CREW.snapshot())
+        elif urlsplit(self.path).path == "/api/insights":  # the Insights tab: day-by-day history
+            days = (parse_qs(urlsplit(self.path).query).get("days") or ["30"])[0]
+            c = CREW
+            with c.lock:
+                self._json(workflows.insights.public(c, int(days) if days.isdigit() else 30))
         elif urlsplit(self.path).path == "/api/commands":  # the / picker: what this agent's session can run
             who = (parse_qs(urlsplit(self.path).query).get("agent") or [""])[0]
             c = CREW
@@ -2678,6 +2851,7 @@ def main() -> None:
                     with CREW.lock:
                         workflows.alert_watch.tick(CREW)
                         workflows.merge_watch.tick(CREW)
+                        workflows.insights.tick(CREW)
                 CREW.dispatch()
                 busy = args.awake == "always" or CREW.busy()
                 if busy != awake.on:

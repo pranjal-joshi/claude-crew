@@ -44,6 +44,7 @@
   --tab-on:var(--raised); --tab-on-fg:var(--text); --tab-on-ring:var(--line2);
   --kon-bg:rgba(0,0,0,.18); --kon-line:rgba(0,0,0,.2); --kon-ink:#3a1a0c;
   --av2-t:75% 74%; --av2-b:40% 20%; --av2-o:40% 32%;
+  --ch-tok:#e07a52; --ch-1:#5a93f0; --ch-2:#26a86b;
   color-scheme:dark;
 }
 :root[data-theme="light"]{
@@ -70,6 +71,7 @@
   --tab-on:var(--accent); --tab-on-fg:var(--on-accent); --tab-on-ring:var(--accent);
   --kon-bg:rgba(0,0,0,.10); --kon-line:rgba(0,0,0,.18); --kon-ink:#2A1810;
   --av2-t:60% 28%; --av2-b:55% 86%; --av2-o:45% 72%;
+  --ch-tok:#B85C3E; --ch-1:#1F4FA8; --ch-2:#16643A;
   color-scheme:light;
 }
 *{box-sizing:border-box}
@@ -162,6 +164,12 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .agent .act{margin-top:3px;font:11.5px var(--mono);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .agent .act.live{color:var(--muted)}
 .subs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;min-width:0}
+.lanes{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;min-width:0}
+.lanechip{display:inline-flex;align-items:center;gap:5px;max-width:100%;min-width:0;font:10.5px var(--mono);color:var(--muted);background:var(--bg2);border:1px solid var(--line2);border-radius:999px;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lanechip.running{color:var(--green);border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+.lanechip.review{color:var(--blue);border-color:color-mix(in srgb,var(--blue) 30%,transparent)}
+.lanechip.error{color:var(--red);border-color:color-mix(in srgb,var(--red) 30%,transparent)}
+.lanetag{font:600 9.5px var(--mono);color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:0 4px;margin-right:6px;vertical-align:1px}
 .subchip{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0;font:10.5px var(--mono);color:var(--teal);background:var(--teal-soft);border:1px solid color-mix(in srgb,var(--teal) 22%,transparent);border-radius:999px;padding:2px 9px 2px 7px}
 .subchip .sd,.m.subagent .sd{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none;animation:pulse 1.4s ease-in-out infinite}
 .subchip .sl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -198,6 +206,47 @@ kbd{font:500 10.5px var(--mono);padding:1px 5px;border-radius:5px;background:var
 .tpg{width:100%;max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding:18px;flex:1 0 auto;min-height:0}
 .tph{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap}
 .tph h3{font-size:15px}.tph .tsub{font-size:12px;flex:1;min-width:200px}
+/* Insights: a 30-day history. Bars are HTML so labels stay crisp at any width; one tooltip follows the hovered day. */
+.ins .tpg{max-width:1040px;gap:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi .k{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.kpi .v{font:600 22px/1.25 var(--sans);color:var(--text);font-variant-numeric:tabular-nums}
+.kpi .s{font-size:11.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi .sw{width:8px;height:8px;border-radius:2px;flex:none}
+.ichs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:12px}
+.ichbox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px 10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ichbox.wide{grid-column:1/-1}
+.ichbox h4{margin:0;font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap}
+.ichbox h4 .faint{font-weight:400}
+.ilegend{display:flex;gap:12px;font-size:11.5px;color:var(--muted);margin-left:auto}
+.ilegend span{display:inline-flex;align-items:center;gap:5px}.ilegend i{width:9px;height:9px;border-radius:2px}
+.ich{display:grid;grid-template-columns:auto 1fr;grid-template-rows:var(--h,150px) auto;column-gap:8px}
+.ich-y{position:relative;font:10.5px var(--mono);color:var(--faint);text-align:right;min-width:26px}
+.ich-y span{position:absolute;right:0;transform:translateY(50%)}
+.ich-plot{position:relative;border-bottom:1px solid var(--line2)}
+.ich-plot .gl{position:absolute;left:0;right:0;border-top:1px dashed var(--line)}
+.ich-cols{position:absolute;inset:0;display:flex}
+.ich-col{flex:1;display:flex;align-items:flex-end;justify-content:center;gap:2px;padding:0 1px;min-width:0;cursor:default}
+.ich-col:hover,.ich-col.on{background:var(--inset)}
+.ich-col i{flex:1;max-width:16px;border-radius:4px 4px 0 0;min-height:0}
+.ich-col.today i{outline:1px solid var(--line2);outline-offset:1px}
+.ich-x{grid-column:2;display:flex;font:10.5px var(--mono);color:var(--faint);padding-top:4px}
+.ich-x span{flex:1;text-align:center;white-space:nowrap;overflow:visible;min-width:0}
+.itip{position:fixed;z-index:60;pointer-events:none;background:var(--raised);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--shadow);padding:8px 10px;font-size:12px;min-width:170px;max-width:260px;display:none}
+.itip b{font-weight:600}.itip .r{display:flex;justify-content:space-between;gap:14px;color:var(--muted)}.itip .r span:last-child{color:var(--text);font-variant-numeric:tabular-nums}
+.itip .d{font-weight:600;margin-bottom:4px;color:var(--text)}
+.ibars{display:flex;flex-direction:column;gap:7px}
+.ibar{display:grid;grid-template-columns:minmax(70px,130px) 1fr auto;align-items:center;gap:10px;font-size:12px}
+.ibar .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)}
+.ibar .t{height:10px;background:var(--inset);border-radius:0 4px 4px 0;overflow:hidden}.ibar .t i{display:block;height:100%;background:var(--ch-tok);border-radius:0 4px 4px 0}
+.ibar .q{font:11.5px var(--mono);color:var(--muted);text-align:right}
+.itable{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.itable th,.itable td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.itable th:first-child,.itable td:first-child{text-align:left}.itable th{color:var(--muted);font-weight:500}
+.itwrap{overflow-x:auto}
+.ins details summary{cursor:pointer;color:var(--muted);font-size:12px}
+.inote{font-size:11.5px;color:var(--faint)}
 .tpio{display:flex;gap:6px;flex-wrap:wrap}
 .tpb{display:flex;flex-direction:column;gap:12px}
 .tpf{position:sticky;bottom:0;margin:auto -18px 0;padding:12px 18px;border-top:1px solid var(--line);background:var(--bg);display:flex;justify-content:flex-end;gap:8px;z-index:2}
@@ -368,7 +417,11 @@ a.mergecta .go{margin-left:auto;font-size:13px;opacity:.8}
 .m.you{align-self:flex-end;max-width:88%;background:var(--accent-soft);border:1px solid var(--accent-line);padding:8px 11px;border-radius:12px 12px 4px 12px;white-space:pre-wrap;color:var(--accent-ink4)}
 .m.tool{display:flex;align-items:center;gap:8px;font:12px var(--mono);color:var(--muted);padding:6px 9px;border-radius:8px;background:var(--surface);border:1px solid var(--line);min-width:0}
 .m.tool .tn{color:var(--text);font-weight:500;flex:none}
-.m.tool .td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--faint)}
+.m.tool .td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--faint);min-width:0}
+.m.tool{cursor:pointer}.m.tool:hover{border-color:var(--line2)}
+.m.tool.open{align-items:flex-start}.m.tool.open .td{white-space:pre-wrap;overflow:visible;overflow-wrap:anywhere;color:var(--muted)}
+.m .lmore{display:block;margin-top:5px;background:none;border:0;padding:0;font:600 11px var(--sans);color:var(--accent);cursor:pointer}
+.m.sys .lmore{display:inline;margin:0 0 0 6px}
 .m.toolerr{font:12px var(--mono);color:var(--red-ink3);background:var(--red-soft);border-radius:8px;padding:6px 9px;white-space:pre-wrap}
 .m.error{color:var(--red);font-size:12.5px;background:var(--red-soft);border:1px solid color-mix(in srgb,var(--red) 30%,transparent);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
 .m.sys{color:var(--faint);font:11px var(--mono);text-align:center}
@@ -757,7 +810,8 @@ textarea.rolebox{min-height:120px;max-height:min(60vh,520px);resize:vertical;ove
   .colnav button{flex:none;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg2);color:var(--muted);font-weight:600;font-size:12.5px;display:inline-flex;align-items:center;gap:6px}
   .colnav button.on{background:var(--raised);color:var(--text);border-color:var(--line2)}
   .colnav button .n{font:500 11px var(--mono);color:var(--faint)}
-  body[data-m="flows"] .colnav,body[data-m="trigs"] .colnav{display:none}
+  body[data-m="flows"] .colnav,body[data-m="trigs"] .colnav,body[data-m="ins"] .colnav{display:none}
+  .ins .tpg{padding:12px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi .v{font-size:19px}
   .board,.body.drawer-open .board{display:flex!important;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;gap:12px;padding:10px 12px;scrollbar-width:none;overscroll-behavior-x:contain}
   .board::-webkit-scrollbar{display:none}
   .board[hidden],.body.drawer-open .board[hidden]{display:none!important}
@@ -1124,8 +1178,8 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
 .schedh{white-space:nowrap;overflow:hidden}
 .schedh .nxt{text-transform:none;letter-spacing:0;font-weight:500;color:var(--faint);min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis}
 /* cards: look before you approve. "Review changes" is the primary button, "Approve" a quiet outline beside it */
-.card .cta:has(.approvec){flex-wrap:nowrap}
-.card .cta .approvec{flex:0 1 auto;order:2;background:transparent;color:var(--green);border:1px solid color-mix(in srgb,var(--green) 45%,transparent);font-weight:500;justify-content:center}
+.card .cta:has(.approvec){flex-wrap:wrap}.card .cta .btn{min-width:0}
+.card .cta .approvec{flex:1 0 auto;order:2;background:transparent;color:var(--green);border:1px solid color-mix(in srgb,var(--green) 45%,transparent);font-weight:500;justify-content:center}
 .card .cta .approvec:hover{background:var(--green-soft);filter:none}
 .card .cta [data-review]{order:1;flex:1 1 auto;justify-content:center;background:var(--blue)!important;color:var(--on-blue)!important;border-color:transparent!important;font-weight:600}
 .card .cta [data-review]:hover{filter:brightness(1.08)}
@@ -1161,7 +1215,7 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
     <section class="main">
       <div class="banner" id="banner"></div>
       <div class="toolbar">
-        <div class="tabs" id="tabs"><button data-tab="board" class="on">Board</button><button data-tab="flows">Workflows <span class="n" id="runN"></span></button><button data-tab="trigs"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> Triggers <span class="n" id="trigN"></span></button></div>
+        <div class="tabs" id="tabs"><button data-tab="board" class="on">Board</button><button data-tab="flows">Workflows <span class="n" id="runN"></span></button><button data-tab="trigs"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg> Triggers <span class="n" id="trigN"></span></button><button data-tab="ins" title="Tokens, PRs, tasks and monitors over the last 30 days (I)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg> Insights</button></div>
         <span class="muted boardhint">Drag a card onto an agent to assign · unassigned cards go to matching roles</span>
         <button class="btn sm ghost clearbtn" id="clearBtn" aria-haspopup="menu" title="Remove finished or all tasks from the board">Clear board ▾</button>
       </div>
@@ -1169,6 +1223,7 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
       <div class="colnav" id="colnav"></div>
       <div class="board" id="board"></div>
       <div class="flows" id="flows" hidden></div>
+      <div class="flows ins" id="ins" hidden></div>
       <div class="flows trigs" id="trigs" hidden>
         <div class="tpg">
           <div class="tph"><h3 id="tmTitle">Triggers</h3><span class="faint tsub">Each firing adds a task; agents pick it up like any other</span><div class="tpio" id="tmIo"></div></div>
@@ -1205,12 +1260,14 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
 
 <div class="scrim" id="taskModal">
   <div class="modal" role="dialog" aria-label="New task">
-    <div class="mh">New task <button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
+    <div class="mh"><span id="tHead">New task</span> <button class="iconbtn" data-close aria-label="Close" title="Close">✕</button></div>
     <div class="mb">
+      <div class="seg tight" id="tKind" role="tablist"><button data-kind="task" class="on" title="One task for one agent (or whoever's tags match)">Task</button><button data-kind="flow" title="A workflow run: its agents take the steps in turn">Workflow</button></div>
+      <div id="tFlowBox" hidden><div class="label">Workflow</div><div class="seg" id="tFlow"></div><div class="chain" id="tChain" style="margin-top:10px"></div></div>
       <input class="field" id="tTitle" placeholder="What needs doing?" autocomplete="off">
       <textarea class="field" id="tDetails" rows="4" placeholder="Context, acceptance criteria, files to look at… (optional)"></textarea>
-      <div><div class="label">Type</div><div class="seg" id="tTag"></div></div>
-      <div><div class="label">Assign to</div><div class="seg" id="tWho"></div></div>
+      <div id="tTagBox"><div class="label">Type</div><div class="seg" id="tTag"></div></div>
+      <div id="tWhoBox"><div class="label">Assign to</div><div class="seg" id="tWho"></div></div>
     </div>
     <div class="mf"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="tCreate">Create task <kbd class="kon">Ctrl ↵</kbd></button></div>
   </div>
@@ -1229,6 +1286,7 @@ textarea.field#memText{min-height:58px;max-height:180px;resize:vertical;overflow
     <div class="mb">
       <input class="field" id="aName" placeholder="Name, e.g. frontend or db-migrator" autocomplete="off" maxlength="24">
       <textarea class="field rolebox" id="aRole" rows="6" placeholder="Role: what this agent is responsible for and how it should work"></textarea>
+      <input class="field" id="aDeliv" maxlength="500" placeholder="Every reply is… e.g. the full plan, saved to plans/&lt;slug&gt;.md (optional)" title="What every reply of this agent is. After a follow-up or a change request it sends the whole thing again, updated, not only the part that changed.">
       <div><div class="label">Picks up tasks tagged</div><div class="seg" id="aTags"></div>
         <input class="field" id="aTagNew" placeholder="Add a new tag and press Enter" style="margin-top:8px" maxlength="20"></div>
       <div><div class="label">Model</div><div class="seg tight" id="aModel"></div></div>
@@ -1462,10 +1520,11 @@ function render() {
   $('#trigN').textContent = (S.triggers || []).filter(t => t.enabled).length || '';
   const n = c => S.tasks.filter(t => boardCol(t) === c).length;
   const spend = S.agents.reduce((s, a) => s + (a.cost || 0), 0);
-  const running = S.agents.filter(a => a.status === 'running').length;
+  const running = S.agents.reduce((s, a) => s + (a.running ?? (a.status === 'running' ? 1 : 0)), 0);  // every lane that is working
   const subsLive = S.agents.reduce((s, a) => s + Object.keys(a.subs || {}).length, 0);
-  const queued = n('backlog'), toReview = n('review');
-  $('#stats').innerHTML = stats({running, queued, toReview, subsLive, spend});
+  const watching = S.tasks.filter(isWatching), toReview = n('review');
+  const queued = n('backlog');  // (a watching step sits in In progress: boardCol)
+  $('#stats').innerHTML = stats({running, queued, watching, toReview, subsLive, spend});
   if ($('#blockedModal').classList.contains('on')) drawBlocked();
   tokWarnCheck();
   if ($('#memModal').classList.contains('on') && !$('#memModal').contains(document.activeElement)) drawMemory();
@@ -1487,12 +1546,16 @@ function render() {
 // Header. The review queue is the one number that needs you, so it is the one chip that looks like a button and
 // opens the next decision sheet; running/queued are quiet text; memory moves to the ⋮ menu; the token chip is a
 // single target that opens Budgets (where the price toggle now lives).
-function stats({running, queued, toReview, subsLive, spend}) {
+// A ⟳ step between checks: its agent waits on a PR, a pipeline or a deploy (Crew runs its watch command, or wakes it
+// on the step's schedule). A blocked one still watches for its goal while it waits for you.
+const isWatching = t => !t.hold && t.wait && (t.wait.probe || t.wait.next) && (t.col === 'backlog' || t.col === 'review' && t.wait.blocked);
+function stats({running, queued, watching = [], toReview, subsLive, spend}) {
+  const wTip = watching.map(t => `#${t.id} ${t.who || '?'}: ${t.title}${t.wait.probe ? '' : ' (checks on a schedule)'}`).join('\n');
   const T = S.budget?.tokens || {}, lv = tokLevel(T), w5 = planWin('five_hour');
   const ready = S.tasks.filter(mergeReady), urls = [...new Set(ready.map(t => t.gh.url))];
   const tip = ready.map(t => `PR #${t.gh.number} · #${t.id} ${t.title}`).join('\n');
   return `<button class="stat needs ${toReview ? 'hot' : ''}" data-review-next title="${toReview ? 'Open the next decision sheet' : 'Nothing waits for your review'}">◎ <b>${toReview}</b> to review</button>` +
-    `<div class="stat quiet" title="Agents running now${queued ? ', and tasks waiting in the backlog' : ''}"><span class="dot" style="background:${running ? 'var(--green)' : 'var(--faint)'}"></span><span><b>${running}</b> running${queued ? ` · <b>${queued}</b> queued` : ''}</span>${subsLive ? ` <span class="subtag live" title="subagents running inside agents">${SUBI}${subsLive}</span>` : ''}</div>` +
+    `<div class="stat quiet" title="Agents running now${watching.length ? ', ⟳ steps watching a PR, pipeline or deploy until their goal' : ''}${queued ? ', and tasks waiting to start' : ''}"><span class="dot" style="background:${running ? 'var(--green)' : 'var(--faint)'}"></span><span><b>${running}</b> running${watching.length ? ` · <b class="watchn" title="${esc(wTip)}">${watching.length}</b> <span title="${esc(wTip)}">watching</span>` : ''}${queued ? ` · <b>${queued}</b> queued` : ''}</span>${subsLive ? ` <span class="subtag live" title="subagents running inside agents">${SUBI}${subsLive}</span>` : ''}</div>` +
     (running || S.boss?.status === 'running' || (S.runs || []).some(r => r.status === 'running') ? `<button class="stat stopall" data-stop-all aria-label="Stop all" title="Stop every running agent and workflow run. Sessions are kept; tasks wait on hold.">■<span class="sl"> Stop all</span></button>` : '') +
     (S.agents.some(a => a.status === 'paused') ? `<button class="stat resumeall" data-resume-all aria-label="Resume all" title="Let paused agents pick up work again">▶<span class="sl"> Resume</span></button>` : '') +
     (!urls.length ? '' : urls.length === 1
@@ -1535,13 +1598,14 @@ function renderRail() {
   const mini = view.railMin && !matchMedia('(max-width:760px)').matches;
   $('#body').classList.toggle('rail-min', mini);
   if (mini) {
+    $('#rail')._parts = null;
     $('#rail').innerHTML = `<div class="sec"><button class="railbtn" data-rail-toggle title="Expand the agents pane" aria-label="Expand the agents pane">»</button></div><div class="ravs">` +
       S.agents.map(a => `<div class="rmini ${view.drawer?.agent === a.name ? 'sel' : ''}" tabindex="0" aria-label="${esc(a.name)}, ${a.status}" data-agent="${a.name}" data-drop-agent="${a.name}" title="${esc(a.name)} · ${a.status}${a.activity ? ' · ' + esc(a.activity) : ''}"><div class="av ${a.status}" ${avPaint(a)}>${avFace(a, 17)}</div><span class="sd ${a.status}"></span></div>`).join('') +
       `<button class="railbtn" data-add-agent title="Add an agent" aria-label="Add an agent" style="font-size:16px">＋</button></div>`;
     return;
   }
-  $('#rail').innerHTML = `<div class="sec"><span>Agents · ${S.agents.length} <span style="font-weight:500;letter-spacing:0;text-transform:none">· ${S.agents.filter(a => a.alive).length} live</span></span><span class="sr"><button class="add" data-add-agent title="Add an agent" aria-label="Add an agent">＋ Add</button><button class="railbtn" data-rail-toggle title="Collapse the agents pane" aria-label="Collapse the agents pane">«</button></span></div>` +
-    S.agents.map(a => {
+  patchKids($('#rail'), [`<div class="sec"><span>Agents · ${S.agents.length} <span style="font-weight:500;letter-spacing:0;text-transform:none">· ${S.agents.filter(a => a.alive).length} live</span></span><span class="sr"><button class="add" data-add-agent title="Add an agent" aria-label="Add an agent">＋ Add</button><button class="railbtn" data-rail-toggle title="Collapse the agents pane" aria-label="Collapse the agents pane">«</button></span></div>`,
+    ...S.agents.map(a => {
       const t = a.task ? task(a.task) : null;
       const sel = view.drawer?.agent === a.name;
       const live = a.status === 'running';
@@ -1561,11 +1625,29 @@ function renderRail() {
         </div>
         <div class="task">${t ? `<span class="faint">#${t.id}</span> ${esc(t.title)}` : `<span class="faint">${a.status === 'error' ? esc((a.error || '').slice(0, 70)) : a.status === 'killed' ? 'killed' : a.status === 'paused' ? 'paused · ▶ to resume' : a.off ? 'turned off · takes no new work' : ''}</span>`}</div>
         ${a.activity ? `<div class="act ${live ? 'live' : ''}">› ${esc(a.activity)}</div>` : ''}
-        ${subChips(a)}${bgJobs(a).length ? `<div class="subs">${bgChip(a)}</div>` : ''}
+        ${laneChips(a)}${subChips(a)}${bgJobs(a).length ? `<div class="subs">${bgChip(a)}</div>` : ''}
         <div class="meta" style="align-items:center">${modelChip(a.model)}${effortBars(a.effort)}<span style="margin-left:auto;white-space:nowrap">${live ? `<span data-since="${a.since}" title="Running for">${ago(a.since)}</span> · ` : ''}<span class="tok" title="Tokens this session: in ${fmtTok(a.tokens?.in)} · cache ${fmtTok(a.tokens?.cache)} · out ${fmtTok(a.tokens?.out)}">${fmtTok(tokTotal(a))}</span>${showCost ? ` · <span title="Cost this session">${money(a.cost)}</span>` : ''}</span></div>
         ${live ? '<div class="shimmer"></div>' : ''}
       </div>`;
-    }).join('');
+    })]);
+}
+// Replace only the children whose html changed: rebuilding the whole agents pane on every update (several a second
+// while agents work) cut wheel and touch scrolls short and dropped hover.
+function patchKids(el, parts) {
+  if (!el._parts || el._parts.length !== parts.length || el.children.length !== parts.length) el.innerHTML = parts.join('');
+  else parts.forEach((h, i) => { if (el._parts[i] !== h) el.children[i].outerHTML = h; });
+  el._parts = parts;
+}
+
+// An agent working several tasks at once: one chip per lane (its own process, worktree and branch)
+function laneChips(a) {
+  if (!a.lanes || a.lanes.length < 2) return '';
+  const what = l => l.preparing ? 'making its worktree…' : l.task ? `#${l.task} ${l.status === 'running' ? 'working' : l.status === 'review' ? 'waits for review' : l.status}` : l.status === 'idle' ? 'free' : l.status;
+  const wait = a.lanes.filter(l => l.status === 'review' && l.task), free = a.lanes.filter(l => l.status === 'idle' && !l.task && !l.preparing);
+  const chip = l => `<span class="lanechip ${l.status}" title="${esc(l.branch || 'shared folder')}${l.activity ? ' · ' + esc(l.activity) : ''}">⑂${l.n} ${esc(what(l))}</span>`;
+  return `<div class="lanes" title="${esc(a.name)} runs up to ${a.max_parallel || 1} task${(a.max_parallel || 1) > 1 ? 's' : ''} at once. A card waiting for review keeps its lane only while its changes are in that lane's worktree.">${a.lanes.filter(l => !wait.includes(l) && !free.includes(l)).map(chip).join('')}${
+    wait.length ? `<span class="lanechip review" title="${esc(wait.map(l => `⑂${l.n} #${l.task} (${l.branch || 'shared folder'})`).join('\n'))}">${wait.length === 1 ? `⑂${wait[0].n} #${wait[0].task} waits for review` : `${wait.length} wait for review: ${wait.map(l => '#' + l.task).join(' ')}`}</span>` : ''}${
+    free.length ? `<span class="lanechip" title="${esc(free.map(l => l.branch || 'shared folder').join('\n'))}">${free.length} free</span>` : ''}</div>`;
 }
 
 const SUBI = '<svg class="si" viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="4" cy="3.5" r="1.7"/><circle cx="4" cy="12.5" r="1.7"/><circle cx="12" cy="8" r="1.7"/><path d="M4 5.2v5.6M5.7 8h4.6"/></svg>';
@@ -1662,12 +1744,13 @@ $('#alerts').addEventListener('keydown', e => { if (e.key === 'Enter' && e.targe
 function renderBoard() {
   renderColnav();
   const tab = view.tab || 'board', flows = tab === 'flows', onBoard = tab === 'board';
-  $('#board').hidden = !onBoard; $('#clearBtn').hidden = !onBoard; $('#flows').hidden = !flows; $('#trigs').hidden = tab !== 'trigs';
+  $('#board').hidden = !onBoard; $('#clearBtn').hidden = !onBoard; $('#flows').hidden = !flows; $('#trigs').hidden = tab !== 'trigs'; $('#ins').hidden = tab !== 'ins';
   document.querySelector('.boardhint').hidden = !onBoard;
   const running = (S.runs || []).filter(r => r.status === 'running').length;
   $('#runN').textContent = running ? `${running} running` : '';
   if (flows) return renderFlows();
   if (tab === 'trigs') return renderTrigs();
+  if (tab === 'ins') return renderInsights();
   if (document.querySelector('.menu')) return; // keep an open menu anchored
   const show = () => true;
   if (!S.tasks.length && !(S.triggers || []).length) { $('#board').innerHTML = firstRunHtml(); return; }
@@ -1679,7 +1762,7 @@ function renderBoard() {
     const html = items.map(t => groups.at.has(t.id) ? runGroup(groups.at.get(t.id), t) : card(t));
     const sh = k === 'backlog' || k === 'doing' ? schedHtml(k) : '';
     return `<div class="col" data-col="${k}">
-      <div class="colh"><span class="dot" style="background:${c}"></span>${label}${k === 'backlog' ? '<button class="btn sm primary addt" data-new-task title="New task (N)">＋ New</button>' : ''}<span class="n">${items.length}</span></div>
+      <div class="colh"><span class="dot" style="background:${c}"></span>${label}${k === 'backlog' ? '<button class="btn sm primary addt" data-new-task title="New task or workflow run (N)">＋ New</button>' : ''}<span class="n">${items.length}</span></div>
       <div class="cards">${sh}${html.length || (sh && k === 'doing') ? html.join('') : `<div class="empty">${k === 'backlog' ? '<span class="dk">No tasks yet. Press <kbd>N</kbd> to add one.</span>' : '<span class="dk">Nothing here</span>'}<span class="mo">${EMPTY_MO[k]}</span></div>`}</div>
     </div>`;
   }).join('');
@@ -2022,10 +2105,11 @@ function renderAgentDrawer(d, a) {
     ${ctxRow(a)}${blockedBox(a)}${bgBox(a)}`;
   const inh = $('#dinh'); if (inh) { inh.hidden = !view.showInherit; if (view.showInherit) { const h = inheritHtml(a); if (inh.dataset.sig !== h) { inh.innerHTML = h; inh.dataset.sig = h; } } }
   renderSettings(a);
-  const st = $('#stream'), atBottom = st.scrollHeight - st.scrollTop - st.clientHeight < 40;
-  st.innerHTML = a.log.length ? renderLog(a.log) : `<div class="empty">No activity yet. Assign a task or send a message.</div>`;
-  if (atBottom || view.lastLog !== a.log.length) st.scrollTop = st.scrollHeight;
-  view.lastLog = a.log.length;
+  const st = $('#stream'), lg = a.log, fresh = view.lastLogWho !== a.name;  // another agent: start at its latest line
+  logState();
+  paintLog(st, lg.length ? renderLog(lg, a.name) : `<div class="empty">No activity yet. Assign a task or send a message.</div>`,
+    [a.name, lg.length, lg[0]?.t, lg[lg.length - 1]?.t, view.logV].join(':'), fresh);
+  view.lastLogWho = a.name;
 }
 
 function denialRow(a, d, showAgent) {
@@ -2258,13 +2342,13 @@ document.addEventListener('click', async e => {
 // branch, model, tokens, skills/MCP and session: shown at the top of the Edit panel
 function agentKv(a) {
   const t = a.task ? task(a.task) : null;
-  return `<span>${a.branch ? '⎇ ' + esc(a.branch) : 'shared folder'}</span><span>${esc(MODEL_INFO[a.model || '']?.[0] || a.model)} · ${esc(a.effort || 'default')} effort</span><span class="tok" title="Cumulative for this session: input · cache reads · output">this session: ${fmtTok(a.tokens?.in)} in · ${fmtTok(a.tokens?.cache)} cached · ${fmtTok(a.tokens?.out)} out${costTxt(a.cost)}</span>${a.mcp?.length || a.skills ? `<span class="mcpchip" data-inherit title="Skills, plugins and MCP servers this agent loaded: click to list">${a.skills || 0} skills · ${(a.mcp || []).filter(m => m.status === 'connected').length} MCP</span>` : ''}${a.session ? `<span title="${esc(a.session)}">session ${esc(a.session.slice(0, 8))}</span>` : ''}${t ? `<span>#${t.id} ${esc(t.title.slice(0, 32))}</span>` : ''}`;
+  return `<span>${a.branch ? '⎇ ' + esc(a.branch) : 'shared folder'}</span><span>${esc(MODEL_INFO[a.model || '']?.[0] || a.model)} · ${esc(a.effort || 'default')} effort</span>${a.lanes ? `<span title="${esc(a.lanes.map(l => l.branch || 'shared folder').join(', '))}">${a.lanes.length} lanes</span>` : ''}<span class="tok" title="Cumulative for this session: input · cache reads · output">this session: ${fmtTok(a.tokens?.in)} in · ${fmtTok(a.tokens?.cache)} cached · ${fmtTok(a.tokens?.out)} out${costTxt(a.cost)}</span>${a.mcp?.length || a.skills ? `<span class="mcpchip" data-inherit title="Skills, plugins and MCP servers this agent loaded: click to list">${a.skills || 0} skills · ${(a.mcp || []).filter(m => m.status === 'connected').length} MCP</span>` : ''}${a.session ? `<span title="${esc(a.session)}">session ${esc(a.session.slice(0, 8))}</span>` : ''}${t ? `<span>#${t.id} ${esc(t.title.slice(0, 32))}</span>` : ''}`;
 }
 function renderSettings(a) {
   const box = $('#dset'); if (!box) return;
   box.hidden = !view.showSettings;
   if (!view.showSettings) return;
-  const sig = JSON.stringify([agentKv(a), a.name, a.model, a.effort, a.role, a.tags, a.status, S.tags, a.context, a.icon, a.color, a.toolkit, a.kit_est, S.toolkit, (S.triggers || []).filter(t => trigAgent(t) === a.name)]);
+  const sig = JSON.stringify([agentKv(a), a.name, a.model, a.effort, a.max_parallel, a.role, a.deliverable, a.deliverable_default, a.tags, a.status, S.tags, a.context, a.icon, a.color, a.toolkit, a.kit_est, S.toolkit, (S.triggers || []).filter(t => trigAgent(t) === a.name)]);
   if (sig === view.setSig || box.contains(document.activeElement)) return;
   view.setSig = sig;
   const busy = a.status === 'running';
@@ -2273,11 +2357,13 @@ function renderSettings(a) {
     ${kv ? `<div class="kvline">${kv}</div>` : ''}
     <div class="row2"><span class="k">Model</span><div class="seg tight" data-cfg="model">${['', ...S.models].map(m => `<button data-v="${m}" class="${(a.model || '') === m ? 'on' : ''}" title="${MODEL_INFO[m]?.[1] || ''}">${MODEL_INFO[m]?.[0] || m}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Effort</span><div class="seg tight" data-cfg="effort">${['', ...S.efforts].map(e => `<button data-v="${e}" class="${(a.effort || '') === e ? 'on' : ''}">${e || 'Default'}</button>`).join('')}</div></div>
+    <div class="row2"><span class="k">Parallel</span><div class="seg tight" data-cfg="max_parallel">${[1, 2, 3, 4, 6, 8].map(n => `<button data-v="${n}" class="${(a.max_parallel || 1) === n ? 'on' : ''}" title="${n === 1 ? 'One task at a time' : `Up to ${n} tasks at once, each in its own Claude process, worktree and branch (crew/${esc(a.name)}.2 …)`}">${n}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Context</span><div class="seg tight" data-cfg="context">${[['fresh', 'Fresh per task'], ['keep', 'Keep across tasks']].map(([v, l]) => `<button data-v="${v}" class="${a.context === v ? 'on' : ''}" title="${v === 'fresh' ? 'New Claude session for each new task: cheaper, no stale context. Messages, Send back and re-running a task it already worked on continue that task’s own session.' : 'One session across tasks: remembers earlier work, but every turn re-reads it.'}">${l}</button>`).join('')}</div></div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Tools</span>${toolkitBox(a)}</div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Icon</span><div class="iconpick">${['', ...Object.keys(AGENT_ICONS)].map(k => `<button data-icon="${k}" class="${(a.icon || '') === k ? 'on' : ''}" title="${k || 'First letter'}" style="${(a.icon || '') === k ? avCss(a) : ''}">${k ? iconSvg(k, 16) : esc(a.name[0])}</button>`).join('')}</div></div>
     <div class="row2"><span class="k">Color</span><div class="swatches">${['', ...AGENT_COLORS].map(c => `<button data-color="${c}" class="${(a.color || '') === c ? 'on' : ''}" title="${c || 'Default'}" style="${c ? `background:${c};color:${inkOn(c)}` : ''}">${(a.color || '') === c ? '✓' : c ? '' : '∅'}</button>`).join('')}</div></div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:8px">Role</span><textarea class="field rolebox" id="cfgRole" rows="6" title="Enter saves · Shift+Enter for a new line · drag the corner to resize">${esc(a.role)}</textarea></div>
+    <div class="row2"><span class="k" title="What every reply of this agent is. After a follow-up or a change request it sends the whole thing again, updated, not only the part that changed.">Every reply</span><input class="field" id="cfgDeliv" maxlength="500" value="${esc(a.deliverable || '')}" placeholder="${esc(a.deliverable_default || '')}"></div>
     <div class="row2"><span class="k">Tags</span><input class="field" id="cfgTags" value="${esc(a.tags.join(', '))}" placeholder="comma separated"></div>
     <div class="row2" style="align-items:start"><span class="k" style="padding-top:6px">Triggers</span>${agentTriggers(a)}</div>
     <div class="foot"><span class="muted">${busy ? 'Applies after the current turn. ' : ''}${a.context === 'fresh' ? 'Each new task starts a new session; going back to a task resumes its session.' : 'One session across tasks.'}</span>
@@ -2289,7 +2375,9 @@ function renderSettings(a) {
   box.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => pick('icon', b.dataset.icon));
   wireToolkit(box, a, v => { a.toolkit = v === 'recommended' ? a.kit_rec : v; document.activeElement?.blur(); view.setSig = ''; render(); save('toolkit', v); });
   box.querySelectorAll('[data-color]').forEach(b => b.onclick = () => pick('color', b.dataset.color));
-  const role = $('#cfgRole'), tags = $('#cfgTags');
+  const role = $('#cfgRole'), tags = $('#cfgTags'), deliv = $('#cfgDeliv');
+  deliv.onblur = () => { if (deliv.value.trim() !== (a.deliverable || '')) save('deliverable', deliv.value); };
+  deliv.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); deliv.blur(); } };
   fitRole(role); role.oninput = () => fitRole(role);
   role.onblur = () => { if (role.value.trim() !== a.role) save('role', role.value); };
   role.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); role.blur(); } };
@@ -2341,7 +2429,7 @@ function avStat(a) {
 const AST = {idle: 'Idle', running: 'Running', review: 'To review', paused: 'Paused', error: 'Error', killed: 'Killed'};
 function openAgentModal() {
   Object.assign(newAgent, {tags: [], model: 'sonnet', effort: ''});
-  $('#aName').value = ''; $('#aRole').value = ''; fitRole($('#aRole')); $('#aTagNew').value = '';
+  $('#aName').value = ''; $('#aRole').value = ''; $('#aDeliv').value = ''; fitRole($('#aRole')); $('#aTagNew').value = '';
   drawAgentModal(); $('#agentModal').classList.add('on'); setTimeout(() => $('#aName').focus(), 0);
 }
 function drawAgentModal() {
@@ -2357,7 +2445,7 @@ $('#aTagNew').onkeydown = e => { if (e.key !== 'Enter') return; e.preventDefault
 $('#aName').oninput = e => { e.target.value = e.target.value.replace(/[^A-Za-z0-9-]/g, ''); };
 $('#aCreate').onclick = async () => {
   const name = $('#aName').value.trim(); if (!name) return $('#aName').focus();
-  const r = await act('add_agent', {name, role: $('#aRole').value, tags: newAgent.tags, model: newAgent.model, effort: newAgent.effort});
+  const r = await act('add_agent', {name, role: $('#aRole').value, deliverable: $('#aDeliv').value, tags: newAgent.tags, model: newAgent.model, effort: newAgent.effort});
   if (r.ok) { closeModals(); view.drawer = {agent: name}; view.showSettings = false; toast(`${name} joined the crew`, 'var(--green)'); }
 };
 
@@ -2529,17 +2617,58 @@ let mmdTimer = 0;
 new MutationObserver(() => {
   if (document.querySelector('pre.mmd:not([data-mmd])')) { clearTimeout(mmdTimer); mmdTimer = setTimeout(() => drawMermaid(), 60); }
 }).observe(document.body, {childList: true, subtree: true});
-function renderLog(log) {
+// Transcript lines open on a click: a tool call shows its whole command, a long brief or error all of its text. A
+// board update carries long lines cut short ("more"); the rest is fetched once and kept in view.logFull.
+const logKey = (who, m) => `${who}|${m.kind}|${m.t}`;
+function logState() { view.logOpen = view.logOpen || new Set(); view.logFull = view.logFull || {}; view.logV = view.logV || 0; }
+function renderLog(log, who = '') {
+  logState();
   let out = '', run = [];
-  const flush = () => { if (run.length) out += `<div class="msub"><span class="sublbl">↳ ${esc(run[0].sub)}</span>${run.map(msgBody).join('')}</div>`; run = []; };
+  const body = m => msgBody(m, who);
+  const flush = () => { if (run.length) out += `<div class="msub"><span class="sublbl">↳ ${esc(run[0].sub)}</span>${run.map(body).join('')}</div>`; run = []; };
   for (const m of log) {
     if (m.sub && run.length && run[0].sub !== m.sub) flush();
-    if (m.sub) run.push(m); else { flush(); out += msgBody(m); }
+    if (m.sub) run.push(m); else { flush(); out += body(m); }
   }
   flush();
   return out;
 }
-function msgBody(m) {
+function msgBody(m, who = '') {
+  const k = logKey(who, m), open = view.logOpen?.has(k), full = open && view.logFull?.[k];
+  const mm = full ? {...m, ...full, more: false} : m;
+  let h = msgHtml(mm).replace(/^<div class="([^"]*)"/, (_, c) => `<div class="${c}${open ? ' open' : ''}" data-t="${m.t}"`);
+  if (m.kind === 'tool') h = h.replace(/^<div /, `<div data-lk="${esc(k)}" title="${open ? 'Click to fold' : 'Click to show the whole command'}" `);
+  else if (m.more || full) h = h.replace(/<\/div>$/, `<button class="lmore" data-lmore="${esc(k)}">${open ? 'Show less ▴' : 'Show all ▾'}</button></div>`);
+  return m.lane ? h.replace('>', `><span class="lanetag" title="Lane ${m.lane}">⑂${m.lane}</span>`) : h;
+}
+async function toggleLog(k) {
+  logState();
+  if (window.getSelection()?.toString()) return;  // selecting text to copy, not folding
+  if (view.logOpen.has(k)) view.logOpen.delete(k); else view.logOpen.add(k);
+  const [who, kind, t] = k.split('|');
+  const a = who === 'boss' ? S.boss : agent(who);
+  const m = a?.log.find(x => x.kind === kind && String(x.t) === t);
+  if (view.logOpen.has(k) && m?.more && !view.logFull[k]) {
+    const r = await act('log_entry', {agent: who, kind, t: m.t});
+    if (r.ok) view.logFull[k] = {text: r.text, detail: r.detail};
+  }
+  view.logV++;
+  render();
+}
+// Redraw a transcript only when it changed, and keep your place: at the bottom it follows new lines; scrolled up,
+// the line at the top of the view stays put even as old lines drop off the top.
+function paintLog(el, html, sig, follow) {
+  if (el.dataset.sig === sig) return;
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  const top = !atBottom && [...el.querySelectorAll('[data-t]')].find(x => x.offsetTop + x.offsetHeight > el.scrollTop);
+  const anchor = top && {t: top.dataset.t, off: top.offsetTop - el.scrollTop};
+  el.dataset.sig = sig;
+  el.innerHTML = html;
+  if (follow || atBottom) { el.scrollTop = el.scrollHeight; return; }
+  const same = anchor && el.querySelector(`[data-t="${CSS.escape(anchor.t)}"]`);
+  if (same) el.scrollTop = same.offsetTop - anchor.off;
+}
+function msgHtml(m) {
   switch (m.kind) {
     case 'subagent': return `<div class="m subagent"><span class="sd"></span>${SUBI}subagent <b>${esc(m.text)}</b>${m.detail ? `<span class="faint">${esc(m.detail)}</span>` : ''}</div>`;
     case 'subdone': return `<div class="m subdone">${SUBI} ${esc(m.text)} finished · ${esc(m.detail || '')}</div>`;
@@ -2653,6 +2782,12 @@ async function sendMsg() {
 }
 
 /* ── interactions ──────────────────────────────────── */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-lk],[data-lmore]');
+  if (!el || e.target.closest('a')) return;
+  e.stopPropagation();
+  toggleLog(el.dataset.lk || el.dataset.lmore);
+}, true);
 document.addEventListener('click', async e => {
   if (!e.target.closest('.menu')) closeMenu();
   const el = e.target.closest('[data-run-restart],[data-toggle-cost],[data-browse],[data-open-project],[data-add-agent],[data-toggle-settings],[data-remove-agent],[data-menu],[data-fwd],[data-mi],[data-respawn],[data-respawn-fresh],[data-review],[data-approve],[data-reject],[data-addrev],[data-merge],[data-openpr],[data-rebase],[data-undo],[data-try],[data-backlog],[data-refresh-diff],[data-close-drawer],[data-fullscreen],[data-new-task],[data-agent],[data-close],[data-run-stop-card]');
@@ -2934,16 +3069,41 @@ function askConfirm(title, body, ok, run, danger = false) {
 $('#cfOk').onclick = () => { const r = confirmRun; confirmRun = null; closeModals(); r && r(); };
 
 // new task modal
-function openTask(who = '', pre = null) {
+function openTask(who = '', pre = null, kind = 'task') {
   view.newWho = who; view.tagTouched = !!pre; view.newTag = pre?.tag || 'feature';
+  const flows = (S.workflows || []).filter(w => !w.off);
+  view.newFlow = flows.some(w => w.id === view.newFlow) ? view.newFlow : flows[0]?.id;
+  $('#tFlow').innerHTML = flows.length ? flows.map(w => `<button data-flow="${esc(w.id)}" class="${w.id === view.newFlow ? 'on' : ''}" title="${esc(w.description || '')}">${esc(w.name)}</button>`).join('')
+    : '<span class="muted">No workflows turned on: add one in the Workflows tab.</span>';
+  $('#tKind').querySelector('[data-kind="flow"]').disabled = !flows.length;
+  setNewKind(flows.length ? kind : 'task');
   $('#tTag').innerHTML = S.tags.map(t => `<button data-tag="${t}" class="${view.newTag === t ? 'on' : ''}">${t}</button>`).join('');
   $('#tWho').innerHTML = [['', 'anyone'], ...S.agents.map(a => [a.name, a.name])].map(([v, l]) => `<button data-who="${v}" class="${view.newWho === v ? 'on' : ''}">${l}</button>`).join('');
   $('#taskModal').classList.add('on'); $('#tTitle').value = pre?.title || ''; $('#tDetails').value = pre?.details || ''; setTimeout(() => $('#tTitle').focus(), 0);
 }
+// The New dialog makes a task, or starts a workflow run with the same title and details
+function setNewKind(kind) {
+  view.newKind = kind;
+  const flow = kind === 'flow', w = flow && (S.workflows || []).find(x => x.id === view.newFlow);
+  $('#tKind').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.kind === kind));
+  $('#tFlowBox').hidden = !flow; $('#tTagBox').hidden = flow; $('#tWhoBox').hidden = flow;
+  $('#tChain').innerHTML = w ? chainHtml(w.steps) : '';
+  $('#tHead').textContent = flow ? 'New workflow run' : 'New task';
+  $('#tTitle').placeholder = flow ? 'What should it work on?' : 'What needs doing?';
+  $('#tCreate').innerHTML = `${flow ? 'Start run' : 'Create task'} <kbd class="kon">Ctrl ↵</kbd>`;
+}
+$('#tKind').onclick = e => { const b = e.target.closest('[data-kind]'); if (b && !b.disabled) { setNewKind(b.dataset.kind); $('#tTitle').focus(); } };
+$('#tFlow').onclick = e => { const b = e.target.closest('[data-flow]'); if (!b) return; view.newFlow = b.dataset.flow; $('#tFlow').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); setNewKind('flow'); };
 $('#tTag').onclick = e => { const b = e.target.closest('[data-tag]'); if (!b) return; view.newTag = b.dataset.tag; view.tagTouched = true; $('#tTag').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
 $('#tWho').onclick = e => { const b = e.target.closest('[data-who]'); if (!b) return; view.newWho = b.dataset.who; $('#tWho').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
 async function createTask() {
   const title = $('#tTitle').value.trim(); if (!title) return $('#tTitle').focus();
+  if (view.newKind === 'flow') {
+    const w = (S.workflows || []).find(x => x.id === view.newFlow); if (!w) return;
+    const r = await act('wf_run', {id: w.id, title, details: $('#tDetails').value});
+    if (r.ok) { closeModals(); const first = stepGroups(w.steps)[0].map(i => w.steps[i].agent); toast(`${w.name} started: ${first.join(' and ')} ${first.length > 1 ? 'are' : 'is'} up first`, 'var(--teal)'); }
+    return;
+  }
   const r = await act('add', {title, details: $('#tDetails').value, tag: view.newTag, agent: view.newWho || null});
   if (r.ok) closeModals();
 }
@@ -3458,9 +3618,11 @@ function blockedNote(r) {  // why the current step hasn't started
   if (!t) return '';
   const a = S.agents.find(x => x.name === t.who);
   if (!a) return '';
-  if (a.status === 'review' && a.task) return ` · <span style="color:var(--amber)">waiting: review ${esc(a.name)}'s #${a.task} first</span>`;
-  if (a.status === 'running') return ` · <span style="color:var(--faint)">queued: ${esc(a.name)} is busy</span>`;
   if (a.status === 'killed' || a.status === 'error') return ` · <span style="color:var(--red)">${esc(a.name)} is ${a.status}: respawn it</span>`;
+  if (a.status === 'paused') return ` · <span style="color:var(--amber)">${esc(a.name)} is paused: ▶ to resume</span>`;
+  const run = a.running ?? (a.status === 'running' ? 1 : 0), cap = a.max_parallel || 1;
+  if (run >= cap) return ` · <span style="color:var(--faint)">queued: ${esc(a.name)} is busy${cap > 1 ? ` (${run} of ${cap} at once)` : ''}</span>`;
+  if ((a.lanes || []).some(l => l.preparing)) return ` · <span style="color:var(--faint)">starting: making a worktree for ${esc(a.name)}'s next lane</span>`;
   return '';
 }
 function renderFlows() {
@@ -4099,7 +4261,9 @@ $('#hMenu').onclick = e => {
   if (matchMedia('(max-width:760px)').matches && (view.tab || 'board') === 'board') h += item('Clear board…', () => setTimeout(() => clearMenu($('#hMenu'))), {sub: 'Remove finished or all tasks'}) + '<div class="sep"></div>';
   const nf = (S?.facts || []).length;  // the memory chip lives here, out of the header
   h += item(`Crew memory…<span class="faint"> · ${nf} fact${nf === 1 ? '' : 's'}</span>`, () => { $('#memQ').value = ''; memForm(null); $('#memModal').classList.add('on'); setTimeout(() => $('#memText').focus(), 0); }, {sub: 'Project facts every agent reads when it starts a task'}) + '<div class="sep"></div>';
-  h += item('Card buttons…', openCardBtns, {sub: 'Your own one-click actions on task cards'}) + '<div class="sep"></div>';
+  h += item('Card buttons…', openCardBtns, {sub: 'Your own one-click actions on task cards'});
+  if (matchMedia('(max-width:760px)').matches) h += item('Insights', () => setM('ins'), {sub: 'Tokens, PRs and tasks over the last 30 days'});
+  h += '<div class="sep"></div>';
   h += '<div class="mh">Agents</div>' + item('Export agents…', () => openIO('export'), {sub: 'Save all or some agents as a JSON file'}) +
     item('Import agents…', () => openIO('import'), {sub: 'Add agents from an exported file'}) + '<div class="sep"></div>';
   h += '<div class="mh">Workflows</div>' + item('Export workflows…', () => openIO('export', 'workflows'), {sub: 'Steps, gates and output as a JSON file'}) +
@@ -4191,13 +4355,13 @@ function renderChat() {
   view.chatSeen = view.chatSeen || {};
   if (open || view.chatSeen[t.name] == null) view.chatSeen[t.name] = t.log.length;
   if (!open) return;
-  const sig = t.name + ':' + t.log.length + ':' + t.status;
+  logState();
+  const tl = t.log, sig = [t.name, tl.length, tl[0]?.t, tl[tl.length - 1]?.t, t.status, view.logV].join(':');
   if (lg.dataset.sig === sig) return;
-  const atBottom = lg.scrollHeight - lg.scrollTop - lg.clientHeight < 60;
-  lg.dataset.sig = sig;
-  lg.innerHTML = `<div class="chathead"><b style="color:var(--text);flex:none">${boss ? 'Boss' : esc(t.name)}</b><span class="chd">· ${boss ? `${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : esc(t.role.slice(0, 80))}</span>${busy ? ' <span style="color:var(--green);flex:none">· working…</span>' : ''}<span class="chc" style="margin-left:auto" title="Cumulative tokens and cost for this chat session; Clear chat resets them"><span class="lbl">this session: </span>${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear chat</button><button class="hidebtn" data-chat-hide title="Hide the conversation (Esc)">Hide ▾</button></div>` +
-    (t.log.length ? renderLog(t.log.slice(-120)) : `<div class="empty">${boss ? 'Try: “Plan and build CSV export for reports, then have it tested and reviewed.”' : 'No messages yet.'}</div>`);
-  if (atBottom || lg.dataset.jump) { lg.scrollTop = lg.scrollHeight; delete lg.dataset.jump; }
+  const jump = !!lg.dataset.jump;
+  delete lg.dataset.jump;
+  paintLog(lg, `<div class="chathead"><b style="color:var(--text);flex:none">${boss ? 'Boss' : esc(t.name)}</b><span class="chd">· ${boss ? `${esc(MODEL_INFO[t.model || '']?.[0] || t.model)} · delegates to the crew, never edits code` : esc(t.role.slice(0, 80))}</span>${busy ? ' <span style="color:var(--green);flex:none">· working…</span>' : ''}<span class="chc" style="margin-left:auto" title="Cumulative tokens and cost for this chat session; Clear chat resets them"><span class="lbl">this session: </span>${fmtTok(tokTotal(t))} tok${costTxt(t.cost)}</span><button class="clearbtn" data-chat-clear title="Clear this chat and start a fresh session (frees its context)">Clear chat</button><button class="hidebtn" data-chat-hide title="Hide the conversation (Esc)">Hide ▾</button></div>` +
+    (t.log.length ? renderLog(t.log.slice(-120), t.name) : `<div class="empty">${boss ? 'Try: “Plan and build CSV export for reports, then have it tested and reviewed.”' : 'No messages yet.'}</div>`), sig, jump);
 }
 async function bossSays(text, open = true) {
   view.chatTo = 'boss';
@@ -4373,13 +4537,123 @@ $('#chatTo').onclick = e => {
   showMenu(e.currentTarget, h);
 };
 
+// ---- insights: the crew's last 30 days ------------------------------------------------------
+// The server keeps a counter per day (workflows/insights.py); this tab fetches it when opened and again at most every
+// 20 seconds while the board changes, and redraws only when the numbers changed.
+const IV = {days: (() => { try { return +localStorage.getItem('crew.insDays') || 30; } catch { return 30; } })(), data: null, at: 0, sig: '', busy: false};
+function renderInsights() {
+  if (!$('#ins').firstChild) $('#ins').innerHTML = '<div class="tpg"><div class="faint">Loading insights…</div></div>';
+  if (IV.busy || IV.data && Date.now() - IV.at < 20000) return drawInsights();
+  IV.busy = true;
+  fetch('/api/insights?days=' + IV.days, {headers: AUTH}).then(r => r.json()).then(d => { IV.data = d; IV.at = Date.now(); })
+    .catch(() => {}).finally(() => { IV.busy = false; if ((view.tab || 'board') === 'ins') drawInsights(); });
+}
+const insNice = v => { if (v <= 0) return 1; const p = 10 ** Math.floor(Math.log10(v)), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
+const insDay = (k, long) => { const d = new Date(k + 'T12:00:00'); return long ? d.toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'}) : d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'}); };
+const insNum = n => (n || 0).toLocaleString();
+// One bar chart: a column per day, a bar per series side by side, one y axis.
+function insChart(id, days, series, fmt, h = 150, count = false) {
+  const top = Math.max(0, ...days.flatMap(d => series.map(s => d[s.key] || 0)));
+  const max = count && top <= 10 ? Math.max(2, Math.ceil(top / 2) * 2) : insNice(top);  // counts: whole-number ticks
+  const ticks = [0, .5, 1].map(f => max * f);
+  const every = Math.ceil(days.length / (matchMedia('(max-width:760px)').matches ? 4 : 7));
+  const last = days.length - 1;
+  return `<div class="ich" data-ch="${id}" style="--h:${h}px">
+    <div class="ich-y">${ticks.map(v => `<span style="bottom:${v / max * 100}%">${fmt(v)}</span>`).join('')}</div>
+    <div class="ich-plot">${ticks.slice(1).map(v => `<div class="gl" style="bottom:${v / max * 100}%"></div>`).join('')}
+      <div class="ich-cols">${days.map((d, i) => `<div class="ich-col${i === last ? ' today' : ''}" data-i="${i}">${series.map(s => {
+        const v = d[s.key] || 0;
+        return `<i style="height:${v ? `max(2px,${v / max * 100}%)` : '0'};background:${s.color}"></i>`;
+      }).join('')}</div>`).join('')}</div></div>
+    <div class="ich-x">${days.map((d, i) => `<span>${(last - i) % every === 0 ? (i === last ? 'today' : insDay(d.day)) : ''}</span>`).join('')}</div>
+  </div>`;
+}
+const INS_SERIES = {
+  tok: [{key: 'tokens', label: 'Tokens', color: 'var(--ch-tok)'}],
+  prs: [{key: 'prs_opened', label: 'Raised', color: 'var(--ch-1)'}, {key: 'prs_merged', label: 'Merged', color: 'var(--ch-2)'}],
+  tasks: [{key: 'tasks_done', label: 'Done', color: 'var(--ch-1)'}, {key: 'tasks_review', label: 'To review', color: 'var(--ch-2)'}],
+};
+function insTip(ch, d) {
+  const r = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
+  let h = `<div class="d">${insDay(d.day, true)}</div>`;
+  if (ch === 'tok') {
+    h += r('Total', fmtTok(d.tokens)) + r('Input', fmtTok(d.tok_in)) + r('Cache read', fmtTok(d.tok_cache)) + r('Output', fmtTok(d.tok_out));
+    if (showCost && d.cost) h += r('Spend', money(d.cost));
+    const top = Object.entries(d.by || {}).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    if (top.length) h += '<div class="r" style="margin-top:4px"><span>Top agents</span><span></span></div>' + top.map(([a, n]) => r('· ' + esc(a), fmtTok(n))).join('');
+  } else if (ch === 'prs') {
+    h += r('PRs raised', d.prs_opened) + r('PRs merged', d.prs_merged) + r('Reviews addressed', d.address_reviews);
+  } else {
+    h += r('Tasks done', d.tasks_done) + r('Reached review', d.tasks_review) + r('Started', d.tasks_started) + r('Approved', d.approved) + r('Sent back', d.sent_back) + (d.tasks_failed ? r('Failed', d.tasks_failed) : '');
+  }
+  return h;
+}
+function drawInsights() {
+  const D = IV.data, box = $('#ins');
+  if (!D || !D.days) return;
+  const sig = JSON.stringify([D, IV.days, showCost, document.documentElement.dataset.theme]);
+  if (sig === IV.sig && box.querySelector('.kpis')) return;
+  IV.sig = sig;
+  const T = D.totals, days = D.days, n = days.length, act = days.filter(d => d.tokens || d.tasks_started || d.tasks_done).length;
+  const kpi = (k, v, s, sw) => `<div class="kpi"><div class="k">${sw ? `<i class="sw" style="background:${sw}"></i>` : ''}${k}</div><div class="v">${v}</div><div class="s" title="${esc(s)}">${esc(s)}</div></div>`;
+  const legend = ss => `<div class="ilegend">${ss.map(s => `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}</div>`;
+  const since = D.since ? new Date(D.since * 1000) : null;
+  const rng = `<div class="ftabs" role="tablist" aria-label="Range">${[7, 14, 30].map(x => `<button role="tab" data-ins-days="${x}" class="${IV.days === x ? 'on' : ''}" aria-selected="${IV.days === x}">${x} days</button>`).join('')}</div>`;
+  const maxA = D.by_agent[0]?.[1] || 1;
+  box.innerHTML = `<div class="tpg">
+    <div class="tph"><h3>Insights</h3><span class="faint tsub">What the crew did over the last ${n} days${act ? ` · active on ${act}` : ''}</span>${rng}</div>
+    <div class="kpis">
+      ${kpi('Tokens', fmtTok(T.tokens), `${fmtTok(T.tok_in)} in · ${fmtTok(T.tok_cache)} cache · ${fmtTok(T.tok_out)} out`, 'var(--ch-tok)')}
+      ${kpi('Spend', usd(T.cost), `${usd(T.cost / Math.max(1, act))} per active day`)}
+      ${kpi('PRs raised', insNum(T.prs_opened), D.prs_open ? `${D.prs_open} still open` : 'none open now', 'var(--ch-1)')}
+      ${kpi('PRs merged', insNum(T.prs_merged), `${T.prs_merged_raised} raised by the crew`, 'var(--ch-2)')}
+      ${kpi('Tasks done', insNum(T.tasks_done), `${T.tasks_started} started${T.tasks_failed ? ` · ${T.tasks_failed} failed` : ''}`)}
+      ${kpi('Approved', insNum(T.approved), `${T.sent_back} sent back · ${T.merges} merged locally`)}
+      ${kpi('PR reviews addressed', insNum(T.address_reviews), '/address-review runs')}
+      ${kpi('Monitors set', insNum(T.watches), `${insNum(T.watch_checks)} free checks · ${T.watch_wakes} woke an agent`)}
+      ${kpi('Workflow runs', insNum(T.runs), `${T.fired} trigger firings`)}
+      ${kpi('Hand-offs', insNum(T.handoffs), `${T.alerts} alert${T.alerts === 1 ? '' : 's'} raised`)}
+    </div>
+    <div class="ichs">
+      <div class="ichbox wide"><h4>Tokens per day <span class="faint">all agents and the boss</span></h4>${insChart('tok', days, INS_SERIES.tok, fmtTok, 170)}</div>
+      <div class="ichbox"><h4>Pull requests ${legend(INS_SERIES.prs)}</h4>${insChart('prs', days, INS_SERIES.prs, String, 150, true)}</div>
+      <div class="ichbox"><h4>Tasks ${legend(INS_SERIES.tasks)}</h4>${insChart('tasks', days, INS_SERIES.tasks, String, 150, true)}</div>
+      <div class="ichbox wide"><h4>Tokens by agent <span class="faint">last ${n} days</span></h4>${D.by_agent.length ? `<div class="ibars">${D.by_agent.slice(0, 12).map(([a, v]) => `<div class="ibar"><span class="n" title="${esc(a)}">${esc(a)}</span><span class="t"><i style="width:${Math.max(1, v / maxA * 100)}%"></i></span><span class="q">${fmtTok(v)} · ${Math.round(v * 100 / Math.max(1, T.tokens))}%</span></div>`).join('')}</div>` : '<div class="faint">No tokens used in this range yet.</div>'}</div>
+    </div>
+    <details><summary>Daily table</summary><div class="itwrap"><table class="itable"><thead><tr><th>Day</th><th>Tokens</th>${showCost ? '<th>Spend</th>' : ''}<th>PRs raised</th><th>PRs merged</th><th>Tasks done</th><th>Approved</th><th>Sent back</th><th>Reviews addressed</th><th>Monitors</th><th>Runs</th></tr></thead>
+      <tbody>${days.slice().reverse().map(d => `<tr><td>${insDay(d.day, true)}</td><td>${fmtTok(d.tokens)}</td>${showCost ? `<td>${money(d.cost)}</td>` : ''}<td>${d.prs_opened}</td><td>${d.prs_merged}</td><td>${d.tasks_done}</td><td>${d.approved}</td><td>${d.sent_back}</td><td>${d.address_reviews}</td><td>${d.watches}</td><td>${d.runs}</td></tr>`).join('')}</tbody></table></div></details>
+    <div class="inote">${since ? `Tracked since ${since.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}.` : ''}${D.backfilled ? ' Days before Insights was added are estimated from the tasks still on the board, so their tokens all count as input.' : ''} Merges of open PRs are read from GitHub every 10 minutes. Monitors are ⟳ watches agents set; free checks ran without the model.</div>
+  </div>`;
+}
+$('#ins').addEventListener('click', e => {
+  const b = e.target.closest('[data-ins-days]'); if (!b) return;
+  IV.days = +b.dataset.insDays; IV.at = 0; IV.sig = '';
+  try { localStorage.setItem('crew.insDays', IV.days); } catch {}
+  renderInsights();
+});
+{
+  const tip = document.createElement('div'); tip.className = 'itip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip);
+  const hide = () => { tip.style.display = 'none'; document.querySelectorAll('.ich-col.on').forEach(c => c.classList.remove('on')); };
+  $('#ins').addEventListener('mousemove', e => {
+    const col = e.target.closest('.ich-col'), ch = col?.closest('[data-ch]')?.dataset.ch, d = col && IV.data?.days[+col.dataset.i];
+    if (!d) return hide();
+    document.querySelectorAll('.ich-col.on').forEach(c => c !== col && c.classList.remove('on')); col.classList.add('on');
+    tip.innerHTML = insTip(ch, d); tip.style.display = 'block';
+    const w = tip.offsetWidth, hh = tip.offsetHeight;
+    tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, e.clientX + 14)) + 'px';
+    tip.style.top = (e.clientY - hh - 12 < 8 ? e.clientY + 16 : e.clientY - hh - 12) + 'px';
+  });
+  $('#ins').addEventListener('mouseleave', hide);
+  $('#ins').addEventListener('scroll', hide, true);
+}
+
 // ---- auto workflow builder ------------------------------------------------------------------
 // ---- mobile app shell ---------------------------------------------------------------------
 function setM(m) {
   if (m === 'new') return document.body.dataset.m === 'flows' ? openWfEditor(null) : document.body.dataset.m === 'trigs' ? (openTriggers(), editTrig(null)) : openTask();
   document.body.dataset.m = m;
   document.querySelectorAll('#mnav [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m));
-  if (m === 'board' || m === 'flows' || m === 'trigs') { view.tab = m; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === m)); }
+  if (m === 'board' || m === 'flows' || m === 'trigs' || m === 'ins') { view.tab = m; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === m)); }
   render();
   if (m === 'chat') { $('#chatlog').dataset.jump = '1'; renderChat(); }
 }
@@ -4469,6 +4743,7 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette(); }
   if ((e.key === 'w' || e.key === 'b') && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return gotoTab(e.key === 'w' ? 'flows' : 'board'); }
   if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); view.chatOpen = true; renderChat(); return $('#chatIn').focus(); }
+  if (e.key === 'i' && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return gotoTab('ins'); }
   if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) && !document.querySelector('.scrim.on')) { e.preventDefault(); return gotoTab('trigs'); }
   if (e.key === 'Escape' && document.querySelector('.menu')) return closeMenu();
   if (e.key === 'Escape') { if (document.querySelector('.scrim.on')) return closeModals(); if (view.tab === 'trigs' && tv.mode === 'form') return trigBack(tv.id); if (view.drawer && view.drawerFull) return setDrawerFull(false); if (view.drawer) { view.drawer = null; render(); } return; }
@@ -4492,6 +4767,7 @@ function applyDeepLink() {
   if (h.get('modal') === 'task') setTimeout(() => openTask(), 0);
   if (h.get('tab') === 'flows') { view.tab = 'flows'; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === 'flows')); }
   if (h.get('tab') === 'triggers') setTimeout(() => gotoTab('trigs'), 0);
+  if (h.get('tab') === 'insights') setTimeout(() => gotoTab('ins'), 0);
   if (h.get('wf')) setTimeout(() => { const w = S.workflows.find(x => x.id === h.get('wf')); if (w) openWfEditor(w); }, 0);
   if (h.get('modal') === 'triggers') setTimeout(() => { openTriggers(); if (h.get('preset')) { tv = presetForm(+h.get('preset')); drawTriggers(); } }, 0);
   if (h.has('palette')) setTimeout(openPalette, 0);

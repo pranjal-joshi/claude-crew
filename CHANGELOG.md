@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-27
+
+### Added
+- **📈 Insights tab.** A fourth tab (<kbd>I</kbd>; on a phone, the ⋮ menu) shows the last 7, 14 or 30 days day by day: tokens per day (input, cache and output, top agents on hover), spend, PRs raised and merged, tasks started, done and sent back, approvals, PR reviews addressed, ⟳ monitors set with their model-free checks and wakes, workflow runs, trigger firings, hand-offs, alerts and tokens by agent, with a daily table. Counters live in the project's state (`insights`, 90 days kept) and survive restarts and Clear board; `GET /api/insights?days=N` serves them. A PR counts once by URL, as raised only when the crew opened it; open GitHub PRs are checked for a merge every 10 minutes through `gh`. An older state file is backfilled once from its tasks.
+- **⑂ Parallel lanes.** An agent can run several tasks at once: **Parallel** in its settings (1, the default, up to 8; `max_parallel` in `crew.json`). Each task runs in a lane with its own Claude process, worktree and branch: `crew/<name>` for the first, `crew/<name>.2`, `crew/<name>.3` … for the others, made on a background thread the first time and reused after. The agent card shows a chip per lane, the log tags lines from other lanes (⑂2), and approve, diff, undo, merge and PR use the lane the task ran on. Crew tools act on the calling lane's task (`CREW_LANE`).
+- **Every reply is the whole deliverable.** Each agent has a deliverable (*Every reply* in its settings; `deliverable` in `crew.json` and on the boss's `add_agent` / `update_agent`): the planner's is the full plan, the reviewer's the full review, and so on for every preset; an agent without one uses its preset's, else "your complete result". The system prompt says every reply, including answers to follow-ups and change requests, is the complete updated deliverable with a short *Changes:* line, never only the part that changed. A chat message to an agent that has already worked carries a one-line reminder (your words are logged as you typed them; not for the boss or slash commands).
+
+### Changed
+- **Editing an agent's role or deliverable restarts it** (session kept) when it is between turns, so the new system prompt applies from its next message. Before, a role change waited for some other restart.
+- **A card waiting for review never holds other work up.** A card in Review keeps its lane only while its uncommitted changes are in that worktree; without changes (the agent committed them, or changed nothing) it holds none, and outside git nothing is held. With changes the agent's next task starts on another lane, so two workflow runs no longer wait behind a planning card nobody has approved yet. A card's lane doesn't count against Parallel. Earlier, a card with changes stopped its agent entirely and one without changes let only ⟳ watch checks through.
+- **Send back, replies, Allow & retry and Address review use any free lane.** Claude sessions resume from any folder, so the card's session continues in a free lane (a new one if none is free: what you ask for may go past Parallel) instead of being refused while the agent works on something else.
+- **The header counts ⟳ steps watching.** Next to *N running*, *N watching* counts workflow steps waiting on a PR, pipeline or deploy until their goal (hover for which).
+- **＋ New on the board starts a task or a workflow run.** A Task / Workflow switch at the top of the dialog; Workflow picks one (its steps shown) and starts a run with the same title and details.
+- **Transcript lines open on a click.** A tool call shows its whole command (Crew kept only 160 characters; now up to 4,000), long errors and briefs get *Show all*. Board updates carry long lines cut short and fetch the rest on a click, which halves a busy board's update size.
+- **Scrolling holds still.** An agent's transcript redraws only when it changed and keeps the line you are reading in place; the agents pane replaces only the cards that changed.
+- **■ Stop on an agent stops all of its lanes.** A card in Review keeps its lane; the agent still pauses until you resume it.
+
+### Fixed
+- **A ⟳ watch wakes its agent only for something new.** With a `fail` pattern it compared the whole output, so a failure the agent had already seen woke it again whenever a field beside it changed (GitHub recomputing `mergeable`), and every Copilot re-review woke it for another round. It now compares the failing items one by one (the string values of JSON output, else lines). The PR watch Crew suggests also leaves out Copilot reviews with nothing new to act on ("generated no new comments", or "No open issues" with no "previously missed" ones).
+- **Review card buttons wrap in a narrow column** instead of spilling out of the card.
+
 ## [0.8.0] - 2026-10-25
 
 ### Added
@@ -242,4 +263,5 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 [0.6.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.5.0...v0.6.0
 [0.7.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.6.0...v0.7.0
 [0.7.1]: https://github.com/pranjal-joshi/claude-crew/compare/v0.7.0...v0.7.1
-[Unreleased]: https://github.com/pranjal-joshi/claude-crew/compare/v0.7.1...HEAD
+[0.9.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.8.0...v0.9.0
+[Unreleased]: https://github.com/pranjal-joshi/claude-crew/compare/v0.9.0...HEAD

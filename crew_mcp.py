@@ -13,6 +13,7 @@ import urllib.request
 
 URL = os.environ.get("CREW_URL", "http://127.0.0.1:8770")
 ME = os.environ.get("CREW_AGENT", "")
+LANE = os.environ.get("CREW_LANE", "")  # which of the agent's parallel lanes this is: the server finds its task by it
 BOSS = os.environ.get("CREW_ROLE") == "boss"
 TOKEN = os.environ.get("CREW_TOKEN", "")
 
@@ -82,10 +83,11 @@ TOOLS = [
     tool("message_agent", "Send a message to an agent; it lands mid-run if the agent is busy.", {"agent": S, "text": S}, ["agent", "text"], boss=True),
     tool("stop_agent", "Stop an agent's current run. Its task goes back to the backlog on hold; the session is kept.", {"agent": S}, ["agent"], boss=True),
     tool("run_workflow", "Start a workflow run on a goal. `title` is what people read on the run: about 6 plain words saying what to do (\"Fix login timeout on upload\"), no links or long IDs (AB#123 is fine); put everything else in `details`.", {"workflow": S, "title": S, "details": S}, ["workflow", "title"], boss=True),
-    tool("add_agent", "Add an agent to the crew. model: fable|opus|sonnet|haiku or empty; effort: low..max or empty.",
-         {"name": S, "role": S, "tags": {"type": "array", "items": S}, "model": S, "effort": S}, ["name", "role"], boss=True),
-    tool("update_agent", "Change an agent's role, tags, model or effort.",
-         {"name": S, "role": S, "tags": {"type": "array", "items": S}, "model": S, "effort": S}, ["name"], boss=True),
+    tool("add_agent", "Add an agent to the crew. model: fable|opus|sonnet|haiku or empty; effort: low..max or empty; "
+         "deliverable: what every reply of it is, re-sent in full after each change (\"the full plan: ...\").",
+         {"name": S, "role": S, "deliverable": S, "tags": {"type": "array", "items": S}, "model": S, "effort": S}, ["name", "role"], boss=True),
+    tool("update_agent", "Change an agent's role, deliverable, tags, model or effort.",
+         {"name": S, "role": S, "deliverable": S, "tags": {"type": "array", "items": S}, "model": S, "effort": S}, ["name"], boss=True),
     tool("save_workflow", "Create a workflow, or replace one when `id` is given. Steps run in order; gate 'approve' waits for "
          "the user, 'auto' continues when the step is done, 'until' asks the step's agent to check again every `every` minutes "
          "(at most `checks` times) until it calls decide: for a PR to merge or a deployment to land. A step with par: true starts "
@@ -122,6 +124,8 @@ TOOLS = [
 
 
 def call(path, body=None):
+    if isinstance(body, dict) and body.get("from") == ME and LANE:
+        body = {**body, "lane": LANE}
     req = urllib.request.Request(URL + path, data=json.dumps(body).encode() if body is not None else None,
                                  headers={"Content-Type": "application/json", "X-Crew": "1", "X-Crew-Auth": TOKEN}, method="POST" if body is not None else "GET")
     try:
@@ -199,9 +203,9 @@ def run_tool(name, a):
         match = next((w for w in d.get("workflows", []) if wf in (w["id"], w["name"])), None)
         r = call("/api/act/wf_run", {"id": match["id"] if match else wf, "title": a.get("title"), "details": a.get("details", "")})
     elif name == "add_agent":
-        r = call("/api/act/add_agent", {k: a.get(k) for k in ("name", "role", "tags", "model", "effort") if a.get(k) is not None})
+        r = call("/api/act/add_agent", {k: a.get(k) for k in ("name", "role", "deliverable", "tags", "model", "effort") if a.get(k) is not None})
     elif name == "update_agent":
-        r = call("/api/act/configure", {"agent": a.get("name"), **{k: a[k] for k in ("role", "tags", "model", "effort") if k in a}})
+        r = call("/api/act/configure", {"agent": a.get("name"), **{k: a[k] for k in ("role", "deliverable", "tags", "model", "effort") if k in a}})
     elif name == "save_workflow":
         r = call("/api/act/wf_save", a)
     elif name == "set_card_button":

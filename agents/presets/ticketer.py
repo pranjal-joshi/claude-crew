@@ -12,4 +12,5 @@ AGENT = {"name": "ticketer", "tags": ["intake", "ticket"], "model": "sonnet", "e
                  "with the Azure DevOps tools (the azure-devops MCP server, or az boards) in the team's default area and iteration, "
                  "with a short plain title and a link back to the source. Then shares the link where the request came from (a reply in "
                  "the Teams thread, or a comment on the source item) when a tool for that is available. Always ends with the type, id, "
-                 "title and URL. Never edits code, and never closes, reassigns or re-prioritises existing items."}
+                 "title and URL. Never edits code, and never closes, reassigns or re-prioritises existing items.",
+         "deliverable": "the work item: type, id, title and URL, plus where its link was shared"}

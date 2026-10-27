@@ -41,21 +41,21 @@ def check(crew) -> int:
     """Repair impossible states. Returns how many were repaired."""
     fixed: list[tuple[str | None, str]] = []
     owners = {}  # task id -> the agent working on it
-    for a in [*crew.agents.values(), crew.boss]:
-        n = a["name"]
+    for a in [*crew._all_lanes(), crew.boss]:  # every lane of every agent: each has its own process and task
+        n, key = a["name"], a["key"]
         if a["status"] not in AGENT_STATUSES:
             fixed.append((n, f"{n} had an unknown status {a['status']!r}: set to idle"))
             a.update(status="idle", activity="")
-        if a.get("task") is not None and not crew._task(a["task"]) and _suspect(crew, f"gone:{n}", True):
+        if a.get("task") is not None and not crew._task(a["task"]) and _suspect(crew, f"gone:{key}", True):
             fixed.append((n, f"{n} pointed at #{a['task']}, which no longer exists"))
             if a["status"] in ("running", "review"):
-                crew._kill_proc(n)
+                crew._kill_proc(key)
                 a.update(status="idle", activity="", since=None)
             a["task"] = None
         elif a.get("task") is None or crew._task(a["task"]):
-            _suspect(crew, f"gone:{n}", False)
+            _suspect(crew, f"gone:{key}", False)
         running = a["status"] == "running"
-        if _suspect(crew, f"noproc:{n}", running and not crew._alive(n) and not crew._git_busy(n)):
+        if _suspect(crew, f"noproc:{key}", running and not crew._alive(key) and not crew._lane_busy(a)):
             fixed.append((n, f"{n} was marked running but has no Claude process"))
             a.update(status="error", activity="", error="its Claude process was gone")
             if (t := crew._task(a.get("task"))) and t["col"] == "doing":
@@ -106,7 +106,7 @@ def schedule_retry(crew, a: dict, t: dict | None, msg: str) -> bool:
 def tick_retries(crew) -> bool:
     """Agents waiting to retry: once the wait is over, back to idle so the dispatcher hands them the task again."""
     moved = False
-    for a in crew.agents.values():
+    for a in crew._all_lanes():
         r = a.get("retry")
         if not r or now() < r["at"]:
             continue

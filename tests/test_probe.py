@@ -171,6 +171,29 @@ class Watch(TempCrewCase):
         self._poll()
         self.assertEqual(self.t["col"], "doing")
 
+    def test_a_seen_failure_does_not_wake_it_again_when_a_field_beside_it_changes(self):
+        fail = '["OPEN","MERGEABLE",["FAILED build https://x/run/7"],["REVIEW copilot COMMENTED 08:50"]]'
+        self.out[0] = fail
+        self._watch(done="MERGED", fail="FAILED|REVIEW|CONFLICTING")
+        self._end_turn()
+        self._poll()
+        self.out[0] = fail.replace("MERGEABLE", "UNKNOWN")  # GitHub recomputing mergeability: nothing new to act on
+        self._poll()
+        self.assertEqual((self.t["col"], len(self.sent)), ("backlog", 1))
+        self.out[0] = fail.replace('08:50"]', '08:50","REVIEW copilot COMMENTED 09:40"]')  # a new review: new work
+        self._poll()
+        self.assertEqual(self.t["col"], "doing")
+        self.assertIn("09:40", self.sent[-1])
+
+    def test_output_items(self):
+        self.assertEqual(sorted(probe.items('["OPEN",null,["FAILED a"],{"k":"REVIEW b"}]')), ["FAILED a", "OPEN", "REVIEW b"])
+        self.assertEqual(probe.items("one\n\n two "), ["one", "two"])
+
+    def test_the_pr_watch_skips_copilot_reviews_with_nothing_new(self):
+        jq = server.workflows.runs.WATCH_EXAMPLE
+        self.assertIn('test("No open issues") and (test("previously missed")|not)', jq)
+        self.assertIn("generated no new comments", jq)
+
     def test_empty_command_removes_the_watch(self):
         self._watch()
         self.assertTrue(self.crew.act("watch", {"from": self.ci["name"], "command": ""}, via="mcp").get("ok"))

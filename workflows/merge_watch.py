@@ -59,6 +59,7 @@ def tick(crew) -> None:
 
 
 def _check(crew, due: dict) -> None:
+    from . import insights
     try:
         for url, ids in due.items():
             try:
@@ -66,6 +67,7 @@ def _check(crew, due: dict) -> None:
             except Exception as e:  # gh missing, signed out, offline: keep what we knew, try again later
                 got = {"error": str(e)[:200], "t": time.time()}
             with crew.lock:
+                insights.pr_state(crew, url, got.get("state"))  # the Insights tab counts merges
                 for i in ids:
                     if not (t := crew._task(i)):
                         continue

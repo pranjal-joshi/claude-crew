@@ -37,7 +37,7 @@ def save(crew, p: dict, by: str) -> dict:
     if not old and len(crew.facts) >= MAX_FACTS:
         return {"error": f"memory is full ({MAX_FACTS}): replace an outdated fact (same key) or forget one. Keys: "
                          + ", ".join(f["key"] for f in crew.facts)}
-    task = (crew.agents.get(by) or {}).get("task")
+    task = ((crew._src(p) if by in crew.agents else None) or {}).get("task")
     fact = {"key": key, "text": text, "by": by, "t": time.time(), **({"task": task} if task else {})}
     if old:
         crew.facts[crew.facts.index(old)] = fact

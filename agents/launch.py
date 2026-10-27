@@ -10,7 +10,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import procs, toolkit
+from . import presets, procs, toolkit
 from .files import local_mcp_servers, sync_claude_files
 from .procs import CREW_SERVER_RE, IS_WIN, StdinWriter, orphans_to_kill
 from .util import git, write_atomic
@@ -22,11 +22,28 @@ def now() -> float:
     return time.time()
 
 
+GENERIC_DELIVERABLE = "your complete result for the task"
+_PRESET_DELIVERABLES = {x["name"].lower(): x.get("deliverable", "") for x in presets.load()}
+
+
+def deliverable(a: dict) -> str:
+    """What every reply of the agent is: its own setting, else its preset's (crew.json files from before the field), else generic."""
+    return a.get("deliverable") or _PRESET_DELIVERABLES.get(a["name"].lower()) or GENERIC_DELIVERABLE
+
+
+def follow_up(a: dict, text: str) -> str:
+    """A chat message to an agent that has already worked: remind it to send the whole deliverable again, not a diff of it.
+    System prompts fade over a long conversation; this one line keeps "change step 3" from coming back as only step 3."""
+    if a.get("kind") == "boss" or not a.get("session") or text.startswith("/"):
+        return text
+    return f"{text}\n\n(Reply with {deliverable(a)}, complete and updated with this message, not only the part that changed.)"
+
+
 def ensure_worktree(crew, a: dict) -> None:
     if not crew.git or a["branch"]:
         return
-    branch = f"crew/{a['name']}"
-    path = crew.work_root / "wt" / crew.key / a["name"]
+    branch = f"crew/{a['key']}"
+    path = crew.work_root / "wt" / crew.key / a["key"]
     if not (path / ".git").exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         git(crew.project, "worktree", "prune")  # a stale registration for a deleted folder would block the add
@@ -40,8 +57,9 @@ def ensure_worktree(crew, a: dict) -> None:
 
 
 def start(crew, a: dict) -> bool:
-    if crew._alive(a["name"]):
+    if crew._alive(a["key"]):
         return True
+    crew._sync_lane(a)
     boss = a.get("kind") == "boss"
     if not boss:
         ensure_worktree(crew, a)
@@ -58,6 +76,11 @@ def start(crew, a: dict) -> bool:
     else:
         role = (f"You are '{a['name']}', one of {len(crew.agents)} Claude Code agents working in parallel on this project. "
                 f"Your role: {a['role']} Teammates: {team}. "
+                f"Your deliverable is {deliverable(a)}. Every reply, including answers to follow-up questions, change requests "
+                "and feedback, is the complete, updated deliverable: never a partial diff or \"only step 3 changed\". Apply the new "
+                "input, then send the whole thing again (and overwrite its file if it has one), with one short \"Changes:\" line "
+                "at the top saying what changed. If a message is only a question, answer it first, then send the updated "
+                "deliverable only if the answer changes it. "
                 f"Your working folder is {a['cwd']}" + (f", a git worktree of the project {crew.project}" if a['branch'] else "") + ". "
                 "Stay inside it: do not read, create or change files outside this folder unless the task explicitly names a path outside it. "
                 "Never touch other agents' worktrees. "
@@ -98,7 +121,8 @@ def start(crew, a: dict) -> bool:
     servers["crew"] = {"type": "stdio", "command": sys.executable, "args": [str(APP_DIR / "crew_mcp.py")],
                        "env": {"CREW_URL": f"http://127.0.0.1:{crew.port}", "CREW_AGENT": a["name"], "CREW_ROLE": "boss" if boss else "agent",
                                "CREW_TOKEN": crew.mcp_token}}
-    f = crew.work_root / "mcp" / f"{crew.key}-{a['name']}.json"
+    servers["crew"]["env"]["CREW_LANE"] = a["key"]  # which of the agent's lanes is calling (agents/lanes.py)
+    f = crew.work_root / "mcp" / f"{crew.key}-{a['key']}.json"
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps({"mcpServers": servers}, indent=1), encoding="utf-8")
     cmd += [f"--mcp-config={f}"]  # "=" form: the flag is variadic and would swallow what follows
@@ -115,9 +139,9 @@ def start(crew, a: dict) -> bool:
         a["status"], a["error"] = "error", f"could not start claude: {e}"
         crew.log(a, "error", a["error"])
         return False
-    crew.procs[a["name"]] = p
-    crew.writers[a["name"]] = StdinWriter(p)
-    crew._pid_add(p.pid, a["name"])
+    crew.procs[a["key"]] = p
+    crew.writers[a["key"]] = StdinWriter(p)
+    crew._pid_add(p.pid, a["key"])
     a["proc_cost"] = 0.0
     a["error"] = None
     threading.Thread(target=crew._read, args=(a, p), daemon=True).start()
@@ -146,12 +170,12 @@ def clean_images(raw) -> tuple[str | None, list[dict]]:
 def send(crew, a: dict, text: str, images: list[dict] | None = None) -> bool:
     """Queue a user message for the agent's process. The write happens on the process's own writer thread, so
     this never blocks. False when the process is gone, its pipe broke, or it has not read for procs.STDIN_LIMIT seconds."""
-    w = crew.writers.get(a["name"])
+    w = crew.writers.get(a["key"])
     if w and w.stuck():
         w.error = w.error or f"claude has not read its input for {int(procs.STDIN_LIMIT)} s"
-    if not w or w.error or not crew._alive(a["name"]):
+    if not w or w.error or not crew._alive(a["key"]):
         why = w.error if w and w.error else "the process is not running"
-        crew._kill_proc(a["name"])
+        crew._kill_proc(a["key"])
         a["error"] = f"could not send to claude: {why}"
         crew.log(a, "error", a["error"])
         return False
@@ -163,8 +187,8 @@ def send(crew, a: dict, text: str, images: list[dict] | None = None) -> bool:
 def check_writers(crew) -> bool:
     """A process that stopped reading its stdin is hung: end it (session kept) instead of waiting forever."""
     hung = False
-    for name, w in list(crew.writers.items()):
-        if w.stuck() and (a := crew._agent(name)):
+    for key, w in list(crew.writers.items()):
+        if w.stuck() and (a := crew._agent(key)):
             crew._fail(a, f"claude has not read its input for {int(procs.STDIN_LIMIT)} s and was ended; its session is kept")
             hung = True
     return hung
@@ -172,7 +196,7 @@ def check_writers(crew) -> bool:
 
 def fail(crew, a: dict, msg: str) -> None:
     """End an agent's process after a failure: error state, its task back in the backlog."""
-    crew._kill_proc(a["name"])
+    crew._kill_proc(a["key"])
     a["status"], a["error"], a["activity"] = "error", msg[:400], ""
     crew.log(a, "error", a["error"])
     if (t := crew._task(a["task"]) if a["task"] else None) and t["col"] == "doing":
@@ -233,40 +257,41 @@ def reap_orphans(crew) -> int:
     return n
 
 
-def kill_proc(crew, name: str, wait: bool = False) -> None:
-    """End an agent's process tree. Windows: taskkill /T /F (failures are logged). POSIX: SIGTERM to the group,
-    then SIGKILL after 3 s, on a helper thread so the caller (usually holding crew.lock) doesn't wait; wait=True joins it."""
-    a = crew._agent(name)
+def kill_proc(crew, key: str, wait: bool = False) -> None:
+    """End a lane's process tree (key: the agent's name for lane 1, <name>.<n> for another lane). Windows: taskkill
+    /T /F (failures are logged). POSIX: SIGTERM to the group, then SIGKILL after 3 s, on a helper thread so the
+    caller (usually holding crew.lock) doesn't wait; wait=True joins it."""
+    a = crew._agent(key)
     if a:
         a["subs"] = {}  # the tree kill ends its subagents too
         a["bg"] = {}    # and its background jobs
         crew._addressed(a)  # a stopped /address-review turn: its task goes back to Review or Done
-    if w := crew.writers.pop(name, None):
+    if w := crew.writers.pop(key, None):
         w.close()
-    p = crew.procs.pop(name, None)
+    p = crew.procs.pop(key, None)
     if not p or p.poll() is not None:
         return
     if IS_WIN:
-        end_tree(crew, p, name)
+        end_tree(crew, p, key)
     else:
-        th = threading.Thread(target=end_tree, args=(crew, p, name), daemon=True)
+        th = threading.Thread(target=end_tree, args=(crew, p, key), daemon=True)
         th.start()
         if wait:
             th.join(timeout=12)
 
 
-def end_tree(crew, p: subprocess.Popen, name: str) -> None:
+def end_tree(crew, p: subprocess.Popen, key: str) -> None:
     err = procs.terminate_tree(p.pid, p)
     if err:
         try:
             p.kill()
         except OSError:
             pass
-        msg = f"could not stop {name}'s process tree (pid {p.pid}): {err}"
+        msg = f"could not stop {key}'s process tree (pid {p.pid}): {err}"
         with crew.lock:
-            if a := crew._agent(name):
+            if a := crew._agent(key):
                 crew.log(a, "error", msg)
-            crew.event("error", msg, name if name in crew.agents else None)
+            crew.event("error", msg, a["name"] if a and a["name"] in crew.agents else None)
     else:
         try:
             p.wait(timeout=5)
@@ -284,7 +309,7 @@ def launch_key(crew, a: dict) -> tuple:
     # MCP servers found later are allowed from the agent's next start; no restart (that would drop the live context).
     # Rules added from the permission inbox do restart it (the session is kept).
     return (crew.config["permission_mode"], a["model"], a["effort"], tuple(crew.config.get("allowed_tools") or []), tuple(crew._once_rules(a)),
-            json.dumps(a.get("toolkit"), sort_keys=True))
+            json.dumps(a.get("toolkit"), sort_keys=True), a.get("role"), deliverable(a))  # role and deliverable live in the system prompt
 
 
 def once_rules(crew, a: dict) -> list[str]:
@@ -303,7 +328,7 @@ def task_session(crew, a: dict, t: dict) -> None:
         if "kept" in a:  # back from a workflow step: its own long-running session again
             kept = a.pop("kept")
             if kept != a["session"]:
-                crew._kill_proc(a["name"])
+                crew._kill_proc(a["key"])
                 a["session"] = kept
                 crew.log(a, "sys", "back in its own session")
         a["last_task"] = t["id"]
@@ -313,13 +338,13 @@ def task_session(crew, a: dict, t: dict) -> None:
     sid = (t.get("sessions") or {}).get(a["name"])
     if sid:
         if sid != a["session"]:
-            crew._kill_proc(a["name"])
+            crew._kill_proc(a["key"])
             a["session"] = sid
             crew.log(a, "sys", f"back in #{t['id']}'s session")
-    elif a["session"] or crew._alive(a["name"]):
+    elif a["session"] or crew._alive(a["key"]):
         # a task with no session of its own starts a new one: never another task's, a step's or a chat's context (and
         # no paying to re-read old work). Not keyed on last_task, which a restart forgets while the session survives.
-        crew._kill_proc(a["name"])
+        crew._kill_proc(a["key"])
         a["session"] = None
         crew.log(a, "sys", f"fresh context for #{t['id']}")
     a["last_task"] = t["id"]
@@ -332,44 +357,75 @@ def forget_sessions(crew, name: str) -> None:
 
 
 def stop_agent(crew, a: dict, why: str = "stopped by you") -> None:
-    """End the current run now. The session is kept; the task waits in the backlog until you move it."""
-    crew._kill_proc(a["name"])
-    if t := crew._task(a["task"]):
-        if t["col"] == "doing":
-            t.update(col="backlog", who=t.get("pinned") or a["name"], hold=True)
-    a.update(status="paused" if a.get("kind") != "boss" else "idle", task=None, activity="", since=None, compacting=None)
-    crew.log(a, "sys", why + (" · paused until you resume it or give it work" if a.get("kind") != "boss" else ""))
+    """End a lane's current run now. The session is kept; the task waits in the backlog until you move it. Lane 1
+    pauses, and with it the agent; another lane just goes idle."""
+    crew._kill_proc(a["key"])
+    pause = a.get("kind") != "boss" and "n" not in a
+    t = crew._task(a["task"])
+    if a["status"] == "review" and t and t["col"] == "review":  # a card waiting for you keeps the lane with its changes
+        if pause:
+            a["paused"] = True  # the agent pauses all the same: no lane takes new work until you resume it
+        crew.log(a, "sys", why + (" · paused until you resume it or give it work" if pause else ""))
+        return
+    if t and t["col"] == "doing":
+        t.update(col="backlog", who=t.get("pinned") or a["name"], hold=True)
+    a.update(status="paused" if pause else "idle", task=None, activity="", since=None, compacting=None)
+    crew.log(a, "sys", why + (" · paused until you resume it or give it work" if pause else ""))
+
+
+def stop_all_lanes(crew, a: dict, why: str = "stopped by you") -> int:
+    """■ Stop on an agent: every lane that is working stops, and the agent pauses. Returns how many were working."""
+    n = 0
+    for ln in crew._lanes(a)[1:]:
+        if ln["status"] == "running" or crew._alive(ln["key"]):
+            n += ln["status"] == "running"
+            stop_agent(crew, ln, why)
+    n += a["status"] == "running"
+    stop_agent(crew, a, why)
+    return n
 
 
 def kill(crew, a: dict, p: dict) -> dict | None:
-    crew._kill_proc(a["name"])
-    if t := crew._task(a["task"]):
-        t["col"], t["who"] = "backlog", t.get("pinned")
+    for ln in crew._lanes(a):
+        crew._kill_proc(ln["key"])
+        if (t := crew._task(ln["task"])) and (ln is a or t["col"] == "doing"):  # a card in Review keeps its lane
+            t["col"], t["who"] = "backlog", t.get("pinned")
+            ln.update(task=None)
+        if ln is not a and ln["status"] != "review":
+            ln.update(status="idle", activity="", since=None)
     a.update(status="killed", task=None, activity="", since=None)
     crew.log(a, "error", "killed by you")
     crew.event("kill", f"{a['name']} killed", a["name"])
 
 
 def release(crew, a: dict, p: dict) -> dict | None:
-    # Close an idle agent's Claude process (session kept) so you can `claude --resume` it in your own terminal
-    if a["status"] == "running":
+    # Close an idle agent's Claude processes (sessions kept) so you can `claude --resume` one in your own terminal
+    if any(ln["status"] == "running" for ln in crew._lanes(a)):
         return {"error": f"{a['name']} is working: stop it first"}
-    crew._kill_proc(a["name"])
+    for ln in crew._lanes(a):
+        crew._kill_proc(ln["key"])
     crew.log(a, "sys", "process closed so the session can continue in your terminal; the next task resumes it here")
 
 
 def clear_chat(crew, a: dict, p: dict) -> dict | None:
-    if a["status"] == "running":
+    if any(ln["status"] == "running" for ln in crew._lanes(a)):
         return {"error": f"{a['name']} is working: stop it first"}
-    crew._kill_proc(a["name"])
+    for ln in crew._lanes(a):
+        crew._kill_proc(ln["key"])
+        ln.update(session=None, ctx=0, activity="", error=None)
+        if ln["status"] == "error":
+            ln["status"] = "idle"
     crew._forget_sessions(a["name"])
-    a.update(session=None, log=[], ctx=0, activity="", error=None,
-             status="idle" if a["status"] in ("idle", "paused", "review", "error") else a["status"])
+    a["log"].clear()  # in place: the agent's lanes share this list
+    a.update(status="idle" if a["status"] in ("idle", "paused", "review", "error") else a["status"])
     crew.log(a, "sys", "chat cleared · the next message starts a fresh session")
 
 
 def respawn(crew, a: dict, p: dict) -> dict | None:
-    crew._kill_proc(a["name"])
+    for ln in crew._lanes(a):
+        crew._kill_proc(ln["key"])
+        if ln is not a:
+            ln.update(session=None, error=None, activity="", **({} if ln["status"] == "review" else {"status": "idle"}))
     if p.get("fresh"):
         a["session"] = None
         crew._forget_sessions(a["name"])

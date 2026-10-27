@@ -259,7 +259,8 @@ class TaskSessions(TempCrewCase):
         t2 = self._run("second")
         self.assertEqual(t2["sessions"][self.a["name"]], f"s-{t2['id']}")  # a new task did not inherit t1's session
         self.crew.act("reject", {"task": t1["id"], "text": "one more thing"})
-        self.assertEqual((self.a["session"], t1["col"]), (f"s-{t1['id']}", "doing"))  # back in t1's conversation
+        ln = self.crew._holder(t1)  # #2 holds lane 1 in Review, so a second lane takes the send-back
+        self.assertEqual((ln["key"], ln["session"], t1["col"]), (f"{self.a['name']}.2", f"s-{t1['id']}", "doing"))  # back in t1's conversation
 
     def test_fresh_respawn_forgets_task_sessions(self):
         t1 = self._run("first")

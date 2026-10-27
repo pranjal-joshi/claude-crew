@@ -165,7 +165,7 @@ def crew_prs(crew) -> tuple[set[str], set[str]]:
     links = {norm(u) for t in crew.tasks for u in [t.get("pr"), *(t.get("prs") or [])] if u}
     links |= {norm((r.get("source") or {}).get("pr") or "") for r in crew.runs if r["status"] == "running"} - {""}
     links |= {norm(u) for u in [*crew._pr_wait, *crew._pr_had]}  # cards' links still being checked (after a restart)
-    branches = {a["branch"] for a in crew.agents.values() if a.get("branch")}
+    branches = {a["branch"] for a in crew._all_lanes() if a.get("branch")}
     return links, branches
 
 
