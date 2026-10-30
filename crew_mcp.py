@@ -83,6 +83,12 @@ TOOLS = [
     tool("message_agent", "Send a message to an agent; it lands mid-run if the agent is busy.", {"agent": S, "text": S}, ["agent", "text"], boss=True),
     tool("stop_agent", "Stop an agent's current run. Its task goes back to the backlog on hold; the session is kept.", {"agent": S}, ["agent"], boss=True),
     tool("run_workflow", "Start a workflow run on a goal. `title` is what people read on the run: about 6 plain words saying what to do (\"Fix login timeout on upload\"), no links or long IDs (AB#123 is fine); put everything else in `details`.", {"workflow": S, "title": S, "details": S}, ["workflow", "title"], boss=True),
+    tool("rework_run", "Send a workflow run back to an earlier step with changes the user asked for, e.g. CI failed and the "
+         "user wants the fix step to add something. `run` is the run id (r60) or a task id of one of its steps; `step` is the "
+         "step number (1 = first) or the step's agent name. That step and every later one run again, each resuming its earlier "
+         "attempt's session with `text` in its brief: the fixer builds on its commit, the shipper pushes to the same PR, CI "
+         "watches it again. Every step before `step` must have finished.",
+         {"run": S, "step": S, "text": S}, ["run", "step", "text"], boss=True),
     tool("add_agent", "Add an agent to the crew. model: fable|opus|sonnet|haiku or empty; effort: low..max or empty; "
          "deliverable: what every reply of it is, re-sent in full after each change (\"the full plan: ...\").",
          {"name": S, "role": S, "deliverable": S, "tags": {"type": "array", "items": S}, "model": S, "effort": S}, ["name", "role"], boss=True),
@@ -202,6 +208,19 @@ def run_tool(name, a):
         d = call("/api/state")
         match = next((w for w in d.get("workflows", []) if wf in (w["id"], w["name"])), None)
         r = call("/api/act/wf_run", {"id": match["id"] if match else wf, "title": a.get("title"), "details": a.get("details", "")})
+    elif name == "rework_run":
+        d = call("/api/state")
+        ref = str(a.get("run") or "").lstrip("#")
+        tk = next((t for t in d.get("tasks", []) if str(t["id"]) == ref), None)
+        rid = ((tk or {}).get("run") or (tk or {}).get("was_run") or {}).get("id") or ref
+        run = next((x for x in d.get("runs", []) if x["id"] == rid), None)
+        st = str(a.get("step") or "").strip()
+        if not run:
+            r = {"error": f"no workflow run {ref}"}
+        else:
+            i = int(st) - 1 if st.isdigit() else next((k for k, s in enumerate(run["steps"]) if s.get("agent", "").lower() == st.lower()), -1)
+            r = call("/api/act/run_restart", {"id": run["id"], "step": i, "text": a.get("text", "")}) if i >= 0 else \
+                {"error": f"no step {st} in {run['name']}: use 1 to {len(run['steps'])} or one of {', '.join(s['agent'] for s in run['steps'])}"}
     elif name == "add_agent":
         r = call("/api/act/add_agent", {k: a.get(k) for k in ("name", "role", "deliverable", "tags", "model", "effort") if a.get(k) is not None})
     elif name == "update_agent":

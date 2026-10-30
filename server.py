@@ -37,7 +37,7 @@ except ImportError:
     import workflows
     from triggers import azure
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 APP_DIR = Path(__file__).resolve().parent
 # A clone has pyproject.toml next to server.py; an installed wheel does not. When installed, the
@@ -116,6 +116,10 @@ PIPE_ID = re.compile(r"\baz\s+pipelines\s+(?:runs\s+show|build\s+show)\b[^\n]*?-
 PIPE_SAID = re.compile(r"\b(?:[Bb]uild(?:\s+id)?|[Rr]un\s+id|buildId)[\s:=#]+(\d{4,9})(?![\d.])")
 PIPE_ORG = re.compile(r"--org(?:anization)?[ =](https://\S+)")
 PIPE_PROJ = re.compile(r"""--project[ =](?:'([^']+)'|"([^"]+)"|(\S+))""")
+PIPE_WATCH = re.compile(r"\baz\s+pipelines\b")  # a watch that follows a pipeline: its runs are the card's
+# a line naming a run only to set it aside: not the card's run
+PIPE_NOT = re.compile(r"\b(?:ignor(?:e|ed|ing)|(?:does|do|did)\s*n[o']?t\s+count|not\s+counted|baseline|unrelated"
+                      r"|before\s+the\s+merge|not\s+(?:on\s+)?master|someone\s+else'?s)\b", re.I)
 PR_REF = re.compile(r"\b(?:PR|pull request)\s*#(\d{1,7})\b", re.I)
 # an Azure DevOps work item: "AB#123" or its link
 ADO_REF = re.compile(r"\bAB#\d{1,7}\b|/_workitems/edit/\d")
@@ -132,6 +136,7 @@ def pr_base(remote: str) -> str:
         return f"https://dev.azure.com/{m.group(1)}/{m.group(2)}/_git/{m.group(3)}/pullrequest/"
     return ""
 MAX_CHAIN = triggers.MAX_CHAIN
+CARD_LOG = 150  # transcript lines a card keeps of its own (its chat), apart from the agents' logs
 
 
 # ---- permission denials ------------------------------------------------------------
@@ -225,6 +230,7 @@ class Crew:
         self.changed = threading.Condition(self.lock)
         self.version = 0
         self._pr_mine: dict[str, bool] = {}  # PR link -> yours (opened by your gh/az sign-in or from an agent's branch)
+        self._engines_probed = False  # opencode looked for (agents/engines.py)
         self._pr_wait: dict[str, set[int]] = {}  # PR link -> tasks that mentioned it, while its owner is being read
         self._pr_had: dict[str, set[int]] = {}  # PR link -> cards it was on before a restart, kept if its owner can't be read
         self._pr_closed: set[str] = set()  # your PR links that are merged or closed
@@ -491,8 +497,15 @@ class Crew:
             pass  # the log is a record, never a reason to fail
 
     def log(self, a: dict, kind: str, text: str, **extra) -> None:
-        a["log"].append({"t": now(), "kind": kind, "text": text, **({"lane": a["n"]} if "n" in a else {}), **extra})
+        """A transcript line in the agent's log, tagged with the card it is about. A card keeps its own copy of its last
+        CARD_LOG lines (any agent's), so a card's chat outlives the agent's 400-line log and stays apart from other work."""
+        tid = extra.pop("task", None) or a.get("task") or a.get("talk")
+        e = {"t": now(), "kind": kind, "text": text, **({"lane": a["n"]} if "n" in a else {}), **({"task": tid} if tid else {}), **extra}
+        a["log"].append(e)
         del a["log"][:-400]  # in place: an agent's lanes share its log
+        if tid and a.get("kind") != "boss" and (tk := self._task(tid)):
+            tk.setdefault("chat", []).append(log_view([e | {"who": a["name"]}])[0])
+            del tk["chat"][:-CARD_LOG]
 
     # ---- alerts ----------------------------------------------------------------------
     def raise_alert(self, title: str, severity: str = "warning", details: str = "", agent: str | None = None,
@@ -613,18 +626,19 @@ class Crew:
                               | agents.lanes.view(self, a) | ({"status": "paused"} if a.get("paused") else {}))
             boss = {k: v for k, v in self.boss.items() if k != "log"} | {"log": log_view(self.boss["log"][-160:]), "alive": self._alive("boss")}
             self._roll_day()
-            tasks = [t | {"busy": self._busy[t["id"]]} if t["id"] in self._busy else t for t in self.tasks]
+            tasks = [{k: v for k, v in t.items() if k != "chat"} | ({"busy": self._busy[t["id"]]} if t["id"] in self._busy else {})
+                     | ({"chat_n": len(t["chat"])} if t.get("chat") else {}) for t in self.tasks]  # a card's chat: card_log
             return {"version": self.version, "project": str(self.project), "git": self.git, "boss": boss,
                     "agents": roster, "tasks": tasks, "feed": self.feed[-30:],
                     "budget": {"task_usd": self._budget("budget_task_usd"), "day_usd": self._budget("budget_day_usd"),
                                "day_spent": round(self.day_spend, 4), "blocked": self._day_blocked(), "tokens": self._tok_public()},
                     "plan": self.plan,
                     "permission_mode": self.config["permission_mode"], "modes": MODES,
-                    "models": MODELS, "efforts": EFFORTS, "tags": self._all_tags(),
+                    "models": MODELS, "efforts": EFFORTS, "engines": self._engines(), "tags": self._all_tags(),
                     "project_name": self.project.name, "app_version": __version__, "mcp_allow": sorted(self.mcp_allow),
                     "allow_mcp": self.config.get("allow_mcp", True), "triggers": self._public_triggers(), "ado_base": self._ado_base(),
                     "trigger_kinds": TRIGGER_KINDS, "workflows": self.config.get("workflows", []), "card_actions": self.config.get("card_actions", []),
-                    "runs": self.runs[-30:], "contexts": CONTEXTS, "toolkit": agents.toolkit.catalog(self), "alerts": self._public_alerts(), "facts": self.facts,
+                    "runs": [{k: v for k, v in r.items() if k != "prev"} for r in self.runs[-30:]], "contexts": CONTEXTS, "toolkit": agents.toolkit.catalog(self), "alerts": self._public_alerts(), "facts": self.facts,
                     "awake": getattr(self, "awake", False), "awake_mode": getattr(self, "awake_mode", ""), "demo": self.demo,
                     "scratch": self.project.parent.resolve() == WORK_ROOT.resolve()}
 
@@ -728,7 +742,7 @@ class Crew:
         t, st = d.get("type"), d.get("subtype")
         if d.get("session_id"):
             a["session"] = d["session_id"]
-            if (tid := a["task"] or a.get("addressing")) and (tk := self._task(tid)):  # going back to this task resumes this conversation
+            if (tid := a["task"] or a.get("addressing") or a.get("talk")) and (tk := self._task(tid)):  # going back to this task resumes this conversation
                 tk.setdefault("sessions", {})[a["name"]] = a["session"]
         if t == "system" and st == "compact_boundary":
             meta = d.get("compact_metadata") or {}
@@ -736,6 +750,7 @@ class Crew:
             a["ctx"] = 0
         if t == "system" and st == "init":
             a["mcp"] = [{"name": m.get("name"), "status": m.get("status")} for m in d.get("mcp_servers") or []]
+            a["model_live"] = d.get("model") or a.get("model")  # what Insights counts its tokens under
             a["skills"] = len(d.get("skills") or [])
             a["skill_names"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("skills") or [])[:200]
             a["plugins"] = sorted(str(x if isinstance(x, str) else x.get("name", "")) for x in d.get("plugins") or [])[:100]
@@ -758,7 +773,7 @@ class Crew:
                 tk["in"] += int(u.get("input_tokens") or 0) + int(u.get("cache_creation_input_tokens") or 0)
                 tk["cache"] += int(u.get("cache_read_input_tokens") or 0)
                 tk["out"] += int(u.get("output_tokens") or 0)
-                self._count_tokens(a, u)
+                self._count_tokens(a, u, m.get("model"))
                 if not d.get("parent_tool_use_id"):  # the main thread's window, not a subagent's
                     a["ctx"] = sum(int(u.get(k) or 0) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
             for b in m.get("content", []):
@@ -849,6 +864,22 @@ class Crew:
         except OSError as e:
             return f"(cannot read the output: {e})"
 
+    def _fall_back(self, a: dict, task: dict | None, msg: str) -> bool:
+        """An OpenCode turn failed and the agent falls back to Claude Code: its task goes back to it at once, to run on
+        Claude in a fresh session (OpenCode's can't carry over). Lock held. False when there is no fallback to use."""
+        if a.get("kind") == "boss" or agents.engines.effective(a) == "claude" or a.get("fallback") not in agents.engines.FALLBACKS:
+            return False
+        self._kill_proc(a["key"])
+        a.update(session=None, status="idle", error=None, activity="")
+        self.log(a, "error", f"{agents.engines.of(a)} failed: {msg[:300]}")
+        self.log(a, "sys", "falling back to Claude Code for this task")
+        self.event("retry", f"{a['name']}: {agents.engines.of(a)} failed ({msg[:80]}), retrying on Claude Code", a["name"])
+        if task:
+            (task.get("sessions") or {}).pop(a["name"], None)
+            task.update(col="backlog", who=a["name"], on_fallback=True)
+            a["task"] = None
+        return True
+
     def _addressed(self, a: dict) -> None:
         """End an /address-review turn: however it ended (done, failed, stopped), its task leaves In progress for the
         column it was in when you pressed the button. Lock held."""
@@ -879,6 +910,8 @@ class Crew:
             a.update(status=a["compacting"], compacting=None, activity="")
             self.log(a, "done", "compaction finished")
             return
+        if (d.get("is_error") or st != "success") and self._fall_back(a, task, str(d.get("result") or st or "error")):
+            return
         if d.get("is_error") or st != "success":
             msg = d.get("result") or st or "error"
             a["status"], a["error"] = "error", str(msg)[:400]
@@ -894,6 +927,8 @@ class Crew:
                 a["task"] = None
             return
         agents.health.succeeded(self, task)
+        if task:
+            task.pop("on_fallback", None)  # a send-back or the next step runs on the agent's own engine again
         dec = (task or {}).get("decision")
         if dec and dec["verdict"] == "continue" and self._step_gate(task) == "approve":
             dec = None  # a workflow step gated ✋ still waits for you: the decision shows on the review card
@@ -949,7 +984,8 @@ class Crew:
         else:
             a["status"] = "idle"
         a["activity"] = ""
-        self.log(a, "done", f"turn finished · ${total:.3f} this session")
+        self.log(a, "done", f"turn finished · ${total:.3f} this session", **({"task": task["id"]} if task else {}))
+        a.pop("talk", None)  # a message about a card: its turn is over
         if a.get("launched") and tuple(a["launched"]) != self._launch_key(a):
             self._kill_proc(a["key"])  # session is kept; next start uses the new settings
             self.log(a, "sys", "settings changed · restarts on next task")
@@ -1150,13 +1186,14 @@ class Crew:
     def _tok_total(self) -> int:
         return self.tok["in"] + self.tok["cache"] + self.tok["out"]
 
-    def _count_tokens(self, a: dict, u: dict) -> None:
+    def _count_tokens(self, a: dict, u: dict, model: str | None = None) -> None:
         n = {"in": int(u.get("input_tokens") or 0) + int(u.get("cache_creation_input_tokens") or 0),
              "cache": int(u.get("cache_read_input_tokens") or 0), "out": int(u.get("output_tokens") or 0)}
         for k, v in n.items():
             self.tok[k] += v
         self.tok["by"][a["name"]] = self.tok["by"].get(a["name"], 0) + sum(n.values())
-        workflows.insights.tokens(self, a["name"], n)
+        # the model that answered (a subagent's may differ), else the one its session started on, else its setting
+        workflows.insights.tokens(self, a["name"], n, model or a.get("model_live") or a.get("model") or "default")
         lim = int(self._budget("budget_tokens"))
         if not lim:
             return
@@ -1222,6 +1259,58 @@ class Crew:
     def _task(self, tid) -> dict | None:
         return next((t for t in self.tasks if t["id"] == tid), None)
 
+    def _handed(self, t: dict) -> list[dict]:
+        """The cards this card handed its work on to (crew handoff tool, a card button, merge conflicts)."""
+        return [tk for tk in self.tasks if (tk.get("handoff") or {}).get("task") == t["id"]]
+
+    def _kin(self, t: dict) -> list[dict]:
+        """This card's hand-off family: the cards it came from and every card handed on from them, itself left out."""
+        top, seen = t, {t["id"]}
+        while (up := self._task((top.get("handoff") or {}).get("task"))) and up["id"] not in seen:
+            seen.add(up["id"])
+            top = up
+        out, todo, done = [], [top], set()
+        while todo:
+            tk = todo.pop()
+            if tk["id"] in done:
+                continue
+            done.add(tk["id"])
+            if tk["id"] != t["id"]:
+                out.append(tk)
+            todo += self._handed(tk)
+        return out
+
+    @staticmethod
+    def _ab(t: dict) -> str | None:
+        """The Azure DevOps item a card is about: its fetched item, else the first AB# in its title or brief."""
+        if i := (t.get("ado") or (t.get("source") or {}).get("ado") or {}).get("id"):
+            return str(i)
+        m = re.search(r"\bAB#(\d{1,7})\b", f"{t.get('title') or ''}\n{t.get('details') or ''}")
+        return m.group(1) if m else None
+
+    def _shipped_block(self, t: dict) -> str:
+        """For a card's first message: what was already done on its work, so a second agent (or a card picked up
+        again from Review) checks before it opens another PR for the same change. Lock held."""
+        lines = []
+        for c in self._handed(t):
+            prs = ", ".join(c.get("prs") or []) or "no PR yet"
+            lines.append(f"- This card already handed its work on to #{c['id']} ({c.get('who') or 'anyone'}, {c['col']}): "
+                         f"{c['title']} · {prs}")
+        ab, kin = self._ab(t), {tk["id"] for tk in self._kin(t)}
+        open_prs = {}
+        for tk in self.tasks:
+            if tk["id"] != t["id"] and (tk["id"] in kin or (ab and self._ab(tk) == ab)):
+                for u in tk.get("prs") or []:
+                    if u not in self._pr_closed and u != t.get("pr"):
+                        open_prs.setdefault(u, tk["id"])
+        lines += [f"- {u} (on #{i})" for u, i in open_prs.items()]
+        if not lines:
+            return ""
+        return ("\n\n---\nAlready done on this work (Crew's record; PR states may have changed):\n" + "\n".join(lines) +
+                "\nBefore you open a PR, check whether one of these already carries this change (`gh pr view <n> --json "
+                "state,headRefName,commits`). If it does, don't open another: update that PR or report that it is done. "
+                "If you still open a new one, say in your summary which of these it is not.")
+
     def _begin(self, a: dict, t: dict) -> bool:
         if self._day_blocked() or self._tok_blocked():
             return False  # the daily or token budget is spent: the task waits in the backlog
@@ -1233,7 +1322,14 @@ class Crew:
             return False
         if self._lane_busy(a):
             return False
+        if bool(a.get("on_fallback")) != bool(t.get("on_fallback")):  # this task runs on the fallback engine, or no longer
+            self._kill_proc(a["key"])
+            if t.get("on_fallback"):
+                a["on_fallback"] = True
+            else:
+                a.pop("on_fallback", None)
         self._task_session(a, t)
+        a.pop("talk", None)
         self._note_prs(t, brief=(t.get("details"),))
         if not self._start(a):
             return False
@@ -1258,7 +1354,7 @@ class Crew:
         if "n" in a and a.get("branch"):  # another lane: its worktree and branch, not the ones its role may name
             body += (f"\n\nYou are one of {a['name']}'s parallel lanes: for this task work in {a['cwd']} on branch "
                      f"{a['branch']} (not crew/{a['name']}). Commit there if your role says to commit; don't switch branches.")
-        body += workflows.owners.block(t) + workflows.memory.block(self, t)
+        body += workflows.owners.block(t) + workflows.memory.block(self, t) + self._shipped_block(t)
         body += self._ado_hint(t, body)
         self.log(a, "you", body)
         if not self._send(a, body):
@@ -1318,25 +1414,44 @@ class Crew:
                 workflows.insights.pr(self, u, raised=u not in handed)
         self._note_pipes(t, *texts, *brief)
 
-    def _note_pipes(self, t: dict, *texts: str | None) -> None:
-        """Pipeline runs named in the card's text, newest last. Lock held."""
-        found = [m for x in texts if x for m in PIPE_URL.findall(x)]
-        if m := re.match(r"(https://\S+?/)_workitems/edit/$", self._ado_base()):  # "build 306403", "run id 306403"
-            found += [f"{m.group(1)}_build/results?buildId={n}" for x in texts if x for n in PIPE_SAID.findall(x)]
+    def _pipe_links(self, *texts: str | None) -> list[str]:
+        """Pipeline runs named in texts, in order. A run on a line that sets it aside ("a PR build, ignored", "before
+        the merge, so it does not count", "baseline") is someone else's, not the card's. Lock held."""
+        ado = re.match(r"(https://\S+?/)_workitems/edit/$", self._ado_base())
+        found = []
         for x in texts:
             for line in (x or "").splitlines():
+                if PIPE_NOT.search(line):
+                    continue
+                found += PIPE_URL.findall(line)
+                if ado:  # "build 306403", "run id 306403"
+                    found += [f"{ado.group(1)}_build/results?buildId={n}" for n in PIPE_SAID.findall(line)]
                 if not (ids := PIPE_ID.findall(line)):
                     continue
                 org, proj = PIPE_ORG.search(line), PIPE_PROJ.search(line)  # the command's own, else the ADO project's
                 if org and proj:
                     base = f"{org.group(1).rstrip('/')}/{quote(proj.group(1) or proj.group(2) or proj.group(3))}/"
-                elif m := re.match(r"(https://\S+?/)_workitems/edit/$", self._ado_base()):
-                    base = m.group(1)
+                elif ado:
+                    base = ado.group(1)
                 else:
                     continue
                 found += [f"{base}_build/results?buildId={n}" for n in ids]
-        if found:
-            t["pipes"] = list(dict.fromkeys([*(t.get("pipes") or []), *(u.replace("&amp;", "&") for u in found)]))[-5:]
+        return list(dict.fromkeys(u.replace("&amp;", "&") for u in found))
+
+    def _note_pipes(self, t: dict, *texts: str | None) -> None:
+        """Pipeline runs named in the card's text, newest last. A card watching a pipeline takes its runs from that watch
+        alone: the agent's reports also name runs that are not the card's (a baseline, an earlier or unrelated build).
+        The run a pipeline watch last named stays last, the card's link, after the watch ends. Lock held."""
+        cmd = ((t.get("wait") or {}).get("probe") or {}).get("cmd") or ""
+        if PIPE_WATCH.search(cmd):
+            if watched := self._pipe_links(cmd):
+                t["pipe_watch"] = watched
+            texts = ()
+        found = self._pipe_links(*texts)
+        keep = t.get("pipe_watch") or []
+        if found or keep:
+            pipes = list(dict.fromkeys([*(t.get("pipes") or []), *found]))
+            t["pipes"] = ([u for u in pipes if u not in keep] + keep)[-5:]
 
     @staticmethod
     def _bg(fn, *args) -> None:
@@ -1405,6 +1520,17 @@ class Crew:
             return ""
         return (f"\n\nAzure DevOps: organization {m.group(1)}, project \"{unquote(m.group(2))}\". Pass `project` on every "
                 "azure-devops tool call (comments included): without it the tool waits for a project to be picked and times out.")
+
+    def _engines(self) -> dict:
+        """The engines' status for the UI. The first look at opencode runs in the background. Lock held."""
+        if not self._engines_probed:
+            self._engines_probed = True
+            self._bg(self._probe_engines, False)
+        return agents.engines.view()
+
+    def _probe_engines(self, force: bool) -> None:
+        agents.engines.probe(force)
+        self.touch()
 
     @staticmethod
     def _read_ado_dflt() -> None:
@@ -1485,7 +1611,8 @@ class Crew:
                 where += f", commit {t['commit']}"
             t.setdefault("history", []).append({"who": prev, "summary": t["summary"], "commit": t.get("commit"), "t": now()})
             t["details"] = (t.get("details") or "") + (
-                f"\n\n---\nEarlier work on this task by {prev} ({where}):\n{t['summary'][:1500]}")
+                f"\n\n---\nEarlier work on this task by {prev} ({where}):\n"
+                + workflows.runs.cut(t["summary"], workflows.runs.SUMMARY_MAX, t["id"]))  # in full: the next owner may have to post it
             t["summary"] = ""
         t.pop("diff", None)
 
@@ -1978,6 +2105,8 @@ class Crew:
             elif action == "configure" and a:
                 if res := agents.record.configure(self, a, p):
                     return res
+            elif action == "engines_check":  # Recheck in the Edit panel: opencode installed? which models?
+                self._bg(self._probe_engines, True)
             elif action == "add_agent":
                 if res := agents.record.add(self, p):
                     return res
@@ -2024,6 +2153,16 @@ class Crew:
                     return {"error": "empty message"}
                 if a["status"] == "killed":
                     return {"error": "agent is killed"}
+                if t and a.get("kind") != "boss":  # a message about card t: in t's own session, on the lane holding it or a free one
+                    if not (ln := agents.lanes.holder(self, t)) or ln["name"] != a["name"]:
+                        ln, why = agents.lanes.for_user(self, a, t)
+                        if not ln:
+                            return {"error": why}
+                        if ln["status"] == "running":
+                            return {"error": f"{a['name']} is busy on #{ln.get('task')}: try again when it's done"}
+                        self._task_session(ln, t)
+                        ln["talk"] = t["id"]  # its turn's lines and session belong to t; the card stays where it is
+                    a = ln
                 if not self._start(a):
                     return {"error": a["error"]}
                 self.log(a, "you", text, **({"by": p["from"]} if p.get("from") else {}), **({"images": len(images)} if images else {}))
@@ -2039,6 +2178,8 @@ class Crew:
                     rt.update(col="doing", started=now())
                     a["activity"] = "working on your message…"
                 self.event("tell", f"→ {a['name']}: {text[:80]}", a["name"])
+            elif action == "card_log" and t:  # UI only: a card's own transcript, every agent's lines about it
+                return {"ok": True, "log": t.get("chat") or []}
             elif action == "log_entry" and (a or p.get("agent") == "boss"):  # UI only: a transcript line the board shows cut short
                 a = a or self.boss
                 e = next((e for e in reversed(a["log"]) if e["t"] == p.get("t") and e["kind"] == p.get("kind")), None)
@@ -2306,7 +2447,10 @@ class Crew:
                         tk.pop("wait", None)
                         tk.update(col="done", decision={"verdict": "stop", "reason": "workflow stopped from the board", "by": "you", "t": now()})
                         self.event("decide", f"⏹ #{tk['id']} stopped with ⛓ {run['name']}")
-            elif action == "run_restart" and (run := self._run(p.get("id"))):  # UI only: from the board's workflow frame
+            elif action == "run_restart" and (run := self._run(p.get("id"))):  # the board's workflow frame; the boss only with `text`
+                ask = (p.get("text") or "").strip()  # go back to the step with these changes, building on the earlier attempt
+                if via == "mcp" and not ask:
+                    return {"error": "say what to change in `text`: the step resumes its earlier work with your request"}
                 err, g0 = workflows.runs.restart_point(self, run, p.get("step"))
                 if err:
                     return {"error": err}
@@ -2314,9 +2458,9 @@ class Crew:
                     if tk["col"] != "done":  # the open step ends; its agent stops working and checking
                         self._release(tk)
                         tk.pop("wait", None)
-                        tk.update(col="done", decision={"verdict": "stop", "reason": f"workflow restarted from step {g0 + 1}", "by": "you", "t": now()})
+                        tk.update(col="done", decision={"verdict": "stop", "reason": f"workflow {'went back to' if ask else 'restarted from'} step {g0 + 1}", "by": "you", "t": now()})
                     tk["was_run"] = tk.pop("run")  # the earlier attempt leaves the run's frame
-                res = workflows.runs.restart(self, run, g0)
+                res = workflows.runs.restart(self, run, g0, ask)
                 self.touch()
                 return res
             elif action == "run_delete" and (run := self._run(p.get("id"))) and (p.get("tasks") or run["status"] != "running"):
@@ -2475,7 +2619,8 @@ MCP_TOKEN = secrets.token_urlsafe(24)
 GIT_ACTIONS = ("approve", "unapprove", "merge", "open_pr", "diff")  # UI only; each runs git outside the lock (_git_action)
 UI_TASK_ACTIONS = {"merge_rebase": "_merge_rebase"}
 MCP_ACTIONS = {"handoff", "add", "assign", "tell", "stop", "wf_run", "add_agent", "configure", "wf_save", "trigger_add",
-               "alert", "alert_resolve", "decide", "watch", "pipeline_fix", "remember", "card_button_save", "card_button_delete"}
+               "alert", "alert_resolve", "decide", "watch", "pipeline_fix", "remember", "card_button_save", "card_button_delete",
+               "run_restart"}
 LAN_KEY: str | None = None   # set when serving beyond this computer; every non-local request must carry it
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "[::1]")
 MAX_BODY = 1_000_000

@@ -121,6 +121,8 @@ def start_step(crew, run: dict, i: int) -> None:
     merge = list(dict.fromkeys(r["branch"] for r in prevs if r.get("commit") and r.get("branch")))
     if merge:
         brief.append(f"Run `git merge {' '.join(merge)}` in your worktree first so you build on that work.")
+    if again := (run.get("prev") or {}).get(str(i)):
+        brief.append(rework_brief(run, i, again))
     if step.get("gate") == "until":
         brief.append(until_brief(step))
     label = f"{run['name']} · {run['id']} · step {i + 1}"
@@ -133,10 +135,35 @@ def start_step(crew, run: dict, i: int) -> None:
         t["ado"] = run["ado"]
     if run.get("subagents") and (sid := run_session(crew, run, a["name"], i)):
         t["sessions"], t["run_session"] = {a["name"]: sid}, True  # this run's session for this agent, not a fresh one
+    elif again and (sid := again["sessions"].get(a["name"])):
+        t["sessions"] = {a["name"]: sid}  # gone back to: the step's agent resumes its earlier attempt's conversation
+    if again and again["prs"]:
+        t["prs"] = list(again["prs"])  # the PR the earlier attempt opened is still this step's
     crew.next_id += 1
     crew.tasks.append(t)
     run["tasks"][i] = t["id"]
     crew.event("workflow", f"⛓ {run['name']} {i + 1}/{n}{' ∥' if len(gs[g]) > 1 else ''} → {a['name']}: {title}", a["name"])
+
+
+def rework_brief(run: dict, i: int, again: dict) -> str:
+    """The brief's part for a step the run went back to with your changes (`run["ask"]`): what this step did last time,
+    and how to build on it rather than start over."""
+    g0 = min(int(k) for k in run["prev"])
+    prs = list(dict.fromkeys(u for p in run["prev"].values() for u in p.get("prs") or []))
+    where = f" on {again['branch']} (commit {again['commit']})" if again.get("commit") else ""
+    out = [f"This run went back to step {g0 + 1} with changes you asked for:\n{run['ask']}",
+           f"This step ran before as #{again['task']} ({again['who'] or 'its agent'}){where}. Its result then:\n{again['summary'] or '(no summary)'}"]
+    if prs:
+        out.append("PRs this run already has: " + ", ".join(prs) + ".")
+    if i == g0:
+        out.append("Make the requested changes on top of your earlier work"
+                   + (f" (`git merge {again['branch']}` first if your worktree doesn't have commit {again['commit']})" if where else "")
+                   + ". Don't redo what is already done; your summary should say what changed this round.")
+    else:
+        out.append("Step " + str(g0 + 1) + " has been redone for these changes: carry them through as this step's delta. "
+                   + ("Push the new commits to the existing PR's branch and update its description; don't open another PR. " if prs else "")
+                   + "Your summary should say what changed this round.")
+    return "\n\n".join(out)
 
 
 # Subagent steps: an agent that works several steps of one run keeps one session for the run, and does each step in a
@@ -352,18 +379,36 @@ def restart_point(crew, run: dict, i) -> tuple[str | None, int]:
     return None, g0
 
 
-def restart(crew, run: dict, g0: int) -> dict:
+def restart(crew, run: dict, g0: int, ask: str = "") -> dict:
     """Run again from step g0 (0: the whole workflow, with its current steps). Earlier steps keep their results; g0 and
-    later start as new tasks, so each gets a fresh session. The caller has closed the run's open cards."""
-    if g0 == 0 and (w := find(crew, run["wf"])):
+    later start as new tasks, so each gets a fresh session. The caller has closed the run's open cards.
+    With `ask` (go back to a step with changes): the steps keep their definitions, and each step from g0 on resumes
+    its earlier attempt's session with that attempt's result, PRs and your request in its brief, so it builds on its
+    own work (the fixer adds to its commit, the shipper pushes to its PR, the reviewer watches that PR again)."""
+    ask = (ask or "").strip()[:SUMMARY_MAX]
+    run.pop("prev", None)
+    if ask:
+        prev = {}
+        for k in range(g0, len(run["steps"])):
+            tk = crew._task(run["tasks"][k]) if run["tasks"][k] else None
+            if tk:
+                prev[str(k)] = {"task": tk["id"], "sessions": dict(tk.get("sessions") or {}), "prs": list(tk.get("prs") or []),
+                                "summary": cut(tk.get("summary") or "", SUMMARY_MAX, tk["id"]), "who": tk.get("who") or "",
+                                "branch": tk.get("branch") or "", "commit": tk.get("commit") or ""}
+        run["prev"], run["ask"] = prev, ask
+        run.setdefault("asks", []).append({"t": now(), "step": g0, "text": ask})
+    elif g0 == 0 and (w := find(crew, run["wf"])):
         run.update(steps=json.loads(json.dumps(w["steps"])), name=w["name"], subagents=bool(w.get("subagents")))
+    if not ask:
+        run.pop("ask", None)
     n = len(run["steps"])
     run["tasks"] = (run["tasks"][:g0] + [None] * n)[:n]
     run["results"] = (run["results"][:g0] + [None] * n)[:n]
     run.update(status="running", note="", step=g0, restarts=run.get("restarts", 0) + 1)
     for k in ("ended", "output"):
         run.pop(k, None)
-    crew.event("workflow", f"⛓ {run['name']} restarted {'from the start' if not g0 else f'from step {g0 + 1}'}: {run['title']}")
+    crew.event("workflow", f"⛓ {run['name']} {'back at' if ask else 'restarted'} {'from the start' if not g0 else f'from step {g0 + 1}'}"
+                           + (f" with changes: {ask[:80]}" if ask else f": {run['title']}"))
     start_group(crew, run, g0)
     return {"ok": True, "run": run["id"], "step": g0}
 

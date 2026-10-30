@@ -153,6 +153,16 @@ class AdoTriggerCase(AdoCase):
         self.check(tr, FakeAz([item(7)]))
         self.assertEqual(len(self.crew.runs), 1)
 
+    def test_a_running_run_does_not_block_new_items(self):
+        tr = self.add()
+        self.check(tr, FakeAz([item(1)]))
+        run = self.crew.runs[0]
+        self.crew._task(run["tasks"][0])["col"] = "doing"  # its run is mid-way, like a Feature delivery at step 3
+        self.assertEqual(run["status"], "running")
+        self.check(tr, FakeAz([item(1), item(2)]))
+        self.assertEqual([r["ado"]["id"] for r in self.crew.runs], [1, 2])
+        self.assertEqual(tr["checked"]["picked"], 1)
+
     def test_agent_mode_creates_a_task_with_a_link(self):
         who = next(iter(self.crew.agents))
         tr = self.add(workflow="", agent=who)

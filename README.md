@@ -37,7 +37,7 @@ Crew is pure standard-library Python (3.10 or newer) and installs as a `crew` co
 
 ```bash
 pipx install claude-crew                      # from PyPI, once published
-pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.9.0/claude_crew-0.9.0-py3-none-any.whl   # a release wheel
+pipx install https://github.com/pranjal-joshi/claude-crew/releases/download/v0.10.0/claude_crew-0.10.0-py3-none-any.whl   # a release wheel
 pipx install git+https://github.com/pranjal-joshi/claude-crew   # latest main
 ```
 
@@ -109,6 +109,10 @@ The **Workflows** tab (<kbd>W</kbd>) chains agents in a fixed order. Run one wit
 **Fix a broken pipeline.** When a deploy watch (a ⟳ step whose agent is tagged `deploy` or `cd`) sees its pipeline run fail, its card shows **🛠 Fix pipeline**, and the agent can ask for the same with the crew tool `fix_pipeline`. That starts the *Pipeline fix* workflow, made from your crew's tags the first time (a fixer tagged `bug`, a shipper tagged `release` or `chore`, a CI agent tagged `ci` or `review`; edit it in Workflows like any other): the fixer finds the cause in the run's log, the shipper opens a PR linked to the same work item, and the CI agent keeps it green until it merges. Each step first looks for a fix someone else already shipped (open and merged PRs, branches, master) and reuses it or stops. The deploy watch waits meanwhile without checking, then wakes to follow the first run that carries the fix. A second watch blocked by the same failure can join the running fix instead of starting another. A PR's CI watch does the same when its check fails on master too (not the PR's doing): it calls `fix_pipeline` instead of waiting on a master its watch can't see, and once the fix merges it brings master into its branch and carries on.
 
 **Restart a run.** ↻ on a workflow's frame on the board restarts the whole run (with the workflow's steps as they are now) or restarts from any step whose earlier steps finished; those keep their results and the restarted step reads them. The open step stops, and every restarted step is a new task, so each agent starts on a fresh session. Earlier cards stay in Done. It works on running, stopped and finished runs.
+
+**Go back to a step with changes.** The same ↻ menu has *↩ Back to step N with changes…* (the boss can do it too: "CI failed, send r60 back to the Fixer to also handle X"). Type what to change. That step and the ones after it run again, each resuming its earlier attempt's session, with your request and its last result in the brief: the fixer adds to its commit, the shipper pushes the delta to the same PR, and CI-Review watches that PR again.
+
+**Talk about one card.** Every line in an agent's log carries the card it was about, and each card keeps its own transcript. The chips above an agent's chat (All, #266, #271…) show one card's lines, and a message sent there goes to that card's own session, not whichever one the agent was last in. A card's ⋮ menu has *Message <agent> about #N*.
 
 **Gates: stop or go on.** An agent can decide whether work should go ahead with the crew tool `decide` (continue or stop, with a one-line reason). *Continue* closes its task without review and starts the next workflow step with its summary, unless that step's link is ✋: then it waits for your approval as usual, with the agent's verdict on the review card; *stop* closes it marked ⏹ stopped and ends the run, so nothing else starts. Put a gate agent such as **Picker** first in a workflow that an ADO trigger runs: it checks each new item against the ownership in its role and passes on only what is ours. Outside a workflow, a gate that continues hands the work on with `handoff` first.
 

@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-30
+
+### Added
+- **OpenCode and Copilot engines.** An agent can run on OpenCode (free models) or GitHub Copilot models instead of Claude Code: *Engine*, a per-engine *Model* and *Fallback* (retry on Claude Code) in its settings, with a *Works here* row showing what each engine can do. `agents/opencode_bridge.py` drives `opencode run --format json` and speaks Claude Code's stream-json, so Crew reads it unchanged; `agents/engines.py` writes each agent's OpenCode config (role, crew and MCP servers, allow-list as bash rules) and probes the installed models. Cards show `oc·` / `gh·` model chips.
+- **Go back to a workflow step with changes.** The workflow ↻ menu has *Back to step N with changes…* (and the boss tool `rework_run`): say what to change, and that step and the ones after it resume their earlier sessions with your request, building on their own commit; the shipping step pushes to the same PR instead of opening another.
+- **Talk about one card.** Log lines carry their card and each card keeps its own transcript. The agent drawer filters by card, a message about a card goes to that card's session, and the card menu has *Message ⟨agent⟩ about #N*. The card stays where it is.
+- **Insights by model.** Tokens by model with the agents that used each, and the top models in the daily tooltip.
+
+### Changed
+- **The agent panel takes focus.** The agents list and board blur while the right-hand agent panel is open (desktop and tablet).
+- **A card moved to another agent hands over the full output** (up to 20k characters, marked if cut) instead of the first 1,500.
+- **Dialogs fit short screens:** they cap at the window height and scroll their body.
+
+### Fixed
+- **No second PR for work already shipped.** A card's first brief now lists the cards it handed work to and the open PRs on its hand-off family and work item, so a re-run or a second shipper checks before opening another PR. Cards show *↪ to #N · k PRs* after a hand-off.
+- **The PR trigger skips PRs opened from a Crew worktree branch** (a workflow's ship step), so it no longer starts a duplicate CI monitor.
+- **A card's pipeline link comes from its pipeline watch**, and runs the agent only cites to set aside (baseline, ignored, before the merge) are dropped.
+
 ## [0.9.0] - 2026-10-27
 
 ### Added
@@ -264,4 +282,5 @@ First packaged release. `pipx install claude-crew` gives a `crew` command; `pyth
 [0.7.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.6.0...v0.7.0
 [0.7.1]: https://github.com/pranjal-joshi/claude-crew/compare/v0.7.0...v0.7.1
 [0.9.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.8.0...v0.9.0
-[Unreleased]: https://github.com/pranjal-joshi/claude-crew/compare/v0.9.0...HEAD
+[0.10.0]: https://github.com/pranjal-joshi/claude-crew/compare/v0.9.0...v0.10.0
+[Unreleased]: https://github.com/pranjal-joshi/claude-crew/compare/v0.10.0...HEAD

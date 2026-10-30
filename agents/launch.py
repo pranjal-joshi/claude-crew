@@ -10,7 +10,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import presets, procs, toolkit
+from . import engines, presets, procs, toolkit
 from .files import local_mcp_servers, sync_claude_files
 from .procs import CREW_SERVER_RE, IS_WIN, StdinWriter, orphans_to_kill
 from .util import git, write_atomic
@@ -92,6 +92,9 @@ def start(crew, a: dict) -> bool:
                 "call resolve_alert with the same title once it recovers. Not for your own task's normal progress or failures you are fixing. "
                 "When you finish a task, end with a short summary: what you changed, files touched, and anything left open.")
     mode = "acceptEdits" if boss else crew.config["permission_mode"]
+    engine = engines.effective(a)
+    if not engines.session_ok(engine, a["session"]):  # the engine changed: its conversation can't carry over
+        a["session"] = None
     cmd = [*crew.claude, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
            "--permission-mode", mode, "--append-system-prompt", role]
     if boss:  # coordinates, never edits: crew tools and read-only tools only
@@ -99,7 +102,8 @@ def start(crew, a: dict) -> bool:
                 "--disallowedTools", "Edit", "Write", "MultiEdit", "NotebookEdit"]
     elif mode == "bypassPermissions":
         cmd += ["--dangerously-skip-permissions"]
-    else:
+    allowed: list[str] = []
+    if not boss and mode != "bypassPermissions":
         allowed = list(crew.config.get("allowed_tools") or []) + ["mcp__crew"] + crew._once_rules(a)
         if crew.config.get("allow_mcp", True):
             allowed += sorted(crew.mcp_allow)  # e.g. mcp__azure-devops: every tool on that server
@@ -108,8 +112,8 @@ def start(crew, a: dict) -> bool:
     if a["effort"]:
         cmd += ["--effort", a["effort"]]
     a["launched"] = crew._launch_key(a)
-    if a["model"]:
-        cmd += ["--model", a["model"]]
+    if model := (a["model"] if engines.of(a) == "claude" else engines.FALLBACK_MODEL):  # on its fallback: Claude's model
+        cmd += ["--model", model]
     if a["session"]:
         cmd += ["--resume", a["session"]]
     # Same setup as `claude` in a terminal: user-level skills, plugins, MCP servers and claude.ai
@@ -128,6 +132,13 @@ def start(crew, a: dict) -> bool:
     cmd += [f"--mcp-config={f}"]  # "=" form: the flag is variadic and would swallow what follows
     if not boss:
         cmd += toolkit.flags(crew, a)  # [] when it loads everything
+    if engine != "claude":  # OpenCode, through a bridge that speaks Claude Code's stream-json (agents/engines.py)
+        rules = [] if mode == "bypassPermissions" else allowed
+        cmd = engines.command(crew, a, role, mode, rules, servers)
+        if isinstance(cmd, str):
+            a["status"], a["error"] = "error", f"could not start OpenCode: {cmd}"
+            crew.log(a, "error", a["error"])
+            return False
     if boss:  # the boss only needs the crew tools and a few readers: a small context keeps every turn cheap
         cmd += ["--strict-mcp-config", "--disable-slash-commands", "--tools=Read,Grep,Glob,WebSearch,WebFetch,Bash"]
     flags = subprocess.CREATE_NEW_PROCESS_GROUP if IS_WIN else 0
@@ -136,7 +147,7 @@ def start(crew, a: dict) -> bool:
                              text=True, encoding="utf-8", errors="replace", bufsize=1, creationflags=flags,
                              start_new_session=not IS_WIN)
     except OSError as e:
-        a["status"], a["error"] = "error", f"could not start claude: {e}"
+        a["status"], a["error"] = "error", f"could not start {'claude' if engine == 'claude' else 'OpenCode'}: {e}"
         crew.log(a, "error", a["error"])
         return False
     crew.procs[a["key"]] = p
@@ -309,7 +320,8 @@ def launch_key(crew, a: dict) -> tuple:
     # MCP servers found later are allowed from the agent's next start; no restart (that would drop the live context).
     # Rules added from the permission inbox do restart it (the session is kept).
     return (crew.config["permission_mode"], a["model"], a["effort"], tuple(crew.config.get("allowed_tools") or []), tuple(crew._once_rules(a)),
-            json.dumps(a.get("toolkit"), sort_keys=True), a.get("role"), deliverable(a))  # role and deliverable live in the system prompt
+            json.dumps(a.get("toolkit"), sort_keys=True), a.get("role"), deliverable(a),  # role and deliverable live in the system prompt
+            engines.effective(a))
 
 
 def once_rules(crew, a: dict) -> list[str]:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from . import toolkit
+from . import engines, toolkit
 from .util import git
 
 CONTEXTS = ["fresh", "keep"]
@@ -15,7 +15,7 @@ NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,23}")
 RESERVED = {"boss", "you", "anyone", "auto"}
 ICON_RE = re.compile(r"[a-z][a-z0-9-]{0,23}")  # a key from the UI's icon set
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
-CONFIG_KEYS = ("model", "effort", "context", "role", "deliverable", "tags", "icon", "color", "off", "toolkit", "max_parallel")
+CONFIG_KEYS = ("engine", "fallback", "model", "effort", "context", "role", "deliverable", "tags", "icon", "color", "off", "toolkit", "max_parallel")
 PARALLEL_MAX = 8  # tasks one agent may run at once (agents/lanes.py)
 ROLE_MAX = 4000  # an agent role goes into its system prompt: room for a real brief, not a novel
 DELIVERABLE_MAX = 500  # what every reply of the agent is: one line, also repeated on chat follow-ups
@@ -44,6 +44,10 @@ def config_change(key: str, value) -> str:
         return f"up to {value} task{'s' if value != 1 else ''} at once"
     if key == "effort":
         return f"{value or 'default'} effort"
+    if key == "engine":
+        return {"opencode": "runs on OpenCode", "copilot": "runs on GitHub Copilot"}.get(value, "runs on Claude Code")
+    if key == "fallback":
+        return "falls back to Claude Code" if value else "no fallback"
     return f"{key} {value or 'default'}" if key == "context" else (value or "default model")
 
 
@@ -62,6 +66,8 @@ def new_agent(crew, spec: dict) -> dict:
         "max_parallel": clean_parallel(spec.get("max_parallel")) or 1, "role": spec.get("role", ""), "tags": list(spec.get("tags", [])),
         "deliverable": str(spec.get("deliverable") or "").strip()[:DELIVERABLE_MAX],  # "": the preset's, else a generic one
         "model": spec.get("model") or None, "effort": spec.get("effort") or None,
+        "engine": spec.get("engine") if spec.get("engine") in engines.ENGINES[1:] else None,  # None: Claude Code
+        "fallback": spec.get("fallback") if spec.get("fallback") in engines.FALLBACKS else None,
         "icon": spec.get("icon") if ICON_RE.fullmatch(str(spec.get("icon") or "")) else None,
         "color": spec.get("color") if COLOR_RE.fullmatch(str(spec.get("color") or "")) else None,
         "off": bool(spec.get("off")),  # off: takes no new work; a task it is running finishes
@@ -90,16 +96,26 @@ def roster(crew) -> list[dict]:
     """The agents as crew.json keeps them."""
     return [{"name": a["name"], "role": a["role"], "tags": a["tags"], "model": a["model"],
              "effort": a["effort"], "context": a["context"],
-             **{k: a[k] for k in ("deliverable", "icon", "color", "off", "toolkit") if a.get(k)},
+             **{k: a[k] for k in ("engine", "fallback", "deliverable", "icon", "color", "off", "toolkit") if a.get(k)},
              **({"max_parallel": a["max_parallel"]} if a.get("max_parallel", 1) > 1 else {})} for a in crew.agents.values()]
 
 
 def configure(crew, a: dict, p: dict) -> dict | None:
     before = {k: a.get(k) for k in CONFIG_KEYS}
-    if "model" in p:
-        if p["model"] and p["model"] not in MODELS:
-            return {"error": f"unknown model {p['model']}"}
-        a["model"] = p["model"] or None
+    engine = p.get("engine", engines.of(a)) or "claude"
+    if engine not in engines.ENGINES:
+        return {"error": f"unknown engine {engine}"}
+    if "fallback" in p and p["fallback"] and p["fallback"] not in engines.FALLBACKS:
+        return {"error": f"unknown fallback {p['fallback']}"}
+    model = p["model"] if "model" in p else (a["model"] if engine == engines.of(a) else None)  # a new engine: its default model
+    if not engines.model_ok(engine, model, MODELS):
+        return {"error": f"unknown model {model} for {engine}"}
+    a["engine"] = None if engine == "claude" else engine
+    a["model"] = model or None
+    if "fallback" in p:
+        a["fallback"] = p["fallback"] or None
+    if a["engine"] is None:
+        a.pop("on_fallback", None)
     if "effort" in p:
         if p["effort"] and p["effort"] not in EFFORTS:
             return {"error": f"unknown effort {p['effort']}"}
@@ -145,12 +161,13 @@ def add(crew, p: dict) -> dict | None:
         return {"error": f"{name} is reserved"}
     if name.lower() in {n.lower() for n in crew.agents}:  # worktree folders are case-insensitive on Windows
         return {"error": f"{name} already exists"}
-    if p.get("model") and p["model"] not in MODELS or p.get("effort") and p["effort"] not in EFFORTS:
+    engine = p.get("engine") or "claude"
+    if engine not in engines.ENGINES or not engines.model_ok(engine, p.get("model"), MODELS) or p.get("effort") and p["effort"] not in EFFORTS:
         return {"error": "unknown model or effort"}
     crew.agents[name] = new_agent(crew, {"name": name, "role": (p.get("role") or "").strip()[:ROLE_MAX], "deliverable": p.get("deliverable"),
                                          "tags": clean_tags(p.get("tags") or []),
-                                         "model": p.get("model"), "effort": p.get("effort"),
-                                         "icon": p.get("icon"), "color": p.get("color"), "max_parallel": p.get("max_parallel")})
+                                         "model": p.get("model"), "effort": p.get("effort"), "engine": p.get("engine"),
+                                         "fallback": p.get("fallback"), "icon": p.get("icon"), "color": p.get("color"), "max_parallel": p.get("max_parallel")})
     attach_worktree(crew, crew.agents[name])
     crew._save_config()
     crew.event("agent", f"+ {name} joined the crew", name)
@@ -286,11 +303,14 @@ def import_agents(crew, specs, update: bool) -> dict:
         if name.lower() in RESERVED:
             skipped.append({"name": name, "why": "reserved name"})
             continue
-        if spec.get("model") and spec["model"] not in MODELS or spec.get("effort") and spec["effort"] not in EFFORTS:
+        eng = spec.get("engine") or "claude"
+        if eng not in engines.ENGINES or not engines.model_ok(eng, spec.get("model"), MODELS) or spec.get("effort") and spec["effort"] not in EFFORTS:
             skipped.append({"name": name, "why": "unknown model or effort"})
             continue
         fields = {"role": str(spec.get("role") or "").strip()[:ROLE_MAX], "tags": clean_tags(spec.get("tags") or []),
-                  "model": spec.get("model") or None, "effort": spec.get("effort") or None}
+                  "model": spec.get("model") or None, "effort": spec.get("effort") or None,
+                  "engine": None if eng == "claude" else eng,
+                  "fallback": spec.get("fallback") if spec.get("fallback") in engines.FALLBACKS else None}
         for k, rx in (("icon", ICON_RE), ("color", COLOR_RE)):
             fields[k] = spec.get(k) if rx.fullmatch(str(spec.get(k) or "")) else None
         if n := clean_parallel(spec.get("max_parallel")):

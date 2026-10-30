@@ -7,6 +7,7 @@ import json
 import re
 import shutil
 import subprocess
+from pathlib import Path
 from urllib.parse import quote
 
 from . import azure
@@ -17,7 +18,7 @@ from .pipeline import iso_ts
 # ---- PR trigger ----------------------------------------------------------------------------------
 # Each check lists your open (or merged) PRs, read-only, and starts work for the ones that are new. On "raised", a PR Crew
 # already knows is skipped: one it opened, one an agent opened or works on (Crew notes PR links from task text and
-# summaries), and one opened from an agent's branch. Only PRs opened (or merged) after the trigger was count, and each
+# summaries), and one opened from an agent's branch (crew/<lane>, or the branch checked out in a lane's worktree). Only PRs opened (or merged) after the trigger was count, and each
 # one starts once.
 PR_HOSTS = ("github", "ado")
 PR_STATES = ("raised", "merged")
@@ -160,6 +161,28 @@ def norm(url: str) -> str:
     return url.strip().rstrip("/").lower()
 
 
+def worktrees(crew) -> list[str]:
+    """Every lane's worktree folder, never the project's own checkout (its branch is yours). Lock held."""
+    home = str(Path(crew.project).resolve()).lower()
+    return [a["cwd"] for a in crew._all_lanes() if a.get("cwd") and str(Path(a["cwd"]).resolve()).lower() != home]
+
+
+def checked_out(cwds: list[str]) -> set[str]:
+    """The branches checked out in these worktrees now. An agent that opens a PR (the Ship step) does it from a branch it
+    makes in its worktree, not from crew/<lane>, and Crew learns the PR's link only when the agent's turn ends: the PR
+    trigger can see the PR first. Never with the lock held: one git call per worktree."""
+    out = set()
+    for cwd in cwds:
+        try:
+            r = subprocess.run(["git", "-C", cwd, "branch", "--show-current"], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=15, stdin=subprocess.DEVNULL)
+        except (subprocess.TimeoutExpired, OSError):
+            continue
+        if not r.returncode and r.stdout.strip():
+            out.add(r.stdout.strip())
+    return out
+
+
 def crew_prs(crew) -> tuple[set[str], set[str]]:
     """(PR links Crew knows, agent branches). Lock held."""
     links = {norm(u) for t in crew.tasks for u in [t.get("pr"), *(t.get("prs") or [])] if u}
@@ -217,7 +240,11 @@ class Pr(Trigger):
         except (PrError, AzError) as e:
             return {"error": str(e)}
         with crew.lock:
+            cwds = worktrees(crew)
+        live = set() if merged(sp) else checked_out(cwds)
+        with crew.lock:
             links, branches = crew_prs(crew)
+            branches |= live
             since = now()  # a trigger made now starts nothing that already happened
             items = [{"number": x["number"], "title": x["title"], "url": x["url"], "draft": x["draft"],
                       "why": why_not(x, sp, links, branches, since) or (f"news for #{o['id']}" if (o := owned_by(crew, x)) else "would start")}
@@ -262,9 +289,13 @@ class Pr(Trigger):
         try:
             prs = list_prs(crew, sp)
             with crew.lock:
+                cwds = worktrees(crew)
+            live = set() if merged(sp) or not prs else checked_out(cwds)
+            with crew.lock:
                 if tr not in crew.triggers:
                     return
                 links, branches = crew_prs(crew)
+                branches |= live
                 seen = list(tr.get("seen") or [])
                 since = tr.get("created") or 0  # PRs opened (or merged) before the trigger existed never start
                 new = [x for x in prs if x["key"] not in seen and not why_not(x, sp, links, branches, since)]

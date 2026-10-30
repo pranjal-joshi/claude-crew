@@ -43,8 +43,8 @@ def bump(crew, key: str, n: float = 1) -> None:
     d[key] = d.get(key, 0) + n
 
 
-def tokens(crew, agent: str, n: dict) -> None:
-    """Tokens one Claude Code event reported: n has in, cache and out."""
+def tokens(crew, agent: str, n: dict, model: str = "default") -> None:
+    """Tokens one Claude Code (or OpenCode) event reported: n has in, cache and out; model is the one that answered."""
     if getattr(crew, "hist_quiet", False):
         return
     d = _day(crew)
@@ -54,6 +54,10 @@ def tokens(crew, agent: str, n: dict) -> None:
     if total := sum(n.values()):
         by = d.setdefault("by", {})
         by[agent] = by.get(agent, 0) + total
+        m = d.setdefault("models", {}).setdefault(str(model)[:80], {"in": 0, "cache": 0, "out": 0, "agents": {}})
+        for k in ("in", "cache", "out"):
+            m[k] += n.get(k, 0)
+        m["agents"][agent] = m["agents"].get(agent, 0) + total
 
 
 def pr(crew, url: str, raised: bool) -> None:
@@ -167,7 +171,7 @@ def public(crew, days: int = SHOW_DAYS) -> dict:
     days = max(1, min(int(days or SHOW_DAYS), KEEP_DAYS))
     h = crew.hist
     t0 = time.time()
-    out, tot, by = [], {k: 0 for k in (*KEYS, "prs_merged_raised")}, {}
+    out, tot, by, models = [], {k: 0 for k in (*KEYS, "prs_merged_raised")}, {}, {}
     for i in range(days - 1, -1, -1):
         k = day_of(t0 - i * 86400)
         d = h["days"].get(k) or {}
@@ -180,9 +184,20 @@ def public(crew, days: int = SHOW_DAYS) -> dict:
             tot[x] += d.get(x, 0)
         for a, n in row["by"].items():
             by[a] = by.get(a, 0) + n
+        row["models"] = {}
+        for name, m in (d.get("models") or {}).items():
+            row["models"][name] = m["in"] + m["cache"] + m["out"]
+            w = models.setdefault(name, {"model": name, "in": 0, "cache": 0, "out": 0, "agents": {}})
+            for k in ("in", "cache", "out"):
+                w[k] += m[k]
+            for a, n in m["agents"].items():
+                w["agents"][a] = w["agents"].get(a, 0) + n
     tot["cost"] = round(tot["cost"], 4)
     tot["tokens"] = tot["tok_in"] + tot["tok_cache"] + tot["tok_out"]
     prs = h["prs"]
+    by_model = [m | {"tokens": m["in"] + m["cache"] + m["out"], "agents": sorted(m["agents"].items(), key=lambda kv: -kv[1])}
+                for m in models.values()]
     return {"days": out, "totals": tot, "by_agent": sorted(by.items(), key=lambda kv: -kv[1]),
+            "by_model": sorted(by_model, key=lambda m: -m["tokens"]),
             "prs_open": sum(1 for e in prs.values() if e.get("state") == "OPEN" and e.get("raised")),
             "since": h.get("since"), "backfilled": h.get("backfilled")}

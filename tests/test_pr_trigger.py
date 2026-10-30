@@ -59,6 +59,23 @@ class PrTrigger(TempCrewCase):
         self.check(tr)
         self.assertEqual([r["source"]["pr"] for r in self.runs()], ["https://github.com/o/r/pull/4"])
 
+    def test_a_pr_from_a_branch_checked_out_in_a_worktree_is_crews(self):
+        # The Ship step opens its PR from a branch it makes in its worktree, and the trigger can see the PR before the
+        # agent's turn ends and Crew notes the link: that PR is Crew's, not a hand-raised one
+        tr = self.add()
+        self.open = [gh_pr(10, head="pj/ab1-ship"), gh_pr(11, head="pj/by-hand")]
+        with mock.patch.object(pr, "checked_out", lambda cwds: {"pj/ab1-ship"}):
+            self.check(tr)
+        self.assertEqual([r["source"]["pr"] for r in self.runs()], ["https://github.com/o/r/pull/11"])
+
+    def test_the_projects_own_checkout_is_not_a_worktree(self):
+        lane = next(iter(self.crew.agents.values()))
+        old = lane.get("cwd")
+        self.addCleanup(lane.__setitem__, "cwd", old)
+        lane["cwd"] = str(self.crew.project)
+        with self.crew.lock:
+            self.assertNotIn(str(self.crew.project), pr.worktrees(self.crew))
+
     def test_drafts_wait_until_ready(self):
         tr = self.add()
         self.open = [gh_pr(6, draft=True)]

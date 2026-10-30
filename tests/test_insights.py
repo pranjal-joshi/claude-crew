@@ -26,6 +26,23 @@ class InsightsTest(TempCrewCase):
         self.assertEqual(pub["totals"]["cost"], 0.25)
         self.assertEqual(pub["by_agent"], [("builder", 160)])
 
+    def test_tokens_by_model_name_the_agents_that_used_it(self):
+        c = self.crew
+        b, t = c.agents["builder"], c.agents["tester"]
+        b["model"], t["engine"], t["model"] = "opus", "opencode", "opencode/big-pickle"
+        with c.lock:
+            c._on_event(b, {"type": "assistant", "message": {"id": "m1", "model": "claude-opus-5-5", "content": [],
+                                                             "usage": {"input_tokens": 100, "output_tokens": 10}}})
+            c._on_event(t, {"type": "system", "subtype": "init", "model": "opencode/big-pickle"})
+            c._on_event(t, {"type": "assistant", "message": {"id": "m2", "content": [], "usage": {"input_tokens": 300}}})
+            c._on_event(b, {"type": "assistant", "message": {"id": "m3", "model": "opencode/big-pickle", "content": [],
+                                                             "usage": {"cache_read_input_tokens": 40}}})  # a subagent's model
+        pub = ins.public(c, 7)
+        self.assertEqual([(m["model"], m["tokens"], m["agents"]) for m in pub["by_model"]],
+                         [("opencode/big-pickle", 340, [("tester", 300), ("builder", 40)]), ("claude-opus-5-5", 110, [("builder", 110)])])
+        self.assertEqual((pub["by_model"][0]["in"], pub["by_model"][0]["cache"]), (300, 40))
+        self.assertEqual(pub["days"][-1]["models"], {"claude-opus-5-5": 110, "opencode/big-pickle": 340})
+
     def test_a_pr_counts_once_and_its_merge_once(self):
         c = self.crew
         url = "https://github.com/o/r/pull/7"

@@ -2,5 +2,5 @@
 agent's worktree needs (files), self-checks and automatic retries (health), parallel lanes (lanes), which tools each one loads (toolkit), and the built-in presets (presets/). See README.md in this folder."""
 from __future__ import annotations
 
-from . import files, health, lanes, launch, presets, procs, record, toolkit, util  # noqa: F401
+from . import engines, files, health, lanes, launch, presets, procs, record, toolkit, util  # noqa: F401
 from .record import CONTEXTS, EFFORTS, MODELS  # noqa: F401

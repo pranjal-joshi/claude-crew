@@ -16,7 +16,7 @@ import threading
 from . import record
 from .util import git
 
-SYNC = ("role", "deliverable", "tags", "model", "effort", "toolkit", "off", "icon", "color", "max_parallel")  # read from the agent
+SYNC = ("role", "deliverable", "tags", "engine", "fallback", "model", "effort", "toolkit", "off", "icon", "color", "max_parallel")  # read from the agent
 SHARED = ("mcp", "skills", "skill_names", "plugins", "commands")  # what the agent's chip shows; any lane's start updates it
 PARALLEL_MAX = 8
 
